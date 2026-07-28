@@ -1,5 +1,10 @@
 # DevDigest — starter
 
+> **AI Company workflow:** developers and agents must read
+> [`.company/README.md`](.company/README.md) before project work. The registered
+> project ID is `dev-digest`; shared memory and task history live under `.company/`.
+<!-- company-workspace -->
+
 Local-first AI pull-request review. This is the **course starter template**: a
 minimal-but-working tool that does exactly one thing end to end — **import a PR
 and run an agent review on it**. Every later course lesson adds one feature back
