@@ -36,5 +36,10 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   (migration 0010) → `RunStats`/`RunSummary`/`PrMeta.total_cost_usd` contracts
   (both vendored copies) → trace COST tile, timeline `tok · $` line, PR-list
   Cost column; spec in `docs/specs/L01-cost-badge.md`.
+- [2026-07-28] Finding severity breakdown ("the other half of L01") implemented
+  end-to-end: `SeverityCounts` contract (both vendored copies) →
+  `PrMeta.findings` + `RunSummary.severity_counts` computed on read via
+  `rollupSeverities` → PR-list FINDINGS badge column, timeline severity
+  badges, accordion `· N critical · N warning` header text. No schema change.
 
 ## Open Questions

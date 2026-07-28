@@ -2,9 +2,10 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import { Badge, Icon, CircularScore, SeverityBadge, type IconName } from "@devdigest/ui";
+import type { RunSummary, PrCommit, Severity } from "@devdigest/shared";
 import { formatUsd } from "@/lib/format";
+import { FindingsPopover } from "../../../_components/FindingsPopover";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -88,12 +89,15 @@ function tsOf(s: string | null | undefined): number {
 export function RunHistory({
   runs,
   commits = [],
+  prId,
   onOpenTrace,
   onGoToReview,
   onDelete,
 }: {
   runs: RunSummary[];
   commits?: PrCommit[];
+  /** Enables the findings hover card on a run's severity badges. */
+  prId?: string | null;
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
   /** Jump to this run's inline review accordion below (clicking the agent name). */
@@ -101,6 +105,7 @@ export function RunHistory({
   onDelete?: (runId: string) => void;
 }) {
   const t = useTranslations("prReview");
+  const [hoverRunId, setHoverRunId] = React.useState<string | null>(null);
   if (runs.length === 0 && commits.length === 0) return null;
 
   const items: TimelineItem[] = [
@@ -190,9 +195,42 @@ export function RunHistory({
                 </div>
               )}
               {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
-                  {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
+                <div
+                  data-testid={`run-severities:${r.run_id}`}
+                  onMouseEnter={() => setHoverRunId(r.run_id)}
+                  onMouseLeave={() => setHoverRunId((id) => (id === r.run_id ? null : id))}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    position: "relative",
+                    width: "fit-content",
+                  }}
+                >
+                  {r.severity_counts &&
+                  r.severity_counts.critical + r.severity_counts.warning + r.severity_counts.suggestion > 0 ? (
+                    (
+                      [
+                        ["CRITICAL", r.severity_counts.critical],
+                        ["WARNING", r.severity_counts.warning],
+                        ["SUGGESTION", r.severity_counts.suggestion],
+                      ] as [Severity, number][]
+                    )
+                      .filter(([, count]) => count > 0)
+                      .map(([severity, count]) => (
+                        <SeverityBadge key={severity} severity={severity} compact count={count} />
+                      ))
+                  ) : (
+                    <span>{t("runStatus.findings", { count: r.findings_count ?? 0 })}</span>
+                  )}
+                  {(r.blockers ?? 0) > 0 ? (
+                    <span>{t("runStatus.blockers", { count: r.blockers ?? 0 })}</span>
+                  ) : null}
+                  {prId &&
+                    hoverRunId === r.run_id &&
+                    (r.findings_count ?? 0) > 0 && <FindingsPopover prId={prId} runId={r.run_id} />}
                 </div>
               )}
             </div>
