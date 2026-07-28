@@ -1,0 +1,41 @@
+{
+  "workItemId": "TASK-001",
+  "stageId": "01-qa-engineer",
+  "assignee": "qa-engineer",
+  "executionMode": "native-subagent",
+  "vendor": "claude",
+  "authType": "subscription",
+  "requestedModelTier": "mid",
+  "verificationProfile": "smoke",
+  "objective": "Independently smoke-verify that the uncommitted dev-digest .company/ scaffolding and pointer doc edits are safe and correctly scoped for commit.",
+  "contextFiles": [
+    ".company/tasks/active/TASK-001/work-item.json"
+  ],
+  "projectId": "dev-digest",
+  "targetBaseCommit": "66727c85ce06d7b16e64f888925d131d558cbe51",
+  "projectContext": {
+    "projectId": "dev-digest",
+    "query": "company workspace scaffolding commit .company memory tasks",
+    "indexCommit": "66727c85ce06d7b16e64f888925d131d558cbe51",
+    "sourceFingerprint": "sha256:29809161a8654154572f7d726435f8255bfa261a94e54623ff4411de25849c6c",
+    "relevantFiles": [],
+    "symbols": [],
+    "connections": [],
+    "note": "Index covers product source only; this infra scope is verified against the Git diff directly."
+  },
+  "upstreamInputs": [],
+  "acceptanceCriteria": [
+    "Uncommitted change scope in the target is exactly: .company/ (untracked), AGENTS.md (untracked), CLAUDE.md (untracked), README.md (modified) — nothing else",
+    ".company/index/ is git-ignored: git check-ignore .company/index/ succeeds and no index file would be staged by adding .company/",
+    "No secrets, credentials, tokens, or machine-absolute paths (e.g. /Users/...) in .company/ tracked-to-be content, AGENTS.md, CLAUDE.md, or the README.md diff",
+    "README.md diff is additive (company-pointer section) with no removal of existing course content",
+    "scripts/company-map validate dev-digest exits 0 with valid=true and zero errors"
+  ],
+  "constraints": [
+    "Smoke profile: run the listed checks; do not create throwaway tests or extra probes without evidence the profile is insufficient",
+    "Read-only with respect to the target worktree: do not edit, stage, commit, or push anything",
+    "Never push to or modify the upstream course repo remote"
+  ],
+  "deliverables": ["structured QA report with verdict"],
+  "reportPath": "reports/01-qa-engineer.json"
+}

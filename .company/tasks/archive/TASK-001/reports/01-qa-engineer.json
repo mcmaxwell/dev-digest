@@ -1,0 +1,109 @@
+{
+  "workItemId": "TASK-001",
+  "stageId": "01-qa-engineer",
+  "agent": "qa-engineer",
+  "status": "completed",
+  "verdict": "approved",
+  "vendor": "claude",
+  "authType": "subscription",
+  "planLabel": "max",
+  "executionPlan": "Ran the five smoke-profile checks from the stage contract directly against the dev-digest worktree: git status/diff scope check, check-ignore + dry-run add for .company/index/, secret/absolute-path grep across all would-be-committed content, README.md diff inspection, and company-map validate.",
+  "actualModel": "claude-sonnet-5",
+  "summary": "Independently verified the uncommitted dev-digest .company/ scaffolding, AGENTS.md, CLAUDE.md, and README.md pointer edits: change scope is exactly as claimed, .company/index/ is properly git-ignored and excluded from staging, no secrets/credentials/tokens or machine-absolute paths exist in committable content, the README diff is purely additive, and company-map validate passes clean.",
+  "filesChanged": [],
+  "targetEvidence": {
+    "projectId": "dev-digest",
+    "targetBaseCommit": "66727c85ce06d7b16e64f888925d131d558cbe51",
+    "targetResultCommit": null,
+    "targetDiffFiles": [".company/", "AGENTS.md", "CLAUDE.md", "README.md"],
+    "projectContextUsed": false
+  },
+  "testsRun": [
+    {
+      "command": "git status --porcelain (target worktree)",
+      "exitCode": 0,
+      "result": "4 entries: M README.md, ?? .company/, ?? AGENTS.md, ?? CLAUDE.md",
+      "evidence": " M README.md\n?? .company/\n?? AGENTS.md\n?? CLAUDE.md"
+    },
+    {
+      "command": "git rev-parse HEAD (target worktree)",
+      "exitCode": 0,
+      "result": "HEAD matches targetBaseCommit",
+      "evidence": "66727c85ce06d7b16e64f888925d131d558cbe51"
+    },
+    {
+      "command": "git check-ignore -v .company/index/ (target worktree)",
+      "exitCode": 0,
+      "result": "path is ignored via .company/.gitignore",
+      "evidence": ".company/.gitignore:1:index/\t.company/index/"
+    },
+    {
+      "command": "git add --dry-run .company/ AGENTS.md CLAUDE.md README.md (target worktree)",
+      "exitCode": 0,
+      "result": "17 files staged, none under .company/index/",
+      "evidence": "add 'README.md'\nadd '.company/README.md'\nadd '.company/costs/ledger.jsonl'\nadd '.company/memory/conventions.md'\n...\nadd '.company/tasks/board.md'\nadd 'AGENTS.md'\nadd 'CLAUDE.md'"
+    },
+    {
+      "command": "grep -rn '/Users/' <committable .company files> AGENTS.md CLAUDE.md",
+      "exitCode": 0,
+      "result": "only self-referential mention inside the stage contract's own acceptance-criteria text (example pattern, not a real path); no actual absolute path present",
+      "evidence": ".company/tasks/active/TASK-001/01-qa-engineer.json:30:    \"No secrets, credentials, tokens, or machine-absolute paths (e.g. /Users/...) in .company/ tracked-to-be content...\""
+    },
+    {
+      "command": "git diff README.md | grep -niE '/Users/|api[_-]?key|secret|password|token|credential' (target worktree)",
+      "exitCode": 1,
+      "result": "no matches (grep exit 1 = clean)",
+      "evidence": "(no output)"
+    },
+    {
+      "command": "grep -rniE 'api[_-]?key|secret|password|token|credential|-----BEGIN|ghp_|sk-[a-zA-Z0-9]' <committable .company files> AGENTS.md CLAUDE.md",
+      "exitCode": 0,
+      "result": "only prose mentions instructing not to store secrets/credentials, and the literal string 'tokenRange' in estimatedUsage (a numeric range field, not a token value); no actual secret/credential/token values present",
+      "evidence": ".company/README.md:46:- Never store secrets, credentials, raw auth output, or machine-absolute paths here."
+    },
+    {
+      "command": "git diff README.md (target worktree)",
+      "exitCode": 0,
+      "result": "5-line hunk added at top of file; zero removed lines; existing course content untouched",
+      "evidence": "+> **AI Company workflow:** developers and agents must read\n+[`.company/README.md`](.company/README.md) before project work...\n+<!-- company-workspace -->"
+    },
+    {
+      "command": "scripts/company-map validate dev-digest (controller repo)",
+      "exitCode": 0,
+      "result": "valid=true, zero errors",
+      "evidence": "{\n  \"projectId\": \"dev-digest\",\n  \"valid\": true,\n  \"errors\": []\n}"
+    }
+  ],
+  "criteria": [
+    {
+      "criterion": "Uncommitted change scope in the target is exactly: .company/ (untracked), AGENTS.md (untracked), CLAUDE.md (untracked), README.md (modified) — nothing else",
+      "status": "passed",
+      "evidence": "git status --porcelain output shows exactly these 4 entries, no more, no less"
+    },
+    {
+      "criterion": ".company/index/ is git-ignored: git check-ignore .company/index/ succeeds and no index file would be staged by adding .company/",
+      "status": "passed",
+      "evidence": "check-ignore exit 0 (matched .company/.gitignore:1:index/); dry-run add of .company/ lists 15 .company/-scoped files, none under .company/index/; git status --ignored confirms '! .company/index/'"
+    },
+    {
+      "criterion": "No secrets, credentials, tokens, or machine-absolute paths (e.g. /Users/...) in .company/ tracked-to-be content, AGENTS.md, CLAUDE.md, or the README.md diff",
+      "status": "passed",
+      "evidence": "Targeted greps for /Users/ and secret/credential/token/password patterns across all committable files and the README diff returned no real matches — only prose describing the rule itself (e.g. '.company/README.md:46: Never store secrets...') and the JSON field name 'tokenRange' (a numeric estimate range, not a token value)"
+    },
+    {
+      "criterion": "README.md diff is additive (company-pointer section) with no removal of existing course content",
+      "status": "passed",
+      "evidence": "git diff README.md shows a single 5-line addition (+ lines only) before the existing course intro; no '-' lines in the diff"
+    },
+    {
+      "criterion": "scripts/company-map validate dev-digest exits 0 with valid=true and zero errors",
+      "status": "passed",
+      "evidence": "Command exited 0 twice (reproducible) with {\"projectId\": \"dev-digest\", \"valid\": true, \"errors\": []}"
+    }
+  ],
+  "assumptions": [],
+  "questions": [],
+  "decisionsProposed": [],
+  "lessonsProposed": [],
+  "selfUsage": {"filesRead": 9, "approxLinesRead": 450, "approxLinesWritten": 0, "retries": 0}
+}
