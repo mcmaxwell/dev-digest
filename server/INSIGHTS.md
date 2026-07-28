@@ -15,6 +15,9 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   — users read this as "list shows 0 but inside I have several". List rollups
   must use the same population as the detail view
   (`src/modules/pulls/routes.ts` findings breakdown).
+  - [2026-07-28] Same divergence existed for the SCORE ring; fixed via
+    `worstLatestScoreByPr` (`src/modules/pulls/status.ts`) — worst score among
+    each agent's latest review, unit-tested in `test/pulls-status.test.ts`.
 
 ## Codebase Patterns
 

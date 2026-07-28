@@ -7,7 +7,7 @@ import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { deriveReviewStatus, rollupSeverities } from './status.js';
+import { deriveReviewStatus, rollupSeverities, worstLatestScoreByPr } from './status.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -111,25 +111,27 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest-review SCORE + FINDINGS severity breakdown per PR. Computed on
-    // read from reviews (no FK denorm); the list is small, so IN-queries + JS
-    // grouping are cheap.
+    // SCORE + FINDINGS severity breakdown per PR. Computed on read from
+    // reviews (no FK denorm); the list is small, so IN-queries + JS grouping
+    // are cheap. Score = the WORST score among each agent's latest review
+    // (worstLatestScoreByPr) — showing only the newest review's score would
+    // let a clean run from one agent mask another agent's failing review.
     const prIds = rows.map((r) => r.id);
-    const latestReviewByPr = new Map<string, { id: string; score: number | null }>();
     const reviewIdToPr = new Map<string, string>();
+    let scoreByPr = new Map<string, number | null>();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ id: t.reviews.id, prId: t.reviews.prId, score: t.reviews.score })
+        .select({
+          id: t.reviews.id,
+          prId: t.reviews.prId,
+          agentId: t.reviews.agentId,
+          score: t.reviews.score,
+        })
         .from(t.reviews)
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
-      // Rows are newest-first → first seen per PR is the latest review.
-      for (const rv of reviewRows) {
-        reviewIdToPr.set(rv.id, rv.prId);
-        if (!latestReviewByPr.has(rv.prId)) {
-          latestReviewByPr.set(rv.prId, { id: rv.id, score: rv.score });
-        }
-      }
+      for (const rv of reviewRows) reviewIdToPr.set(rv.id, rv.prId);
+      scoreByPr = worstLatestScoreByPr(reviewRows);
     }
 
     // Findings severity breakdown for the list's FINDINGS badges — aggregated
@@ -171,7 +173,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
 
     const now = Date.now();
     return rows.map((r) => {
-      const review = latestReviewByPr.get(r.id);
+      const reviewed = scoreByPr.has(r.id); // ≥1 persisted review, scored or not
       return {
         id: r.id,
         number: r.number,
@@ -192,9 +194,9 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         }),
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
-        score: review ? review.score : null,
+        score: scoreByPr.get(r.id) ?? null,
         total_cost_usd: costByPr.get(r.id) ?? null,
-        findings: review ? rollupSeverities(severityRowsByPr.get(r.id) ?? []) : null,
+        findings: reviewed ? rollupSeverities(severityRowsByPr.get(r.id) ?? []) : null,
       };
     });
   });

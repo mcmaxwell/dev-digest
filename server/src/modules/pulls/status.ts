@@ -25,6 +25,39 @@ export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
 }
 
 /**
+ * PR-list SCORE: take each agent's LATEST review, return the WORST (lowest)
+ * score per PR — a failing Security review must not be hidden behind a later
+ * clean run from another agent. `rows` MUST be newest-first (the route orders
+ * by created_at desc). A review whose agent was deleted (agentId null) still
+ * counts as its own "agent" (keyed by review id). Latest reviews without a
+ * score are skipped; a PR whose latest reviews are all score-less maps to null
+ * (reviewed, no score) — PRs with no reviews are absent from the map.
+ */
+export function worstLatestScoreByPr(
+  rows: { id: string; prId: string; agentId: string | null; score: number | null }[],
+): Map<string, number | null> {
+  const seenAgents = new Map<string, Set<string>>();
+  const worst = new Map<string, number | null>();
+  for (const rv of rows) {
+    const agentKey = rv.agentId ?? `review:${rv.id}`;
+    let seen = seenAgents.get(rv.prId);
+    if (!seen) {
+      seen = new Set();
+      seenAgents.set(rv.prId, seen);
+    }
+    if (seen.has(agentKey)) continue; // an older review of this agent — superseded
+    seen.add(agentKey);
+    const current = worst.get(rv.prId);
+    if (rv.score == null) {
+      if (!worst.has(rv.prId)) worst.set(rv.prId, null);
+    } else {
+      worst.set(rv.prId, current == null ? rv.score : Math.min(current, rv.score));
+    }
+  }
+  return worst;
+}
+
+/**
  * Review-freshness status for the PR list. Merged/closed PRs keep their GitHub
  * merge state; open PRs map to:
  *  - `needs_review` — never reviewed, OR head moved since the last review

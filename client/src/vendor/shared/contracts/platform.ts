@@ -169,7 +169,9 @@ export const PrMeta = z.object({
   status: PrStatus,
   opened_at: z.string().nullish(),
   updated_at: z.string().nullish(),
-  // Latest-review score (list endpoint only; null/absent until reviewed).
+  // Worst (lowest) score among each agent's latest review (list endpoint
+  // only; null/absent until reviewed) — one agent's newer clean run must not
+  // hide another agent's failing review.
   score: z.number().int().nullish(),
   // Total USD spend: sum of all agent runs' cost on this PR (list endpoint
   // only; null/absent until a run with known pricing completes).
