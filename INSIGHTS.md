@@ -19,6 +19,22 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## Recurring Errors & Fixes
 
+- [2026-07-28] On this machine the default shell Node is v17 (nvm), so every
+  `pnpm` command fails with "requires at least Node.js v18.12" — prefix
+  non-interactive shells with
+  `export PATH="$HOME/.nvm/versions/node/v22.18.0/bin:$PATH"` (repo needs
+  Node ≥ 22).
+- [2026-07-28] `./scripts/e2e.sh` failing every flow with
+  `spawn agent-browser ENOENT` means the one-time global setup is missing:
+  `npm i -g agent-browser && agent-browser install` (plus `pnpm install` in
+  `e2e/` — the packages have separate lockfiles, installing server/client does
+  NOT install e2e).
+
 ## Session Notes
+
+- [2026-07-28] L01 run-cost implemented end-to-end: `agent_runs.cost_usd`
+  (migration 0010) → `RunStats`/`RunSummary`/`PrMeta.total_cost_usd` contracts
+  (both vendored copies) → trace COST tile, timeline `tok · $` line, PR-list
+  Cost column; spec in `docs/specs/L01-cost-badge.md`.
 
 ## Open Questions
