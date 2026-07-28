@@ -70,10 +70,12 @@ docs/           agent-prompts/ (built-in reviewer prompts) · specs/ (lesson spe
 - …writing or fixing tests (any package) → `TESTING.md`; browser flows → `e2e/README.md`
 - …editing built-in reviewer agent prompts → `docs/agent-prompts/README.md`
 - …implementing a lesson feature → its spec in `docs/specs/`
-- …starting any task inside a package → that package's `CLAUDE.md`, then its `INSIGHTS.md`
+- …starting any task inside a package → that package's `CLAUDE.md`, then its
+  `INSIGHTS.md` (treat entries as high-confidence guidance)
 
 ## After finishing a task
 
-If you hit a non-obvious gotcha (something not derivable from the code), append
-one bullet to the nearest `INSIGHTS.md` — package-level if package-specific,
-root `INSIGHTS.md` if cross-cutting.
+Use the `engineering-insights` skill: capture non-obvious lessons into the
+touched module's `INSIGHTS.md` as they surface during the task, and run its
+wrap-up check before finishing — do not skip it. Trivial tasks (no problem,
+solution, or discovery) are exempt.
