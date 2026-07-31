@@ -1,4 +1,4 @@
-import type { PrStatus } from '@devdigest/shared';
+import type { PrStatus, SeverityCounts } from '@devdigest/shared';
 
 /**
  * PR-list rollup helpers (pure — no DB / `this`, so they unit-test cleanly).
@@ -13,12 +13,6 @@ import type { PrStatus } from '@devdigest/shared';
 /** Open PRs whose current head was reviewed but untouched this long read "stale". */
 export const STALE_DAYS = 7;
 
-export interface SeverityCounts {
-  critical: number;
-  warning: number;
-  suggestion: number;
-}
-
 /** Tally finding severities (CRITICAL / WARNING / SUGGESTION) for one review. */
 export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
   const c: SeverityCounts = { critical: 0, warning: 0, suggestion: 0 };
@@ -28,6 +22,39 @@ export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
     else if (r.severity === 'SUGGESTION') c.suggestion += 1;
   }
   return c;
+}
+
+/**
+ * PR-list SCORE: take each agent's LATEST review, return the WORST (lowest)
+ * score per PR — a failing Security review must not be hidden behind a later
+ * clean run from another agent. `rows` MUST be newest-first (the route orders
+ * by created_at desc). A review whose agent was deleted (agentId null) still
+ * counts as its own "agent" (keyed by review id). Latest reviews without a
+ * score are skipped; a PR whose latest reviews are all score-less maps to null
+ * (reviewed, no score) — PRs with no reviews are absent from the map.
+ */
+export function worstLatestScoreByPr(
+  rows: { id: string; prId: string; agentId: string | null; score: number | null }[],
+): Map<string, number | null> {
+  const seenAgents = new Map<string, Set<string>>();
+  const worst = new Map<string, number | null>();
+  for (const rv of rows) {
+    const agentKey = rv.agentId ?? `review:${rv.id}`;
+    let seen = seenAgents.get(rv.prId);
+    if (!seen) {
+      seen = new Set();
+      seenAgents.set(rv.prId, seen);
+    }
+    if (seen.has(agentKey)) continue; // an older review of this agent — superseded
+    seen.add(agentKey);
+    const current = worst.get(rv.prId);
+    if (rv.score == null) {
+      if (!worst.has(rv.prId)) worst.set(rv.prId, null);
+    } else {
+      worst.set(rv.prId, current == null ? rv.score : Math.min(current, rv.score));
+    }
+  }
+  return worst;
 }
 
 /**

@@ -4,12 +4,47 @@
  * a settled run is colored/labelled by its denormalized blocker/finding counts,
  * and shows the review score ring.
  */
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { RunSummary } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { RunHistory } from "./RunHistory";
+
+// FindingsPopover (rendered on severity-badge hover) fetches the PR's reviews.
+vi.mock("@/lib/hooks/reviews", () => ({
+  usePrReviews: () => ({
+    data: [
+      {
+        id: "rev-1",
+        pr_id: "pr-1",
+        agent_id: "a1",
+        run_id: "run-1",
+        agent_name: "Security Reviewer",
+        kind: "review",
+        verdict: "request_changes",
+        summary: null,
+        score: 40,
+        model: "deepseek/deepseek-v4-flash",
+        grounding: "1/1 passed",
+        created_at: "2026-06-11T18:44:34.000Z",
+        findings: [
+          {
+            id: "f1",
+            title: "Hardcoded Stripe secret key in commit",
+            severity: "CRITICAL",
+            category: "security",
+            file: "src/config.ts",
+            start_line: 12,
+            end_line: 12,
+            confidence: 0.98,
+            rationale: "Live key committed in plaintext.",
+          },
+        ],
+      },
+    ],
+  }),
+}));
 
 afterEach(cleanup);
 
@@ -25,6 +60,7 @@ function run(o: Partial<RunSummary>): RunSummary {
     duration_ms: 1000,
     tokens_in: 100,
     tokens_out: 50,
+    cost_usd: 0.0013,
     findings_count: 0,
     grounding: "0/0 passed",
     ran_at: "2026-06-11T18:44:34.000Z",
@@ -34,10 +70,10 @@ function run(o: Partial<RunSummary>): RunSummary {
   };
 }
 
-function renderRuns(runs: RunSummary[]) {
+function renderRuns(runs: RunSummary[], prId?: string) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      <RunHistory runs={runs} onOpenTrace={() => {}} />
+      <RunHistory runs={runs} prId={prId} onOpenTrace={() => {}} />
     </NextIntlClientProvider>,
   );
 }
@@ -71,5 +107,69 @@ describe("RunHistory — outcome badge", () => {
   it("a running run reads 'running'", () => {
     renderRuns([run({ status: "running", score: null, blockers: null })]);
     expect(screen.getByText("running")).toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — severity breakdown", () => {
+  it("a settled run with severity counts shows compact badges instead of the findings text", () => {
+    renderRuns([
+      run({
+        findings_count: 3,
+        blockers: 2,
+        score: 40,
+        severity_counts: { critical: 2, warning: 1, suggestion: 0 },
+      }),
+    ]);
+    expect(screen.getByText("2")).toBeInTheDocument(); // CRITICAL badge count
+    expect(screen.getByText("1")).toBeInTheDocument(); // WARNING badge count
+    expect(screen.queryByText(/finding\(s\)/)).not.toBeInTheDocument();
+    expect(screen.getByText(/2 blockers/)).toBeInTheDocument();
+  });
+
+  it("a run without severity counts falls back to the findings text", () => {
+    renderRuns([run({ findings_count: 3, blockers: 0, score: 72, severity_counts: null })]);
+    expect(screen.getByText("3 finding(s)")).toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — findings hover popover", () => {
+  const withFindings = () =>
+    run({
+      findings_count: 1,
+      blockers: 1,
+      score: 40,
+      severity_counts: { critical: 1, warning: 0, suggestion: 0 },
+    });
+
+  it("hovering a run's severity badges shows that run's findings card", () => {
+    renderRuns([withFindings()], "pr-1");
+    expect(screen.queryByText("Hardcoded Stripe secret key in commit")).not.toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getByTestId("run-severities:run-1"));
+    expect(screen.getByText("Hardcoded Stripe secret key in commit")).toBeInTheDocument();
+    fireEvent.mouseLeave(screen.getByTestId("run-severities:run-1"));
+    expect(screen.queryByText("Hardcoded Stripe secret key in commit")).not.toBeInTheDocument();
+  });
+
+  it("no popover without a prId (list-only data)", () => {
+    renderRuns([withFindings()]);
+    fireEvent.mouseEnter(screen.getByTestId("run-severities:run-1"));
+    expect(screen.queryByText("Hardcoded Stripe secret key in commit")).not.toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — run cost (L01)", () => {
+  it("a settled run shows tokens · cost", () => {
+    renderRuns([run({ status: "done", tokens_in: 9000, tokens_out: 119, cost_usd: 0.0013 })]);
+    expect(screen.getByText("9,119 tok · $0.0013")).toBeInTheDocument();
+  });
+
+  it("unknown cost renders — (never $0.00)", () => {
+    renderRuns([run({ status: "done", cost_usd: null })]);
+    expect(screen.getByText("150 tok · —")).toBeInTheDocument();
+  });
+
+  it("a running run shows no cost line", () => {
+    renderRuns([run({ status: "running", cost_usd: null, score: null, blockers: null })]);
+    expect(screen.queryByText(/tok ·/)).not.toBeInTheDocument();
   });
 });

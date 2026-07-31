@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, sum } from 'drizzle-orm';
 import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { deriveReviewStatus } from './status.js';
+import { deriveReviewStatus, rollupSeverities, worstLatestScoreByPr } from './status.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -111,27 +111,69 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest-review SCORE per PR for the list's score ring. Computed on read
-    // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // SCORE + FINDINGS severity breakdown per PR. Computed on read from
+    // reviews (no FK denorm); the list is small, so IN-queries + JS grouping
+    // are cheap. Score = the WORST score among each agent's latest review
+    // (worstLatestScoreByPr) — showing only the newest review's score would
+    // let a clean run from one agent mask another agent's failing review.
     const prIds = rows.map((r) => r.id);
-    const latestReviewByPr = new Map<string, { score: number | null }>();
+    const reviewIdToPr = new Map<string, string>();
+    let scoreByPr = new Map<string, number | null>();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ prId: t.reviews.prId, score: t.reviews.score })
+        .select({
+          id: t.reviews.id,
+          prId: t.reviews.prId,
+          agentId: t.reviews.agentId,
+          score: t.reviews.score,
+        })
         .from(t.reviews)
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
-      // Rows are newest-first → first seen per PR is the latest review.
-      for (const rv of reviewRows) {
-        if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { score: rv.score });
+      for (const rv of reviewRows) reviewIdToPr.set(rv.id, rv.prId);
+      scoreByPr = worstLatestScoreByPr(reviewRows);
+    }
+
+    // Findings severity breakdown for the list's FINDINGS badges — aggregated
+    // across ALL of the PR's reviews, matching the detail page (which lists
+    // every run's findings; the latest run alone can be clean while older runs
+    // hold findings). Only never-reviewed PRs get findings: null; all-zero
+    // counts mean "reviewed clean".
+    const severityRowsByPr = new Map<string, { severity: string }[]>();
+    if (reviewIdToPr.size > 0) {
+      const findingRows = await container.db
+        .select({ reviewId: t.findings.reviewId, severity: t.findings.severity })
+        .from(t.findings)
+        .where(inArray(t.findings.reviewId, [...reviewIdToPr.keys()]));
+      for (const f of findingRows) {
+        const prId = reviewIdToPr.get(f.reviewId)!;
+        const list = severityRowsByPr.get(prId) ?? [];
+        list.push(f);
+        severityRowsByPr.set(prId, list);
+      }
+    }
+
+    // Total spend per PR for the list's COST column: sum of cost_usd across ALL
+    // agent runs (not just the latest — re-reviews accumulate). Runs with
+    // unknown pricing (cost_usd NULL) are skipped; a PR with no priced runs is
+    // absent from the map → total_cost_usd null → the UI renders "—".
+    const costByPr = new Map<string, number>();
+    if (prIds.length > 0) {
+      const costRows = await container.db
+        .select({ prId: t.agentRuns.prId, total: sum(t.agentRuns.costUsd) })
+        .from(t.agentRuns)
+        .where(and(inArray(t.agentRuns.prId, prIds), isNotNull(t.agentRuns.costUsd)))
+        .groupBy(t.agentRuns.prId);
+      for (const row of costRows) {
+        // Drizzle's sum() returns a string (SQL numeric); prId is non-null here
+        // thanks to the inArray filter.
+        if (row.prId != null && row.total != null) costByPr.set(row.prId, Number(row.total));
       }
     }
 
     const now = Date.now();
     return rows.map((r) => {
-      const review = latestReviewByPr.get(r.id);
+      const reviewed = scoreByPr.has(r.id); // ≥1 persisted review, scored or not
       return {
         id: r.id,
         number: r.number,
@@ -152,7 +194,9 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         }),
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
-        score: review ? review.score : null,
+        score: scoreByPr.get(r.id) ?? null,
+        total_cost_usd: costByPr.get(r.id) ?? null,
+        findings: reviewed ? rollupSeverities(severityRowsByPr.get(r.id) ?? []) : null,
       };
     });
   });

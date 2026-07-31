@@ -6,7 +6,12 @@
  * + age, so it gets unit coverage independent of the route's queries.
  */
 import { describe, it, expect } from 'vitest';
-import { deriveReviewStatus, rollupSeverities, STALE_DAYS } from '../src/modules/pulls/status.js';
+import {
+  deriveReviewStatus,
+  rollupSeverities,
+  worstLatestScoreByPr,
+  STALE_DAYS,
+} from '../src/modules/pulls/status.js';
 
 const DAY = 86_400_000;
 const now = Date.UTC(2026, 5, 11);
@@ -64,5 +69,53 @@ describe('rollupSeverities', () => {
 
   it('is all-zero for no findings', () => {
     expect(rollupSeverities([])).toEqual({ critical: 0, warning: 0, suggestion: 0 });
+  });
+});
+
+describe('worstLatestScoreByPr', () => {
+  // Rows are newest-first, matching the route's ORDER BY created_at DESC.
+  it('multi-agent: the worst latest score wins — a newer clean run does not mask a failing agent', () => {
+    const scores = worstLatestScoreByPr([
+      { id: 'r3', prId: 'pr1', agentId: 'perf', score: 90 }, // newest overall
+      { id: 'r2', prId: 'pr1', agentId: 'sec', score: 38 },
+      { id: 'r1', prId: 'pr1', agentId: 'general', score: 64 },
+    ]);
+    expect(scores.get('pr1')).toBe(38);
+  });
+
+  it("an agent's older reviews are superseded by its latest", () => {
+    const scores = worstLatestScoreByPr([
+      { id: 'r2', prId: 'pr1', agentId: 'sec', score: 85 }, // sec re-reviewed, now clean
+      { id: 'r1', prId: 'pr1', agentId: 'sec', score: 10 }, // superseded — ignored
+    ]);
+    expect(scores.get('pr1')).toBe(85);
+  });
+
+  it('deleted-agent reviews (agentId null) each count as their own agent', () => {
+    const scores = worstLatestScoreByPr([
+      { id: 'r2', prId: 'pr1', agentId: null, score: 70 },
+      { id: 'r1', prId: 'pr1', agentId: null, score: 30 }, // NOT superseded by r2
+    ]);
+    expect(scores.get('pr1')).toBe(30);
+  });
+
+  it('score-less latest reviews are skipped; all score-less → null; no reviews → absent', () => {
+    const scores = worstLatestScoreByPr([
+      { id: 'r2', prId: 'pr1', agentId: 'sec', score: null },
+      { id: 'r1', prId: 'pr1', agentId: 'perf', score: 55 },
+      { id: 'r3', prId: 'pr2', agentId: 'sec', score: null },
+    ]);
+    expect(scores.get('pr1')).toBe(55);
+    expect(scores.get('pr2')).toBeNull(); // reviewed, but no score to show
+    expect(scores.has('pr3')).toBe(false); // never reviewed
+  });
+
+  it('groups PRs independently', () => {
+    const scores = worstLatestScoreByPr([
+      { id: 'r2', prId: 'pr1', agentId: 'sec', score: 40 },
+      { id: 'r1', prId: 'pr2', agentId: 'sec', score: 95 },
+    ]);
+    expect(scores.get('pr1')).toBe(40);
+    expect(scores.get('pr2')).toBe(95);
   });
 });

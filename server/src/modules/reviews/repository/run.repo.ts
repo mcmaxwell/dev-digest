@@ -1,7 +1,8 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
-import type { RunSummary, RunTrace } from '@devdigest/shared';
+import type { RunSummary, RunTrace, SeverityCounts } from '@devdigest/shared';
+import { rollupSeverities } from '../../pulls/status.js';
 
 // ---- in-flight / history --------------------------------------------------
 
@@ -48,6 +49,38 @@ export async function listRunsForPull(
     .leftJoin(t.agents, eq(t.agents.id, t.agentRuns.agentId))
     .where(and(eq(t.agentRuns.workspaceId, workspaceId), eq(t.agentRuns.prId, prId)))
     .orderBy(desc(t.agentRuns.ranAt));
+
+  // Per-severity finding counts for the timeline's severity badges.
+  // `reviews.run_id` links each run to the review it produced; runs without a
+  // review (failed/cancelled) stay null, a clean review yields all-zero counts.
+  const severityByRun = new Map<string, SeverityCounts>();
+  const reviewRows = await db
+    .select({ id: t.reviews.id, runId: t.reviews.runId })
+    .from(t.reviews)
+    .where(
+      and(
+        eq(t.reviews.workspaceId, workspaceId),
+        eq(t.reviews.prId, prId),
+        eq(t.reviews.kind, 'review'),
+        isNotNull(t.reviews.runId),
+      ),
+    );
+  if (reviewRows.length > 0) {
+    const findingRows = await db
+      .select({ reviewId: t.findings.reviewId, severity: t.findings.severity })
+      .from(t.findings)
+      .where(inArray(t.findings.reviewId, reviewRows.map((rv) => rv.id)));
+    const grouped = new Map<string, { severity: string }[]>();
+    for (const f of findingRows) {
+      const list = grouped.get(f.reviewId) ?? [];
+      list.push(f);
+      grouped.set(f.reviewId, list);
+    }
+    for (const rv of reviewRows) {
+      severityByRun.set(rv.runId!, rollupSeverities(grouped.get(rv.id) ?? []));
+    }
+  }
+
   return rows.map(({ run, agentName }) => ({
     run_id: run.id,
     agent_id: run.agentId,
@@ -59,7 +92,9 @@ export async function listRunsForPull(
     duration_ms: run.durationMs,
     tokens_in: run.tokensIn,
     tokens_out: run.tokensOut,
+    cost_usd: run.costUsd,
     findings_count: run.findingsCount,
+    severity_counts: severityByRun.get(run.id) ?? null,
     grounding: run.grounding,
     ran_at: run.ranAt ? run.ranAt.toISOString() : null,
     score: run.score,
@@ -146,6 +181,8 @@ export async function completeAgentRun(
     durationMs: number;
     tokensIn: number;
     tokensOut: number;
+    /** USD cost of the run's LLM calls; null when pricing is unknown. */
+    costUsd: number | null;
     findingsCount: number;
     grounding: string;
     /** Review score (0-100); null on failed/cancelled runs. */
@@ -163,6 +200,7 @@ export async function completeAgentRun(
       durationMs: values.durationMs,
       tokensIn: values.tokensIn,
       tokensOut: values.tokensOut,
+      costUsd: values.costUsd,
       findingsCount: values.findingsCount,
       grounding: values.grounding,
       score: values.score ?? null,

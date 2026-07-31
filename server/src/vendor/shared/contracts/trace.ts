@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SeverityCounts } from './findings.js';
 
 /**
  * Run trace. The ENTIRE trace of one run is persisted as a SINGLE
@@ -62,6 +63,8 @@ export const RunStats = z.object({
   duration_ms: z.number().int(),
   tokens_in: z.number().int(),
   tokens_out: z.number().int(),
+  // USD cost of the run's LLM calls; null when pricing is unknown.
+  cost_usd: z.number().nullable(),
   findings: z.number().int(),
   grounding: z.string(),
 });
@@ -102,7 +105,12 @@ export const RunSummary = z.object({
   duration_ms: z.number().int().nullable(),
   tokens_in: z.number().int().nullable(),
   tokens_out: z.number().int().nullable(),
+  // USD cost of the run; null on failed/cancelled runs or unknown pricing.
+  cost_usd: z.number().nullable(),
   findings_count: z.number().int().nullable(),
+  // Per-severity breakdown of the run's review findings; null when the run
+  // produced no review (failed/cancelled) or predates severity rollups.
+  severity_counts: SeverityCounts.nullish(),
   grounding: z.string().nullable(),
   ran_at: z.string().nullable(),
   // Review outcome, denormalized onto the run row at completion (the timeline

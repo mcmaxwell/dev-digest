@@ -54,6 +54,13 @@ export function ReviewRunAccordion({
   const del = useDeleteReview(prId);
   const findings = review.findings;
   const blockers = findings.filter((f) => f.severity === "CRITICAL" && !f.dismissed_at).length;
+  // Severity breakdown for the header, e.g. "2 critical · 1 warning" (zero
+  // counts omitted; empty string when the review has no findings).
+  const severitySummary = (["CRITICAL", "WARNING", "SUGGESTION"] as const)
+    .map((sev) => [sev, findings.filter((f) => f.severity === sev).length] as const)
+    .filter(([, count]) => count > 0)
+    .map(([sev, count]) => `${count} ${sev.toLowerCase()}`)
+    .join(" · ");
   const verdictColor = review.verdict ? VERDICT_COLOR[review.verdict] ?? "var(--text-muted)" : "var(--text-muted)";
 
   return (
@@ -95,6 +102,7 @@ export function ReviewRunAccordion({
         )}
         <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
           {findings.length} finding{findings.length === 1 ? "" : "s"}
+          {severitySummary ? ` · ${severitySummary}` : ""}
           {blockers > 0 ? ` · ${blockers} blocker${blockers === 1 ? "" : "s"}` : ""}
         </span>
         <span style={{ flex: 1 }} />
