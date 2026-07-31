@@ -61,7 +61,7 @@ so the next session in that module starts with its lessons, not from zero.
 
 1. **Anti-banality**: if it would be obvious to anyone reading the code — don't write it.
 2. **5-minute test**: would this save 5+ minutes next session?
-3. **Not derivable**: not in the code, README, or CLAUDE.md; not generic best practice.
+3. **Not derivable**: not in the code, README, or AGENTS.md; not generic best practice.
 4. **Stable**: not about code actively churning in this very session.
 
 If an entry can't be made that specific yet, hold it in Open Questions instead.
