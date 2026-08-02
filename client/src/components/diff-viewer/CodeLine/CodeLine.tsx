@@ -3,11 +3,11 @@
 "use client";
 
 import React from "react";
-import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
-import { type Line } from "../helpers";
-import { s, lineRowFor, lineSignFor } from "../styles";
-import { CommentThreadView } from "../CommentThreadView";
-import { InlineComposer } from "../InlineComposer";
+import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "@/components/diff-viewer/comments";
+import { type Line } from "@/components/diff-viewer/helpers";
+import { s, lineRowFor, lineSignFor } from "@/components/diff-viewer/styles";
+import { CommentThreadView } from "@/components/diff-viewer/CommentThreadView";
+import { InlineComposer } from "@/components/diff-viewer/InlineComposer";
 
 export function CodeLine({
   ln,

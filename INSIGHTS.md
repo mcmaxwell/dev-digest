@@ -17,6 +17,14 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## Tool & Library Notes
 
+- [2026-07-31] `Finding` in `contracts/findings.ts` doubles as the LLM
+  structured-output schema, so it must stay a FLAT `z.object` — a
+  `z.discriminatedUnion` would emit a `oneOf` JSON Schema that models handle far
+  worse. Cross-field rules go in `superRefine` instead (`refineTrifecta`), which
+  costs at most one reprompt (`completeStructured` feeds the issues back).
+  Anything that needs `.extend()` builds on `FindingShape` and re-applies the
+  refinement, because `.superRefine()` returns a `ZodEffects` with no `.extend`.
+
 ## Recurring Errors & Fixes
 
 - [2026-07-28] On this machine the default shell Node is v17 (nvm), so every

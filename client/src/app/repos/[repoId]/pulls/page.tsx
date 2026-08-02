@@ -11,10 +11,10 @@ import {
   ErrorState,
   AutoTriggerStatus,
 } from "@devdigest/ui";
-import { AppShell } from "@/components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
 import { usePulls, useRefreshRepo } from "@/lib/hooks";
 import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
+import { useSetCrumb } from "@/lib/shell-crumb";
 import { ApiError } from "@/lib/api";
 import { COLUMN_KEYS, SKELETON_ROWS } from "./constants";
 import { s } from "./styles";
@@ -60,17 +60,15 @@ export default function PullsPage() {
   const openCount = (pulls ?? []).filter((p) => OPEN_STATUSES.has(p.status)).length;
   const needsReviewCount = (pulls ?? []).filter((p) => p.status === "needs_review").length;
 
+  useSetCrumb([{ label: repoName, mono: true }, { label: t("list.breadcrumb") }]);
+
   // Stale/unknown :repoId → friendly empty state instead of a 404 error.
   if (repoNotFound) {
-    return (
-      <AppShell crumb={[{ label: repoName, mono: true }, { label: t("list.breadcrumb") }]}>
-        <RepoNotFound />
-      </AppShell>
-    );
+    return <RepoNotFound />;
   }
 
   return (
-    <AppShell crumb={[{ label: repoName, mono: true }, { label: t("list.breadcrumb") }]}>
+    <>
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.pageTitle}>{t("list.title")}</h1>
@@ -130,6 +128,6 @@ export default function PullsPage() {
           filtered.map((pr) => <PRRow key={pr.number} pr={pr} repoId={repoId} />)
         )}
       </div>
-    </AppShell>
+    </>
   );
 }

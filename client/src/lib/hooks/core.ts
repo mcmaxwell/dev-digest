@@ -5,7 +5,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api";
+import { api } from "@/lib/api";
 import type {
   Settings,
   SettingsUpdate,
@@ -17,7 +17,7 @@ import type {
   PrDetail,
   SpecFile,
   IndexStatus,
-} from "../types";
+} from "@/lib/types";
 
 // ---- Settings (F1: GET/PUT /settings, POST /settings/test-connection) ----
 export function useSettings() {
@@ -116,6 +116,22 @@ export function usePullDetail(prId: string | number | null | undefined) {
     queryKey: ["pull", prId],
     queryFn: () => api.get<PrDetail>(`/pulls/${prId}`),
     enabled: prId != null,
+  });
+}
+
+/**
+ * PR detail addressed the way the route is — repo + PR number. Use this on the
+ * PR page instead of waiting for the PR LIST to resolve the number into a uuid;
+ * that dependency made every deep link and refresh a two-request waterfall.
+ */
+export function usePullDetailByNumber(
+  repoId: string | null | undefined,
+  number: number | null | undefined,
+) {
+  return useQuery({
+    queryKey: ["pull-by-number", repoId, number],
+    queryFn: () => api.get<PrDetail>(`/repos/${repoId}/pulls/${number}`),
+    enabled: !!repoId && number != null,
   });
 }
 

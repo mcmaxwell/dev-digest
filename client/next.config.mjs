@@ -5,9 +5,9 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  env: {
-    NEXT_PUBLIC_API_BASE: process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3001",
-  },
+  // NEXT_PUBLIC_* env vars are inlined automatically by Next — no `env` block
+  // needed here. src/lib/api.ts:5-6 is the single source of truth for the
+  // localhost:3001 fallback when the var isn't set.
 };
 
 export default withNextIntl(nextConfig);

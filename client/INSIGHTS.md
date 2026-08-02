@@ -7,7 +7,44 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## What Works
 
+- [2026-07-31] To fix a `useState(agent.x)` derived-state-from-props reset
+  effect (stale-frame flash on prop-id change), prefer `key={agent.id}` at the
+  call site over an effect that re-syncs every field — see
+  `AgentEditor.tsx` → `<ConfigTab key={agent.id} .../>` and the deleted reset
+  effect in `ConfigTab.tsx`. Remount replaces N `useEffect(() => setX(...), [id])`
+  lines with one prop.
+- [2026-07-31] Hoisting `AppShell` (nav/shortcuts/command-palette) out of a
+  page and into a segment `layout.tsx` works, but the layout can't read the
+  page's `crumb` prop directly — bridge it with a small client context
+  (`src/lib/shell-crumb.tsx`: `CrumbProvider` + `useSetCrumb`). The layout
+  renders `<AppShell crumb={ctx.crumb}>`, pages call `useSetCrumb(crumb)`
+  instead of rendering `<AppShell>` themselves. Wired for
+  `repos/[repoId]/pulls/`, `agents/`, `settings/` (each got its own
+  `layout.tsx` using the shared `ShellLayout` component in
+  `components/app-shell/`) — `/` (home) and `/onboarding` were NOT hoisted
+  since they sit as siblings directly under `src/app/`, so a root layout would
+  wrap onboarding too; that needs route groups (not done — bigger/riskier
+  diff for a nav-remount perf nit).
+
 ## What Doesn't Work
+
+- [2026-07-31] Don't reuse `AppShell`/`AppFrame` itself as a root `<Suspense>`
+  fallback. `AppFrame` requires `ShellContext` from `Providers`
+  (Theme/Repo/QueryClient), and a Suspense fallback renders in place of — not
+  nested inside — the tree that suspended, so `Providers` isn't mounted yet
+  either. Build a fully static, provider-free approximation instead (see
+  `AppShellSkeleton.tsx`: hardcoded sidebar/topbar dimensions, no data).
+
+- [2026-07-31] Anything the ROOT `layout.tsx` reaches WITHOUT crossing a
+  `"use client"` boundary is evaluated during SSR for every route — so a
+  server-rendered Suspense fallback must import nothing heavy. Importing the
+  `@devdigest/ui` barrel from `AppShellSkeleton.tsx` dragged in
+  `vendor/ui/charts/LineChart.tsx` (recharts, not RSC-safe) and every page 500'd
+  with `TypeError: Super expression must either be null or a function`. Keep
+  that component's markup inline (inline SVG instead of `<Icon.*>`, plain divs
+  instead of `<Skeleton>`). NOTE: `pnpm build` did NOT catch this — only
+  `./scripts/e2e.sh` (real dev server) did, so run e2e after touching the root
+  layout or anything it imports.
 
 ## Codebase Patterns
 
@@ -18,7 +55,50 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Tool & Library Notes
 
+- [2026-07-31] Every route under `src/app` is a whole-page `"use client"`
+  component reading `useSearchParams` directly (no per-hook Suspense
+  boundaries), so Next 15 requires a Suspense boundary somewhere above all of
+  them — the app satisfies this with ONE boundary at the root
+  (`layout.tsx`, wrapping `<Providers>{children}</Providers>`). Consequence:
+  whichever fallback that boundary has is the SSR'd HTML for literally every
+  route's first paint (it was `fallback={null}` → every route shipped
+  completely blank HTML pre-hydration). If you add a genuinely new
+  `useSearchParams` usage, it's still covered by this same boundary — no new
+  Suspense needed unless you want a *narrower* fallback for just that route.
+- [2026-07-31] `next/font/google`'s generated `.className` (e.g.
+  `inter.className` applied to `<body>`) wins over `vendor/ui/styles.css`'s
+  `body { font-family: "Inter", ... }` element selector purely on CSS
+  specificity (class > element) — safe to layer `next/font` on top of that
+  vendored rule without editing vendor/ui; no need to match variable names.
+
+- [2026-07-31] `eslint-config-next@15` still ships `@rushstack/eslint-patch`,
+  which throws `Failed to patch ESLint because the calling module was not
+  recognized` under ESLint 9 flat config — so `eslint.config.mjs` here does NOT
+  extend it. Boundaries + `react-hooks` are configured directly against
+  `typescript-eslint`'s parser; Next's own checks come from `next build`.
+- [2026-07-31] The feature-isolation lint rule must distinguish a SIBLING
+  feature's `_components` (forbidden) from an ANCESTOR segment's (the
+  sanctioned way to share, e.g. `RunHistory.tsx` → `../../../_components/
+  FindingsPopover`). A glob can't tell them apart because `*` also matches
+  `..`; `no-restricted-imports` with a `regex` pattern
+  (`(^|/)(?!\.\.?/)[^/]+/_components/`) can — it only fires when a NAMED
+  segment precedes `_components`. Corollary: never rewrite an intra-`src/app`
+  relative import to the `@/` alias, since `@/app/…/_components/…` then reads
+  as a sibling import and trips the rule.
+
 ## Recurring Errors & Fixes
+
+- [2026-07-31] A `useRef` flag that's set `true` on one condition and read
+  (but never reset) on another, inside a `useEffect` keyed on a prop callback,
+  causes a call-storm if that callback prop is an unmemoized inline arrow from
+  the parent: the effect re-fires on every parent re-render (new callback
+  identity) and, since the ref is still `true`, calls the callback again —
+  which (if the callback invalidates queries / triggers state) causes the very
+  re-render that produces the next new identity. Fix at both ends: reset the
+  ref inside the branch that consumes it (`RunStatus.tsx`'s `wasRunning.current
+  = false` right before calling `onDone()`), AND wrap the callback in
+  `useCallback` at its source (`page.tsx`'s `handleRunDone`). Either alone is a
+  partial fix; both together close it for good.
 
 ## Session Notes
 

@@ -108,6 +108,11 @@
     "emptyAllBody": "No open PRs found for this repo yet. Refresh to sync from GitHub.",
     "emptyStatusBody": "No PRs with status “{status}”."
   },
+  "detail": {
+    "loadErrorTitle": "Couldn’t load this pull request",
+    "loadErrorBody": "PR #{number} could not be loaded.",
+    "confirmDeleteRun": "Delete this run from history? (its logs are removed too)"
+  },
   "timeline": {
     "goToReview": "Jump to this run’s findings below",
     "openTrace": "Open run trace & logs",

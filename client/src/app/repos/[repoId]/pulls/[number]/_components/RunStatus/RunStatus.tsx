@@ -5,7 +5,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { LiveLogStream, type LogLine } from "@devdigest/ui";
-import { useRunEvents } from "../../../../../../../lib/hooks/reviews";
+import { useRunEvents } from "@/lib/hooks/reviews";
 import { LOG_HEIGHT } from "./constants";
 import { s } from "./styles";
 
@@ -22,7 +22,14 @@ export function RunStatus({
 
   React.useEffect(() => {
     if (running) wasRunning.current = true;
-    if (!running && wasRunning.current) onDone?.();
+    if (!running && wasRunning.current) {
+      // Reset immediately — otherwise an unstable `onDone` identity (a fresh
+      // inline callback from the parent) re-fires this effect on every parent
+      // re-render, calling onDone() again and re-triggering the very
+      // invalidations that caused the re-render (invalidation storm).
+      wasRunning.current = false;
+      onDone?.();
+    }
   }, [running, onDone]);
 
   if (runIds.length === 0) return null;

@@ -4,8 +4,8 @@
 
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, API_BASE } from "../api";
-import { notify } from "../toast";
+import { api, API_BASE } from "@/lib/api";
+import { notify } from "@/lib/toast";
 import type {
   FindingActionKind,
   PrReviewComment,
@@ -14,6 +14,14 @@ import type {
   RunEvent,
   RunSummary,
 } from "@devdigest/shared";
+
+// ---- Query-key factory — the single source of truth for these keys. Import
+// this instead of hand-writing ["pr-active-runs", prId] / ["pr-runs", prId]
+// elsewhere, or the two copies will silently drift. ----
+export const reviewsKeys = {
+  activeRuns: (prId: string | null | undefined) => ["pr-active-runs", prId] as const,
+  runs: (prId: string | null | undefined) => ["pr-runs", prId] as const,
+};
 
 // ---- Active (in-flight) runs — server-side source of truth ----
 export interface ActiveRun {
@@ -27,7 +35,7 @@ export interface ActiveRun {
    Survives reloads/devices; polls while anything is running so it self-clears. */
 export function usePrActiveRuns(prId: string | null | undefined) {
   return useQuery({
-    queryKey: ["pr-active-runs", prId],
+    queryKey: reviewsKeys.activeRuns(prId),
     queryFn: () => api.get<ActiveRun[]>(`/pulls/${prId}/runs/active`),
     enabled: !!prId,
     refetchInterval: (query) => ((query.state.data?.length ?? 0) > 0 ? 4000 : false),
@@ -39,12 +47,30 @@ export function usePrActiveRuns(prId: string | null | undefined) {
    reload (DB-backed). Polls while anything is running so it self-updates. */
 export function usePrRuns(prId: string | null | undefined) {
   return useQuery({
-    queryKey: ["pr-runs", prId],
+    queryKey: reviewsKeys.runs(prId),
     queryFn: () => api.get<RunSummary[]>(`/pulls/${prId}/runs`),
     enabled: !!prId,
     refetchInterval: (query) =>
       (query.state.data ?? []).some((r) => r.status === "running") ? 4000 : false,
   });
+}
+
+/** Invalidate the active-runs poll for a PR (e.g. right after a run is kicked
+   off, so the "Live review" section appears without waiting for the next poll). */
+export function useInvalidateActiveRuns(prId: string | null | undefined) {
+  const qc = useQueryClient();
+  return React.useCallback(() => {
+    if (prId) qc.invalidateQueries({ queryKey: reviewsKeys.activeRuns(prId) });
+  }, [qc, prId]);
+}
+
+/** Invalidate the full run-history list for a PR (e.g. once a run settles, so
+   a just-failed run shows up in "Run history" immediately — no page reload). */
+export function useInvalidateRunHistory(prId: string | null | undefined) {
+  const qc = useQueryClient();
+  return React.useCallback(() => {
+    if (prId) qc.invalidateQueries({ queryKey: reviewsKeys.runs(prId) });
+  }, [qc, prId]);
 }
 
 // ---- Persisted reviews + findings for a PR ----
