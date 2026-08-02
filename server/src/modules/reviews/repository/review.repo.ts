@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { Db } from '../../../db/client.js';
+import type { Db, DbOrTx } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { Finding } from '@devdigest/shared';
 import type { FindingRow, PullRow } from '../../../db/rows.js';
@@ -9,7 +9,7 @@ export type ReviewRow = typeof t.reviews.$inferSelect;
 // ---- reviews + findings ---------------------------------------------------
 
 export async function insertReview(
-  db: Db,
+  db: DbOrTx,
   values: {
     workspaceId: string;
     prId: string;
@@ -27,7 +27,7 @@ export async function insertReview(
 }
 
 export async function insertFindings(
-  db: Db,
+  db: DbOrTx,
   reviewId: string,
   findings: Finding[],
 ): Promise<FindingRow[]> {
@@ -76,6 +76,42 @@ export async function reviewsForPull(
 export async function getReview(db: Db, reviewId: string): Promise<ReviewRow | undefined> {
   const [row] = await db.select().from(t.reviews).where(eq(t.reviews.id, reviewId));
   return row;
+}
+
+// ---- PR-list aggregates ---------------------------------------------------
+// The pulls module renders SCORE + FINDINGS badges per PR but must not query
+// `reviews`/`findings` itself, so the read lives here and is reached through
+// `container.reviewRepo`.
+
+/** Scoring inputs for a batch of PRs, NEWEST FIRST (worstLatestScoreByPr relies
+ *  on that order). Only `kind='review'` rows count — summaries would skew it. */
+export async function reviewSummariesForPulls(
+  db: Db,
+  prIds: string[],
+): Promise<{ id: string; prId: string; agentId: string | null; score: number | null }[]> {
+  if (prIds.length === 0) return [];
+  return db
+    .select({
+      id: t.reviews.id,
+      prId: t.reviews.prId,
+      agentId: t.reviews.agentId,
+      score: t.reviews.score,
+    })
+    .from(t.reviews)
+    .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
+    .orderBy(desc(t.reviews.createdAt));
+}
+
+/** Raw severities for a batch of reviews — the caller groups + rolls them up. */
+export async function findingSeveritiesForReviews(
+  db: Db,
+  reviewIds: string[],
+): Promise<{ reviewId: string; severity: string }[]> {
+  if (reviewIds.length === 0) return [];
+  return db
+    .select({ reviewId: t.findings.reviewId, severity: t.findings.severity })
+    .from(t.findings)
+    .where(inArray(t.findings.reviewId, reviewIds));
 }
 
 /** Delete a whole review (one agent's run) + its findings (cascade), scoped

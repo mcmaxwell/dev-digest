@@ -7,55 +7,72 @@
 
 import React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Skeleton, ErrorState } from "@devdigest/ui";
-import { AppShell } from "../../../../../components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
+import { useSetCrumb } from "@/lib/shell-crumb";
 import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
-import { usePullDetail, usePulls } from "../../../../../lib/hooks";
-import { useQueryClient } from "@tanstack/react-query";
-import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } from "../../../../../lib/hooks/reviews";
-import { useActiveRepo, useRepoNotFound } from "../../../../../lib/repo-context";
-import { ApiError } from "../../../../../lib/api";
-import { githubPrUrl } from "../../../../../lib/github-urls";
+import { usePullDetailByNumber } from "@/lib/hooks";
+import {
+  usePrReviews,
+  useCancelRun,
+  usePrActiveRuns,
+  usePrRuns,
+  useDeleteRun,
+  useInvalidateActiveRuns,
+  useInvalidateRunHistory,
+} from "@/lib/hooks/reviews";
+import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
+import { ApiError } from "@/lib/api";
+import { githubPrUrl } from "@/lib/github-urls";
 import type { FindingRecord } from "@devdigest/shared";
 
 export default function PRDetailPage() {
+  const t = useTranslations("prReview");
   const params = useParams<{ repoId: string; number: string }>();
   const search = useSearchParams();
   const router = useRouter();
   const { repoId, number } = params;
   const { activeRepo } = useActiveRepo();
   const repoNotFound = useRepoNotFound(repoId);
-  // The route is keyed by PR number, but every PR API is keyed by the row's
-  // uuid — resolve number → uuid via the (cached) pulls list before fetching.
-  const { data: pulls, isLoading: pullsLoading } = usePulls(repoId);
-  const prId = pulls?.find((p) => p.number === Number(number))?.id ?? null;
-  const { data: pr, isLoading: detailLoading, isError, error, refetch } = usePullDetail(prId);
-
-  const isLoading = pullsLoading || (prId != null && detailLoading);
+  // The route is keyed by PR number and so is this fetch — the detail endpoint
+  // resolves number → row server-side. Going through the PR LIST to find the
+  // uuid first made every deep link and refresh a two-request waterfall.
+  const {
+    data: pr,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = usePullDetailByNumber(repoId, Number(number));
+  // The uuid the rest of the PR APIs are keyed by, straight off the detail.
+  const prId = pr?.id ?? null;
   const { data: reviews, refetch: refetchReviews } = usePrReviews(prId);
 
   // Live run tracking is SERVER-SOURCED (agent_runs status='running'): survives
   // navigation AND reload, and self-clears via polling when runs finish.
-  const qc = useQueryClient();
   const { data: activeRuns } = usePrActiveRuns(prId);
   const { data: prRuns } = usePrRuns(prId);
   const deleteRun = useDeleteRun(prId);
   const liveRunIds = (activeRuns ?? []).map((r) => r.run_id);
   const reviewRunning = liveRunIds.length > 0;
   const cancel = useCancelRun();
-  const invalidateActiveRuns = () => {
-    if (prId) qc.invalidateQueries({ queryKey: ["pr-active-runs", prId] });
-  };
+  const invalidateActiveRuns = useInvalidateActiveRuns(prId);
   // When a run settles (done OR failed) refresh the full run history too, so a
   // just-failed run shows up in "Run history" immediately — no page reload.
-  const invalidateRunHistory = () => {
-    if (prId) qc.invalidateQueries({ queryKey: ["pr-runs", prId] });
-  };
+  const invalidateRunHistory = useInvalidateRunHistory(prId);
+  // Stable identity: RunStatus's effect depends on `onDone` and only re-fires
+  // it when `running` flips, but an inline arrow here would get a fresh
+  // identity on every render — see RunStatus.tsx for the fallout that causes.
+  const handleRunDone = React.useCallback(() => {
+    invalidateActiveRuns();
+    invalidateRunHistory();
+    refetchReviews();
+  }, [invalidateActiveRuns, invalidateRunHistory, refetchReviews]);
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
@@ -68,10 +85,10 @@ export default function PRDetailPage() {
   const setTab = (t: string) => setParam("tab", t);
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
-  const runs = reviews ?? [];
+  const runs = React.useMemo(() => reviews ?? [], [reviews]);
   const allFindings: FindingRecord[] = React.useMemo(
     () => runs.flatMap((r) => r.findings),
-    [reviews],
+    [runs],
   );
   const lethalTrifecta = allFindings.filter((f) => f.kind === "lethal_trifecta");
   const findingsCount = allFindings.length;
@@ -82,46 +99,39 @@ export default function PRDetailPage() {
   const repoFullName = activeRepo?.full_name ?? null;
   const crumb = [
     { label: repoName, mono: true, href: `/repos/${repoId}/pulls` },
-    { label: "Pull Requests", href: `/repos/${repoId}/pulls` },
+    { label: t("list.breadcrumb"), href: `/repos/${repoId}/pulls` },
     { label: `#${number}`, mono: true },
   ];
+  useSetCrumb(crumb);
 
   // Stale/unknown :repoId → friendly empty state instead of a 404 error.
   if (repoNotFound) {
-    return (
-      <AppShell crumb={crumb}>
-        <RepoNotFound />
-      </AppShell>
-    );
+    return <RepoNotFound />;
   }
 
   if (isLoading) {
     return (
-      <AppShell crumb={crumb}>
-        <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 16, maxWidth: 1080, margin: "0 auto" }}>
-          <Skeleton height={28} width={420} />
-          <Skeleton height={16} width={300} />
-          <Skeleton height={200} />
-        </div>
-      </AppShell>
+      <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 16, maxWidth: 1080, margin: "0 auto" }}>
+        <Skeleton height={28} width={420} />
+        <Skeleton height={16} width={300} />
+        <Skeleton height={200} />
+      </div>
     );
   }
 
   if (isError || !pr) {
     return (
-      <AppShell crumb={crumb}>
-        <ErrorState
-          fullScreen
-          title="Couldn't load this pull request"
-          body={error instanceof ApiError ? error.message : `PR #${number} could not be loaded.`}
-          onRetry={() => refetch()}
-        />
-      </AppShell>
+      <ErrorState
+        fullScreen
+        title={t("detail.loadErrorTitle")}
+        body={error instanceof ApiError ? error.message : t("detail.loadErrorBody", { number })}
+        onRetry={() => refetch()}
+      />
     );
   }
 
   return (
-    <AppShell crumb={crumb}>
+    <>
       <PrDetailHeader
         pr={pr}
         prId={prId}
@@ -130,7 +140,7 @@ export default function PRDetailPage() {
         githubUrl={repoFullName ? githubPrUrl(repoFullName, pr.number) : null}
         onSetTab={setTab}
         onRunStart={() => setTab("findings")}
-        onRunsStarted={() => invalidateActiveRuns()}
+        onRunsStarted={invalidateActiveRuns}
       />
 
       <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
@@ -150,14 +160,9 @@ export default function PRDetailPage() {
             cancelMutation={cancel}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {
-              if (window.confirm("Delete this run from history? (its logs are removed too)"))
-                deleteRun.mutate(id);
+              if (window.confirm(t("detail.confirmDeleteRun"))) deleteRun.mutate(id);
             }}
-            onRunDone={() => {
-              invalidateActiveRuns();
-              invalidateRunHistory();
-              refetchReviews();
-            }}
+            onRunDone={handleRunDone}
           />
         )}
 
@@ -180,6 +185,6 @@ export default function PRDetailPage() {
           onClose={() => setParam("trace", null)}
         />
       )}
-    </AppShell>
+    </>
   );
 }

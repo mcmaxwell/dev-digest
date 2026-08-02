@@ -6,7 +6,10 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
+  API_CONTRACT_REVIEWER_PROMPT,
 } from './seed-prompts.js';
+import { SEED_SKILLS, SEED_AGENT_SKILLS } from './seed-skills.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -18,11 +21,13 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the three built-in agents (General + Security +
- * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
+ * with a few findings, the five built-in agents (General + Security +
+ * Performance + Test Quality + API Contract), all on the default
+ * openrouter/deepseek-v4-flash provider+model, and the built-in skills
+ * (seed-skills.ts) linked to their agents (L02).
  *
- * Course lessons populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * Course lessons populate the remaining tables (conventions, memory, eval, …)
+ * once their features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -211,6 +216,28 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description: 'Checks test quality: uncovered branches, missing corner cases, over-mocking, flakes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
+    {
+      workspaceId,
+      name: 'API Contract Reviewer',
+      description: 'Flags breaking changes to routes, schemas, and caller-visible payloads.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: API_CONTRACT_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -218,6 +245,53 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- built-in skills + agent links (L02) ----
+  // Skill bodies live in ./seed-skills.ts. Links use onConflictDoNothing so a
+  // re-seed never stomps a user's reordering of an existing link.
+  const skillIdByName = new Map<string, string>();
+  for (const s of SEED_SKILLS) {
+    let [existing] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, s.name)));
+    if (!existing) {
+      [existing] = await db
+        .insert(t.skills)
+        .values({
+          workspaceId,
+          name: s.name,
+          description: s.description,
+          type: s.type,
+          source: 'manual',
+          body: s.body,
+          enabled: true,
+          version: 1,
+        })
+        .returning();
+      await db
+        .insert(t.skillVersions)
+        .values({ skillId: existing!.id, version: 1, body: s.body })
+        .onConflictDoNothing();
+    }
+    skillIdByName.set(s.name, existing!.id);
+  }
+
+  for (const [agentName, skillNames] of Object.entries(SEED_AGENT_SKILLS)) {
+    const [agent] = await db
+      .select()
+      .from(t.agents)
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, agentName)));
+    if (!agent) continue;
+    for (const [i, skillName] of skillNames.entries()) {
+      const skillId = skillIdByName.get(skillName);
+      if (!skillId) continue;
+      await db
+        .insert(t.agentSkills)
+        .values({ agentId: agent.id, skillId, order: i })
+        .onConflictDoNothing();
+    }
   }
 
   return { workspaceId, userId };

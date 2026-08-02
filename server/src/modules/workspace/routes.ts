@@ -1,6 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import { eq } from 'drizzle-orm';
-import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 
 /**
@@ -8,17 +6,15 @@ import { getContext } from '../_shared/context.js';
  *   GET /workspace        → workspace info + cloneDir + cloned repos summary
  *
  * Cleanup/re-pull of individual repos is handled by the repos module
- * (refresh/delete); this surface gives the UI an overview.
+ * (refresh/delete); this surface gives the UI an overview. The repo rows come
+ * from `container.reposRepo` — the repos module owns that table.
  */
 export default async function workspaceRoutes(app: FastifyInstance) {
   const { container } = app;
 
   app.get('/workspace', async (req) => {
     const { workspaceId } = await getContext(container, req);
-    const repos = await container.db
-      .select()
-      .from(t.repos)
-      .where(eq(t.repos.workspaceId, workspaceId));
+    const repos = await container.reposRepo.list(workspaceId);
     return {
       workspaceId,
       cloneDir: container.config.cloneDir,

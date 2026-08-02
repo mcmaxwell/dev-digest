@@ -6,7 +6,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon, Card, Avatar, Markdown } from "@devdigest/ui";
 import type { PrReviewComment } from "@/lib/types";
-import { cs } from "../comments";
+import { cs } from "@/components/diff-viewer/comments";
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);

@@ -46,4 +46,8 @@ jobs:
 
       - run: pnpm typecheck
 
+      # Architecture boundaries (feature isolation, layer direction, no cycles)
+      # + react-hooks correctness — see eslint.config.mjs.
+      - run: pnpm lint
+
       - run: pnpm test

@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
 import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
+import { reviewPullRequest, countBlockers, wrapUntrusted } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -184,6 +184,11 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // L02 — linked skills. Enabled linked skills (in link order) become the
+      // prompt's `## Skills / rules` blocks; a globally-disabled skill is
+      // skipped for every agent without unlinking it.
+      const skillBlocks = await this.buildSkillBlocks(agent.id, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -196,6 +201,8 @@ export class ReviewRunExecutor {
         // Per-agent review strategy (configured in the Agent editor); falls back
         // to the studio default. single-pass = whole diff in one call.
         strategy: agent.strategy ?? REVIEW_STRATEGY,
+        // L02 — resolved skill bodies; assemblePrompt omits the section when empty.
+        ...(skillBlocks.length > 0 ? { skills: skillBlocks } : {}),
         // T1.3 — pass the callers digest only when we built one. assemblePrompt
         // omits the section when this is empty/undefined.
         ...(callersDigest ? { callers: callersDigest } : {}),
@@ -215,44 +222,54 @@ export class ReviewRunExecutor {
 
       const keptFindings = outcome.review.findings;
 
-      // ---- Persist review + findings ----------------------------------------
-      const review = await this.repo.insertReview({
-        workspaceId,
-        prId: pull.id,
-        agentId: agent.id,
-        runId,
-        kind: 'review',
-        verdict: outcome.review.verdict,
-        summary: outcome.review.summary,
-        score: outcome.review.score,
-        model: agent.model,
-      });
-      const findingRows = await this.repo.insertFindings(review.id, keptFindings);
-      runLog.result(`Persisted review ${review.id} with ${findingRows.length} finding(s)`);
-
-      // Mark the commit this review ran against so the PR list can tell
-      // reviewed / needs-review (head moved) / stale apart.
-      await this.repo.markReviewed(pull.id, pull.headSha);
-
       const durationMs = Date.now() - start;
 
       // Deterministic blocker count (severity ≥ the agent's gate) — the signal
       // the timeline colors on, NOT the model's self-reported verdict.
       const blockers = countBlockers(keptFindings, agent.ciFailOn);
 
-      // ---- Observability: agent_runs + ONE run_traces document --------------
-      await this.repo.completeAgentRun(runId, {
-        status: 'done',
-        durationMs,
-        tokensIn,
-        tokensOut,
-        costUsd,
-        findingsCount: findingRows.length,
-        grounding,
-        score: outcome.review.score,
-        blockers,
-        error: null,
+      // ---- Persist the whole outcome ATOMICALLY -----------------------------
+      // review + findings + the reviewed-SHA marker + the run's completion are
+      // ONE unit: a crash between them would otherwise leave a review with no
+      // findings, or a PR marked reviewed for a run still stuck in `running`.
+      const { review, findingRows } = await this.repo.transaction(async (tx) => {
+        const review = await this.repo.insertReview(
+          {
+            workspaceId,
+            prId: pull.id,
+            agentId: agent.id,
+            runId,
+            kind: 'review',
+            verdict: outcome.review.verdict,
+            summary: outcome.review.summary,
+            score: outcome.review.score,
+            model: agent.model,
+          },
+          tx,
+        );
+        const findingRows = await this.repo.insertFindings(review.id, keptFindings, tx);
+        // Mark the commit this review ran against so the PR list can tell
+        // reviewed / needs-review (head moved) / stale apart.
+        await this.repo.markReviewed(pull.id, pull.headSha, tx);
+        await this.repo.completeAgentRun(
+          runId,
+          {
+            status: 'done',
+            durationMs,
+            tokensIn,
+            tokensOut,
+            costUsd,
+            findingsCount: findingRows.length,
+            grounding,
+            score: outcome.review.score,
+            blockers,
+            error: null,
+          },
+          tx,
+        );
+        return { review, findingRows };
       });
+      runLog.result(`Persisted review ${review.id} with ${findingRows.length} finding(s)`);
 
       const trace: RunTrace = {
         config: {
@@ -271,7 +288,15 @@ export class ReviewRunExecutor {
           findings: findingRows.length,
           grounding,
         },
-        prompt_assembly: outcome.assembly,
+        prompt_assembly: {
+          ...outcome.assembly,
+          // Per-block token attribution for the skills slot ("what did skills
+          // add to this prompt"). Tokenizer never throws (chars/4 fallback).
+          skills_tokens:
+            outcome.assembly.skills != null
+              ? this.container.tokenizer.count(outcome.assembly.skills)
+              : null,
+        },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
           args: c.label,
@@ -315,6 +340,37 @@ export class ReviewRunExecutor {
       this.container.runBus.complete(runId);
       throw err;
     }
+  }
+
+  /**
+   * L02 — resolve the agent's linked skills into prompt-ready blocks: enabled
+   * skills only, in link order, each prefixed with its name. Bodies from
+   * non-`manual` sources (imports, community) are UNTRUSTED — someone else's
+   * instructions inside this agent's prompt — so they are delimiter-wrapped;
+   * the INJECTION_GUARD then treats them as data, not instructions.
+   * Best-effort: a load failure degrades to a skill-less prompt, never a
+   * failed run.
+   */
+  private async buildSkillBlocks(agentId: string, runLog: RunLogger): Promise<string[]> {
+    let linked;
+    try {
+      linked = await this.agents.linkedSkills(agentId);
+    } catch (err) {
+      runLog.info(`skills: load failed — ${(err as Error).message}`);
+      return [];
+    }
+    if (linked.length === 0) return [];
+    const enabled = linked.filter((l) => l.skill.enabled);
+    const skippedDisabled = linked.length - enabled.length;
+    runLog.info(
+      `skills: ${enabled.length} enabled skill(s) attached` +
+        (skippedDisabled > 0 ? ` (${skippedDisabled} disabled skipped)` : ''),
+    );
+    return enabled.map(({ skill }) => {
+      const body =
+        skill.source === 'manual' ? skill.body : wrapUntrusted(`skill:${skill.name}`, skill.body);
+      return `### Skill: ${skill.name}\n${body}`;
+    });
   }
 
   /**

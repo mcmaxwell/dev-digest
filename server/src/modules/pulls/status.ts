@@ -1,4 +1,4 @@
-import type { PrStatus, SeverityCounts } from '@devdigest/shared';
+import type { PrStatus } from '@devdigest/shared';
 
 /**
  * PR-list rollup helpers (pure — no DB / `this`, so they unit-test cleanly).
@@ -8,21 +8,13 @@ import type { PrStatus, SeverityCounts } from '@devdigest/shared';
  * GitHub's merge state (open/merged/closed); the review status
  * (needs_review / reviewed / stale) is DERIVED here for OPEN PRs from the
  * commit a review last ran against (`lastReviewedSha`) vs the PR head, plus age.
+ *
+ * `rollupSeverities` used to live here too; it moved to `_shared/severity.ts`
+ * because the reviews module needs it as well.
  */
 
 /** Open PRs whose current head was reviewed but untouched this long read "stale". */
 export const STALE_DAYS = 7;
-
-/** Tally finding severities (CRITICAL / WARNING / SUGGESTION) for one review. */
-export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
-  const c: SeverityCounts = { critical: 0, warning: 0, suggestion: 0 };
-  for (const r of rows) {
-    if (r.severity === 'CRITICAL') c.critical += 1;
-    else if (r.severity === 'WARNING') c.warning += 1;
-    else if (r.severity === 'SUGGESTION') c.suggestion += 1;
-  }
-  return c;
-}
 
 /**
  * PR-list SCORE: take each agent's LATEST review, return the WORST (lowest)

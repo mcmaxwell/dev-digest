@@ -8,10 +8,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   deriveReviewStatus,
-  rollupSeverities,
   worstLatestScoreByPr,
   STALE_DAYS,
 } from '../src/modules/pulls/status.js';
+import { rollupSeverities } from '../src/modules/_shared/severity.js';
 
 const DAY = 86_400_000;
 const now = Date.UTC(2026, 5, 11);

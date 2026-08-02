@@ -6,6 +6,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 
 | Skill | Scope | Description |
 |-------|-------|-------------|
+| [onion-architecture](onion-architecture/SKILL.md) | Backend | Onion Architecture layers for server/ + reviewer-core/: dependency rule, ports & adapters, `arch:check` |
 | [fastify-best-practices](fastify-best-practices/SKILL.md) | Backend | Fastify routes, plugins, JSON-schema validation, error handling |
 | [drizzle-orm-patterns](drizzle-orm-patterns/SKILL.md) | Backend | Drizzle schema, queries, relations, transactions, migrations |
 | [postgresql-table-design](postgresql-table-design/SKILL.md) | Backend | Postgres schema design, data types, indexing, constraints |
@@ -16,6 +17,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+| [pr-self-review](pr-self-review/SKILL.md) | Workflow | Pre-PR self-review: routes the local diff to domain skills, deterministic fast checks, gates `gh pr create` on critical findings |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Captures non-obvious lessons into per-module INSIGHTS.md (capture-as-you-go + wrap-up) |
 
 ## What Are Skills?

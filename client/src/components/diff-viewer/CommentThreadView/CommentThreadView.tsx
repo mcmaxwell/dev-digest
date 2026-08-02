@@ -5,9 +5,9 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@devdigest/ui";
-import { type CommentThread, type DiffCommentApi, cs } from "../comments";
-import { CommentCard } from "../CommentCard";
-import { InlineComposer } from "../InlineComposer";
+import { type CommentThread, type DiffCommentApi, cs } from "@/components/diff-viewer/comments";
+import { CommentCard } from "@/components/diff-viewer/CommentCard";
+import { InlineComposer } from "@/components/diff-viewer/InlineComposer";
 
 export function CommentThreadView({
   thread,

@@ -10,6 +10,7 @@ TanStack Query hooks over the Fastify API (`NEXT_PUBLIC_API_BASE`, default
 pnpm dev         # :3000
 pnpm test        # vitest + jsdom, fetch mocked — no API needed
 pnpm typecheck
+pnpm lint        # architecture boundaries + react-hooks (eslint.config.mjs)
 ```
 
 ## Mini-map
@@ -31,8 +32,14 @@ messages/<locale>/*.json   next-intl strings — no hardcoded UI text
 - Pages stay thin; feature logic goes in a colocated `_components/<Name>/`
   folder with its own `*.test.tsx`.
 - Data access only through `src/lib/hooks/*` → `src/lib/api.ts` — no raw fetch
-  in components.
+  in components. Query KEYS belong to the hook file too (see `reviewsKeys` in
+  `lib/hooks/reviews.ts`); never hand-write a key in a component.
 - User-facing strings go through next-intl (`messages/<locale>/*.json`).
+- Cross-folder imports use the `@/` alias; imports INSIDE `src/app` stay
+  relative. One feature must not import a sibling feature's `_components` —
+  promote the shared piece to the nearest common ancestor segment (that
+  ancestor import stays relative) or to `src/components/`. `pnpm lint` enforces
+  this, plus layer direction (`lib` ⇍ `components` ⇍ `app`) and no cycles.
 
 ## Gotchas
 

@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
-import type { Db } from '../../../db/client.js';
+import { and, desc, eq, inArray, isNotNull, sum } from 'drizzle-orm';
+import type { Db, DbOrTx } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace, SeverityCounts } from '@devdigest/shared';
-import { rollupSeverities } from '../../pulls/status.js';
+import { rollupSeverities } from '../../_shared/severity.js';
 
 // ---- in-flight / history --------------------------------------------------
 
@@ -103,25 +103,43 @@ export async function listRunsForPull(
 }
 
 /**
- * Delete one agent run (+ its trace via FK cascade) AND the review it produced.
- * Workspace-scoped. `reviews.run_id` has no FK to `agent_runs`, so the review
- * (and its findings, which DO cascade from `reviews`) must be removed explicitly
- * here — otherwise deleting a run from the timeline leaves its findings orphaned
- * in the Review Runs list below.
+ * Delete one agent run. Workspace-scoped. `reviews.run_id` and `run_traces.run_id`
+ * both cascade from `agent_runs`, and `findings` cascade from `reviews`, so this
+ * ONE statement removes the whole run — no manual compensation, no window where
+ * a run is gone but its findings linger in the Review Runs list.
  */
 export async function deleteAgentRun(
   db: Db,
   workspaceId: string,
   runId: string,
 ): Promise<boolean> {
-  await db
-    .delete(t.reviews)
-    .where(and(eq(t.reviews.runId, runId), eq(t.reviews.workspaceId, workspaceId)));
   const rows = await db
     .delete(t.agentRuns)
     .where(and(eq(t.agentRuns.id, runId), eq(t.agentRuns.workspaceId, workspaceId)))
     .returning({ id: t.agentRuns.id });
   return rows.length > 0;
+}
+
+/**
+ * Total LLM spend per PR for the PR list's COST column: sum of `cost_usd` across
+ * ALL runs (re-reviews accumulate). Runs with unknown pricing are skipped, so a
+ * PR with no priced runs is simply absent from the result.
+ */
+export async function totalCostByPull(
+  db: Db,
+  prIds: string[],
+): Promise<{ prId: string; total: number }[]> {
+  if (prIds.length === 0) return [];
+  const rows = await db
+    .select({ prId: t.agentRuns.prId, total: sum(t.agentRuns.costUsd) })
+    .from(t.agentRuns)
+    .where(and(inArray(t.agentRuns.prId, prIds), isNotNull(t.agentRuns.costUsd)))
+    .groupBy(t.agentRuns.prId);
+  // Drizzle's sum() returns a STRING (SQL numeric); prId is non-null thanks to
+  // the inArray filter.
+  return rows.flatMap((r) =>
+    r.prId != null && r.total != null ? [{ prId: r.prId, total: Number(r.total) }] : [],
+  );
 }
 
 /** Mark a still-running run as cancelled (no-op if it already finished). */
@@ -174,7 +192,7 @@ export async function createAgentRun(
 }
 
 export async function completeAgentRun(
-  db: Db,
+  db: DbOrTx,
   runId: string,
   values: {
     status: 'done' | 'failed' | 'cancelled';

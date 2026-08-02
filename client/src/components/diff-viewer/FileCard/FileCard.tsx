@@ -6,18 +6,18 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
-import { AUTO_EXPAND_MAX_LINES } from "../constants";
-import { parsePatch, type Line } from "../helpers";
+import { AUTO_EXPAND_MAX_LINES } from "@/components/diff-viewer/constants";
+import { parsePatch, type Line } from "@/components/diff-viewer/helpers";
 import {
   buildThreads,
   keysForLine,
   partitionThreads,
   type CommentThread,
   type DiffCommentApi,
-} from "../comments";
-import { s, chevronFor } from "../styles";
-import { CodeLine } from "../CodeLine";
-import { OutdatedComments } from "../OutdatedComments";
+} from "@/components/diff-viewer/comments";
+import { s, chevronFor } from "@/components/diff-viewer/styles";
+import { CodeLine } from "@/components/diff-viewer/CodeLine";
+import { OutdatedComments } from "@/components/diff-viewer/OutdatedComments";
 
 /** Threads anchored to a given parsed line (RIGHT=new, LEFT=old). */
 function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): CommentThread[] {
@@ -78,9 +78,12 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
           {lines.length === 0 ? (
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
           ) : (
-            lines.map((ln, i) => (
+            lines.map((ln) => (
               <CodeLine
-                key={i}
+                // Derived from the parsed line itself (kind + old/new line no.
+                // + text) instead of its array index, so the key stays stable
+                // if `lines` is ever reordered/filtered independently.
+                key={`${ln.kind}-${ln.oldNo ?? ""}-${ln.newNo ?? ""}-${ln.text}`}
                 ln={ln}
                 path={file.path}
                 threads={threadsForLine(ln, matched)}

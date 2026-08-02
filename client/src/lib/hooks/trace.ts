@@ -6,7 +6,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../api";
+import { api } from "@/lib/api";
 import type { RunTrace } from "@devdigest/shared";
 
 export function useRunTrace(runId: string | null | undefined, enabled = true) {

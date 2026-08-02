@@ -4,39 +4,52 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { FormField, TextInput, SelectInput, SearchableSelect, Textarea, Toggle, Button } from "@devdigest/ui";
 import type { Agent, CiFailOn, Provider, ReviewStrategy } from "@devdigest/shared";
-import { useUpdateAgent, useProviderModels } from "../../../../../../../lib/hooks/agents";
-import { useToast } from "../../../../../../../lib/toast";
-import { toModelOptions } from "../../../../../../../lib/model-label";
+import { useUpdateAgent, useProviderModels } from "@/lib/hooks/agents";
+import { useToast } from "@/lib/toast";
+import { toModelOptions } from "@/lib/model-label";
 import { CI_FAIL_ON_VALUES, OUTPUT_SCHEMA_VALUE, PROVIDER_OPTIONS, STRATEGY_VALUES } from "./constants";
 import { s } from "./styles";
 
-/** Config tab — name/description/provider/model/system-prompt + enabled toggle. */
+/** Local form state — shape matches the update-agent patch payload 1:1, so
+   `save()` below can send it straight through. */
+interface ConfigForm {
+  name: string;
+  description: string;
+  provider: Provider;
+  model: string;
+  system_prompt: string;
+  strategy: ReviewStrategy;
+  ci_fail_on: CiFailOn;
+  repo_intel: boolean;
+  enabled: boolean;
+}
+
+function formFromAgent(agent: Agent): ConfigForm {
+  return {
+    name: agent.name,
+    description: agent.description,
+    provider: agent.provider,
+    model: agent.model,
+    system_prompt: agent.system_prompt,
+    strategy: agent.strategy,
+    ci_fail_on: agent.ci_fail_on,
+    repo_intel: agent.repo_intel,
+    enabled: agent.enabled,
+  };
+}
+
+/** Config tab — name/description/provider/model/system-prompt + enabled toggle.
+   Callers must render this with `key={agent.id}` (see AgentEditor.tsx) so
+   switching agents remounts a fresh instance instead of needing a
+   derived-state-from-props reset effect. */
 export function ConfigTab({ agent }: { agent: Agent }) {
   const t = useTranslations("agents");
   const toast = useToast();
   const update = useUpdateAgent();
-  const [name, setName] = React.useState(agent.name);
-  const [description, setDescription] = React.useState(agent.description);
-  const [provider, setProvider] = React.useState<Provider>(agent.provider);
-  const [model, setModel] = React.useState(agent.model);
-  const [systemPrompt, setSystemPrompt] = React.useState(agent.system_prompt);
-  const [strategy, setStrategy] = React.useState<ReviewStrategy>(agent.strategy);
-  const [ciFailOn, setCiFailOn] = React.useState<CiFailOn>(agent.ci_fail_on);
-  const [repoIntel, setRepoIntel] = React.useState(agent.repo_intel);
-  const [enabled, setEnabled] = React.useState(agent.enabled);
-
-  // Reset local form when switching agents.
-  React.useEffect(() => {
-    setName(agent.name);
-    setDescription(agent.description);
-    setProvider(agent.provider);
-    setModel(agent.model);
-    setSystemPrompt(agent.system_prompt);
-    setStrategy(agent.strategy);
-    setCiFailOn(agent.ci_fail_on);
-    setRepoIntel(agent.repo_intel);
-    setEnabled(agent.enabled);
-  }, [agent.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [form, setForm] = React.useState<ConfigForm>(() => formFromAgent(agent));
+  const set = <K extends keyof ConfigForm>(key: K) => (value: ConfigForm[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+  const { name, description, provider, model, system_prompt: systemPrompt, strategy, ci_fail_on: ciFailOn, repo_intel: repoIntel, enabled } = form;
 
   const { data: models } = useProviderModels(provider);
   // Show the price (USD per 1M in/out tokens) in the label when the provider
@@ -54,20 +67,7 @@ export function ConfigTab({ agent }: { agent: Agent }) {
 
   const save = () =>
     update.mutate(
-      {
-        id: agent.id,
-        patch: {
-          name,
-          description,
-          provider,
-          model,
-          system_prompt: systemPrompt,
-          strategy,
-          ci_fail_on: ciFailOn,
-          repo_intel: repoIntel,
-          enabled,
-        },
-      },
+      { id: agent.id, patch: form },
       {
         // Failures are surfaced by the global mutation error toast; confirm the
         // save with a success toast (not just the inline "Saved (vN)" note).
@@ -81,19 +81,19 @@ export function ConfigTab({ agent }: { agent: Agent }) {
         <h2 style={s.h2}>{t("config.title")}</h2>
         <label style={s.enabledLabel}>
           {t("config.enabled")}
-          <Toggle on={enabled} onChange={setEnabled} size={16} />
+          <Toggle on={enabled} onChange={set("enabled")} size={16} />
         </label>
       </div>
       <FormField label={t("config.name")} required>
-        <TextInput value={name} onChange={setName} />
+        <TextInput value={name} onChange={set("name")} />
       </FormField>
       <FormField label={t("config.description")}>
-        <TextInput value={description} onChange={setDescription} />
+        <TextInput value={description} onChange={set("description")} />
       </FormField>
       <FormField label={t("config.provider")}>
         <SelectInput
           value={provider}
-          onChange={(v) => setProvider(v as Provider)}
+          onChange={(v) => set("provider")(v as Provider)}
           options={[...PROVIDER_OPTIONS]}
         />
       </FormField>
@@ -103,7 +103,7 @@ export function ConfigTab({ agent }: { agent: Agent }) {
       >
         <SearchableSelect
           value={model}
-          onChange={setModel}
+          onChange={set("model")}
           options={modelOptions}
           placeholder={t("config.modelSearch")}
         />
@@ -111,24 +111,24 @@ export function ConfigTab({ agent }: { agent: Agent }) {
       <FormField label={t("config.strategy")} hint={t("config.strategyHint")}>
         <SelectInput
           value={strategy}
-          onChange={(v) => setStrategy(v as ReviewStrategy)}
+          onChange={(v) => set("strategy")(v as ReviewStrategy)}
           options={strategyOptions}
         />
       </FormField>
       <FormField label={t("config.ciFailOn")} hint={t("config.ciFailOnHint")}>
         <SelectInput
           value={ciFailOn}
-          onChange={(v) => setCiFailOn(v as CiFailOn)}
+          onChange={(v) => set("ci_fail_on")(v as CiFailOn)}
           options={ciFailOnOptions}
         />
       </FormField>
       <FormField label={t("config.repoIntel")} hint={t("config.repoIntelHint")}>
         <label style={s.enabledLabel}>
-          <Toggle on={repoIntel} onChange={setRepoIntel} size={16} />
+          <Toggle on={repoIntel} onChange={set("repo_intel")} size={16} />
         </label>
       </FormField>
       <FormField label={t("config.systemPrompt")} hint={t("config.systemPromptHint")}>
-        <Textarea value={systemPrompt} onChange={setSystemPrompt} rows={8} mono />
+        <Textarea value={systemPrompt} onChange={set("system_prompt")} rows={8} mono />
       </FormField>
       <FormField label={t("config.outputSchema")}>
         <SelectInput value={OUTPUT_SCHEMA_VALUE} options={[OUTPUT_SCHEMA_VALUE]} />

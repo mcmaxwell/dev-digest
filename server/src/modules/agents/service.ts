@@ -56,13 +56,18 @@ export class AgentsService {
   }
 
   async list(workspaceId: string): Promise<Agent[]> {
-    const rows = await this.repo.list(workspaceId);
-    return rows.map(toAgentDto);
+    const [rows, counts] = await Promise.all([
+      this.repo.list(workspaceId),
+      this.repo.skillCountsByAgent(workspaceId),
+    ]);
+    return rows.map((r) => ({ ...toAgentDto(r), skill_count: counts.get(r.id) ?? 0 }));
   }
 
   async get(workspaceId: string, id: string): Promise<Agent | undefined> {
     const row = await this.repo.getById(workspaceId, id);
-    return row ? toAgentDto(row) : undefined;
+    if (!row) return undefined;
+    const skillIds = await this.repo.skillIdsForAgent(id);
+    return { ...toAgentDto(row), skill_count: skillIds.length };
   }
 
   /** Delete an agent (and its versions/skill-links, via cascade). */
@@ -143,7 +148,10 @@ export class AgentsService {
 
   /**
    * Set / reorder the agent's linked skills. If `skillIds` is provided, replaces
-   * the whole set in that order. Returns the resulting ordered links.
+   * the whole set in that order. A real change (different ids OR order) bumps
+   * the agent's config version and snapshots it — the snapshot's `skills` array
+   * pins the exact ordered set a run of that version used. Returns the
+   * resulting ordered links.
    */
   async setSkills(
     workspaceId: string,
@@ -152,7 +160,15 @@ export class AgentsService {
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
-    await this.repo.setSkills(agentId, skillIds);
+    const current = await this.repo.skillIdsForAgent(agentId);
+    const changed =
+      current.length !== skillIds.length || current.some((id, i) => id !== skillIds[i]);
+    if (changed) {
+      await this.repo.transaction(async (tx) => {
+        await this.repo.setSkills(agentId, skillIds, tx);
+        await this.repo.bumpVersionWithSnapshot(agentId, tx);
+      });
+    }
     return this.skillLinks(agentId);
   }
 
@@ -167,7 +183,12 @@ export class AgentsService {
     if (!agent) return undefined;
     const existing = await this.repo.linkedSkills(agentId);
     const resolvedOrder = order ?? existing.length;
-    await this.repo.linkSkill(agentId, skillId, resolvedOrder);
+    const already = existing.find((l) => l.skill.id === skillId);
+    if (already?.order === resolvedOrder) return this.skillLinks(agentId);
+    await this.repo.transaction(async (tx) => {
+      await this.repo.linkSkill(agentId, skillId, resolvedOrder, tx);
+      await this.repo.bumpVersionWithSnapshot(agentId, tx);
+    });
     return this.skillLinks(agentId);
   }
 

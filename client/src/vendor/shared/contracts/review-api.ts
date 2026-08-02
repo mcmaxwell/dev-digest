@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Finding, Verdict } from './findings.js';
+import { FindingShape, refineTrifecta, Verdict } from './findings.js';
 import { Intent, SmartDiff } from './brief.js';
 
 /**
@@ -12,11 +12,11 @@ import { Intent, SmartDiff } from './brief.js';
  * state and the `review_id` it belongs to.
  */
 
-export const FindingRecord = Finding.extend({
+export const FindingRecord = FindingShape.extend({
   review_id: z.string(),
   accepted_at: z.string().nullable(),
   dismissed_at: z.string().nullable(),
-});
+}).superRefine(refineTrifecta);
 export type FindingRecord = z.infer<typeof FindingRecord>;
 
 /** A persisted review with its kept findings + grounding summary. */

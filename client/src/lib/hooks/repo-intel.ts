@@ -7,7 +7,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api";
+import { api } from "@/lib/api";
 
 /** Subset of the server's IndexState the badge + completion-poll need (kept
     local — not in @devdigest/shared, since repo-intel types live server-side). */

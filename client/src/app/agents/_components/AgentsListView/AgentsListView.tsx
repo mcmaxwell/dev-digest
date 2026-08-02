@@ -6,8 +6,8 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, Dropdown, EmptyState, ErrorState, Skeleton, Icon } from "@devdigest/ui";
-import { AppShell } from "../../../../components/app-shell";
-import { useAgents, useUpdateAgent } from "../../../../lib/hooks/agents";
+import { useSetCrumb } from "@/lib/shell-crumb";
+import { useAgents, useUpdateAgent } from "@/lib/hooks/agents";
 import { AgentCard } from "../AgentCard";
 import { CreateAgentModal } from "./_components/CreateAgentModal";
 import { TEMPLATES } from "./constants";
@@ -23,9 +23,10 @@ export function AgentsListView() {
   const [search, setSearch] = React.useState("");
 
   const list = filterAgents(agents ?? [], search);
+  useSetCrumb([{ label: t("list.breadcrumbLab") }, { label: t("list.breadcrumb") }]);
 
   return (
-    <AppShell crumb={[{ label: t("list.breadcrumbLab") }, { label: t("list.breadcrumb") }]}>
+    <>
       {creating && <CreateAgentModal onClose={() => setCreating(false)} />}
       <div style={s.page}>
         <div style={s.header}>
@@ -86,6 +87,7 @@ export function AgentsListView() {
               <AgentCard
                 key={a.id}
                 ag={a}
+                skillCount={a.skill_count ?? undefined}
                 onClick={() => router.push(`/agents/${a.id}?tab=config`)}
                 onToggle={(enabled) => update.mutate({ id: a.id, patch: { enabled } })}
               />
@@ -93,6 +95,6 @@ export function AgentsListView() {
           </div>
         )}
       </div>
-    </AppShell>
+    </>
   );
 }

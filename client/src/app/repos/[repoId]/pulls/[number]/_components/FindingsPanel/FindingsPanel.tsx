@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Toggle, EmptyState } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
-import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
+import { useFindingAction } from "@/lib/hooks/reviews";
 import { KEY_TO_ACTION } from "./constants";
 import { visibleFindings } from "./helpers";
 import { s } from "./styles";
@@ -29,6 +29,13 @@ export function FindingsPanel({
   const [focusIdx, setFocusIdx] = React.useState(0);
 
   const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+
+  // Re-clamp focus when the filtered list shrinks (e.g. toggling hideLow) —
+  // otherwise focusIdx can point past the end, the focus ring vanishes, and
+  // j/k/accept/dismiss silently target nothing.
+  React.useEffect(() => {
+    setFocusIdx((i) => Math.min(i, Math.max(shown.length - 1, 0)));
+  }, [shown.length]);
 
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
   React.useEffect(() => {

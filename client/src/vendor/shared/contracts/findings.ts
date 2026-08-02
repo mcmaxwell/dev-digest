@@ -48,11 +48,8 @@ export const TrifectaEvidence = z.object({
 });
 export type TrifectaEvidence = z.infer<typeof TrifectaEvidence>;
 
-/**
- * Finding — the atomic review unit. `start_line`/`end_line` are used by the
- * citation-grounding gate (must intersect a real diff hunk for diff-findings).
- */
-export const Finding = z.object({
+/** The raw field shape of a Finding, before the trifecta refinement. */
+export const FindingShape = z.object({
   id: z.string(),
   severity: Severity,
   category: FindingCategory,
@@ -68,6 +65,47 @@ export const Finding = z.object({
   trifecta_components: z.array(TrifectaComponent).nullish(),
   evidence: z.array(TrifectaEvidence).nullish(),
 });
+
+/**
+ * Ties the lethal-trifecta variant fields to `kind`. Exported separately so
+ * schemas that need to `.extend()` the shape (e.g. `FindingRecord`) can build on
+ * `FindingShape` and re-apply this.
+ *
+ * A refinement rather than a discriminated union on purpose: this same schema is
+ * handed to the LLM as structured output, and a flat object yields a far more
+ * reliable JSON Schema than a oneOf. A violation costs one reprompt (see
+ * `completeStructured`), not a failed run.
+ *
+ * `evidence` is deliberately NOT required: it is an LLM-only field with no
+ * column in `findings`, so a finding re-read from the DB never carries it.
+ */
+export const refineTrifecta = (
+  f: { kind?: FindingKind | null; trifecta_components?: TrifectaComponent[] | null },
+  ctx: z.RefinementCtx,
+): void => {
+  const components = f.trifecta_components ?? [];
+  if (f.kind === 'lethal_trifecta') {
+    if (components.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['trifecta_components'],
+        message: "kind 'lethal_trifecta' requires at least one trifecta component",
+      });
+    }
+  } else if (components.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['trifecta_components'],
+      message: "trifecta_components is only valid when kind is 'lethal_trifecta'",
+    });
+  }
+};
+
+/**
+ * Finding — the atomic review unit. `start_line`/`end_line` are used by the
+ * citation-grounding gate (must intersect a real diff hunk for diff-findings).
+ */
+export const Finding = FindingShape.superRefine(refineTrifecta);
 export type Finding = z.infer<typeof Finding>;
 
 /** Review — the consolidated structured output of a single agent run. */

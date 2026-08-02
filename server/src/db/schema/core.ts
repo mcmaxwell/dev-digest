@@ -1,14 +1,20 @@
-import { pgTable, uuid, text, jsonb, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, jsonb, uniqueIndex, unique, primaryKey } from 'drizzle-orm/pg-core';
 import { now } from './_shared';
 
 // ============================================================ Tenancy & core
 
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  email: text('email').notNull(),
-  name: text('name').notNull(),
-  createdAt: now(),
-});
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    email: text('email').notNull(),
+    name: text('name').notNull(),
+    createdAt: now(),
+  },
+  (t) => ({
+    emailUq: uniqueIndex('users_email_uq').on(t.email),
+  }),
+);
 
 export const workspaces = pgTable('workspaces', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -43,6 +49,10 @@ export const settings = pgTable(
     value: jsonb('value'),
   },
   (t) => ({
-    uq: uniqueIndex('settings_ws_user_key_uq').on(t.workspaceId, t.userId, t.key),
+    // NULLS NOT DISTINCT: user_id is nullable, and without this a NULL-user row
+    // would bypass both the uniqueness and the onConflictDoUpdate in PUT /settings.
+    uq: unique('settings_ws_user_key_uq')
+      .on(t.workspaceId, t.userId, t.key)
+      .nullsNotDistinct(),
   }),
 );

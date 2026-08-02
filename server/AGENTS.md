@@ -32,11 +32,20 @@ clones/               runtime repo checkouts — never edit
 
 - Routes declare zod `params`/`body` schemas (fastify-type-provider-zod);
   invalid input 422s before the handler — never `Schema.parse(req.body)`.
+- Only a `repository.ts` (or `repository/*.ts`) imports the drizzle query
+  builder; everything else goes through it. Cross-module reads use a Container
+  getter (`container.reposRepo`, `container.reviewRepo`), never another
+  module's folder. `pnpm arch:check` enforces both.
+- Multi-write operations get a transaction, opened by the SERVICE
+  (`repo.transaction(tx => …)`); repository methods take an optional `DbOrTx`
+  and join whatever handle they are given.
 - Plugins (helmet, cors, rate-limit, SSE, error handler) register before
   modules so modules inherit them. Errors: structured envelope; AppError → status.
+  5xx messages are withheld from clients in production.
 - A test importing `test/helpers/pg.ts` MUST be named `*.it.test.ts`.
 - Schema change flow: edit `src/db/schema*.ts` → `pnpm db:generate` →
-  `pnpm db:migrate`. Never hand-edit `src/db/migrations/`.
+  `pnpm db:migrate`. Never hand-edit a GENERATED migration; a data fix-up ships
+  as its own `drizzle-kit generate --custom` file (see `0011_heal_*`).
 - The DB schema already contains EVERY table for all course lessons; unused
   tables sit empty by design — do not "clean them up".
 
@@ -56,6 +65,9 @@ clones/               runtime repo checkouts — never edit
 ## Read when…
 
 - …anything non-trivial here → `README.md` (request/DI flow, API map, env table)
+- …adding/changing a module, adapter, or port; deciding which layer code
+  belongs to → `onion-architecture` skill (`.claude/skills/onion-architecture/`);
+  verify structure with `pnpm arch:check`
 - …touching indexing / repo map → `src/modules/repo-intel/README.md`
 - …changing prompt assembly or grounding → `../reviewer-core/README.md`
 - …test strategy or CI → `../TESTING.md`
