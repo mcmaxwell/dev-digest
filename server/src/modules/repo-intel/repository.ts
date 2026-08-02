@@ -242,10 +242,13 @@ export class RepoIntelRepository {
   // T2 indexer-pipeline writes.
   // -------------------------------------------------------------------------
 
-  /** Wipe every cached symbol + reference row for a repo (full-index reset). */
+  /** Wipe every cached symbol + reference row for a repo (full-index reset).
+   *  ATOMIC: half a wipe would leave references pointing at deleted symbols. */
   async deleteAllForRepo(repoId: string): Promise<void> {
-    await this.db.delete(t.symbols).where(eq(t.symbols.repoId, repoId));
-    await this.db.delete(t.references).where(eq(t.references.repoId, repoId));
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.symbols).where(eq(t.symbols.repoId, repoId));
+      await tx.delete(t.references).where(eq(t.references.repoId, repoId));
+    });
   }
 
   /**
@@ -347,40 +350,47 @@ export class RepoIntelRepository {
   // T3 — graph / rank / repo-map / facts writes.
   // -------------------------------------------------------------------------
 
-  /** Replace the whole import-graph for a repo (full index / incremental). */
+  /** Replace the whole import-graph for a repo (full index / incremental).
+   *  ATOMIC: a crash between the wipe and the chunked re-insert would leave an
+   *  EMPTY graph while `repo_index_state.status` still claims a full index. */
   async replaceEdges(repoId: string, edges: IndexerEdgeRow[]): Promise<void> {
-    await this.db.delete(t.fileEdges).where(eq(t.fileEdges.repoId, repoId));
-    if (edges.length === 0) return;
     const rows = edges.map((e) => ({ repoId, fromFile: e.fromFile, toFile: e.toFile }));
-    for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.fileEdges).values(rows.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.fileEdges).where(eq(t.fileEdges.repoId, repoId));
+      for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
+        await tx.insert(t.fileEdges).values(rows.slice(i, i + INSERT_CHUNK_SIZE));
+      }
+    });
   }
 
-  /** Replace the whole file_rank table for a repo. */
+  /** Replace the whole file_rank table for a repo (ATOMIC, see replaceEdges). */
   async replaceFileRank(repoId: string, rows: IndexerFileRankRow[]): Promise<void> {
-    await this.db.delete(t.fileRank).where(eq(t.fileRank.repoId, repoId));
-    if (rows.length === 0) return;
     const values = rows.map((r) => ({ repoId, ...r }));
-    for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.fileRank).values(values.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.fileRank).where(eq(t.fileRank.repoId, repoId));
+      for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
+        await tx.insert(t.fileRank).values(values.slice(i, i + INSERT_CHUNK_SIZE));
+      }
+    });
   }
 
-  /** Replace per-file facts; only rows with at least one endpoint/cron persist. */
+  /** Replace per-file facts; only rows with at least one endpoint/cron persist.
+   *  ATOMIC, see replaceEdges. */
   async replaceFileFacts(repoId: string, rows: IndexerFileFactsRow[]): Promise<void> {
-    await this.db.delete(t.fileFacts).where(eq(t.fileFacts.repoId, repoId));
-    const nonEmpty = rows.filter((r) => r.endpoints.length > 0 || r.crons.length > 0);
-    if (nonEmpty.length === 0) return;
-    const values = nonEmpty.map((r) => ({
-      repoId,
-      filePath: r.filePath,
-      endpoints: r.endpoints,
-      crons: r.crons,
-    }));
-    for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.fileFacts).values(values.slice(i, i + INSERT_CHUNK_SIZE));
-    }
+    const values = rows
+      .filter((r) => r.endpoints.length > 0 || r.crons.length > 0)
+      .map((r) => ({
+        repoId,
+        filePath: r.filePath,
+        endpoints: r.endpoints,
+        crons: r.crons,
+      }));
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.fileFacts).where(eq(t.fileFacts.repoId, repoId));
+      for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
+        await tx.insert(t.fileFacts).values(values.slice(i, i + INSERT_CHUNK_SIZE));
+      }
+    });
   }
 
   /**

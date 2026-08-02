@@ -100,7 +100,13 @@ export type SettingsKnown = z.infer<typeof SettingsKnown>;
 export const Settings = SettingsKnown.passthrough();
 export type Settings = z.infer<typeof Settings>;
 
-export const SettingsUpdate = Settings.partial();
+/**
+ * Settings PATCH body. Built from `SettingsKnown` (strip mode), NOT from the
+ * passthrough `Settings`: a write must not be able to persist arbitrary,
+ * unvalidated keys of arbitrary size into the settings table. Reads stay
+ * passthrough so pre-existing extras remain visible.
+ */
+export const SettingsUpdate = SettingsKnown.partial();
 export type SettingsUpdate = z.infer<typeof SettingsUpdate>;
 
 // ---- Connection test ----

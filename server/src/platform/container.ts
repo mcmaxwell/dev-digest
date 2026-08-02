@@ -24,6 +24,7 @@ import { estimateCost } from '../adapters/llm/pricing.js';
 import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
+import { RepoRepository } from '../modules/repos/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
@@ -71,6 +72,7 @@ export class Container {
   // runs). Constructed here, in the composition root, so consuming modules use
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
+  private _reposRepo?: RepoRepository;
   private _reviewRepo?: ReviewRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
@@ -94,6 +96,10 @@ export class Container {
 
   get agentsRepo(): AgentsRepository {
     return (this._agentsRepo ??= new AgentsRepository(this.db));
+  }
+
+  get reposRepo(): RepoRepository {
+    return (this._reposRepo ??= new RepoRepository(this.db));
   }
 
   get reviewRepo(): ReviewRepository {
@@ -157,6 +163,27 @@ export class Container {
     if (!token) throw new ConfigError('GITHUB_TOKEN is not configured');
     this._github = new OctokitGitHubClient(token);
     return this._github;
+  }
+
+  /**
+   * A throwaway GitHub client built from a CANDIDATE token — not cached, not
+   * persisted. Used to probe a key before it is allowed to replace a stored one.
+   * Falls back to an injected client so tests keep working.
+   */
+  githubWithToken(token: string): GitHubClient {
+    return this.overrides.github ?? new OctokitGitHubClient(token);
+  }
+
+  /** Same as `githubWithToken`, for LLM providers: probe before persisting. */
+  llmWithKey(id: 'openai' | 'anthropic' | 'openrouter', key: string): LLMProvider {
+    const injected = this.overrides.llm?.[id];
+    if (injected) return injected;
+    if (id === 'openai') return new OpenAIProvider(key);
+    if (id === 'anthropic') return new AnthropicProvider(key);
+    return new OpenRouterProvider(key, {
+      estimateCost: (model, tokensIn, tokensOut) =>
+        this.priceBook.estimate(model, tokensIn, tokensOut),
+    });
   }
 
   /** Resolve an LLM provider by id; constructs from the secret key, cached. */

@@ -90,6 +90,10 @@ export const RunTrace = z.object({
 });
 export type RunTrace = z.infer<typeof RunTrace>;
 
+/** Lifecycle of one agent run — the domain of `agent_runs.status`. */
+export const RunStatus = z.enum(['running', 'done', 'failed', 'cancelled']);
+export type RunStatus = z.infer<typeof RunStatus>;
+
 /**
  * One row of a PR's run history (every agent_runs row, any status). Surfaced on
  * the PR page so runs — including FAILED ones with their error — survive reload.
@@ -100,7 +104,7 @@ export const RunSummary = z.object({
   agent_name: z.string().nullable(),
   provider: z.string().nullable(),
   model: z.string().nullable(),
-  status: z.string().nullable(), // running | done | failed | cancelled
+  status: RunStatus.nullable(),
   error: z.string().nullable(),
   duration_ms: z.number().int().nullable(),
   tokens_in: z.number().int().nullable(),

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 import { RunRequest } from '@devdigest/shared';
 import type { RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
@@ -16,6 +17,10 @@ import { ReviewService } from './service.js';
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
+
+/** RunRequest, but tolerant of a missing/null body (both fields are optional). */
+const RunBody = z.preprocess((v) => v ?? {}, RunRequest);
+
 export default async function reviewsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
@@ -23,13 +28,18 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
 
   // ---- Run a review (manual trigger) -------------------------------
   // Tight per-route limit: each call can fan out to expensive LLM runs.
-  // Body stays a tolerant manual parse (both fields optional; empty body is OK).
+  // Both fields are optional and an ABSENT body is valid, so the schema
+  // pre-normalises a missing/null body to `{}` — validation still happens
+  // before the handler (never `Schema.parse(req.body)` in here).
   app.post(
     '/pulls/:id/review',
-    { schema: { params: IdParams }, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    {
+      schema: { params: IdParams, body: RunBody },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
     async (req) => {
     const { workspaceId } = await getContext(container, req);
-    const body = RunRequest.parse(req.body ?? {});
+    const body = req.body;
     const targets = await service.resolveTargets(workspaceId, {
       ...(body.agentId !== undefined ? { agentId: body.agentId } : {}),
       ...(body.all !== undefined ? { all: body.all } : {}),
@@ -67,6 +77,14 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
           done = true;
           resolve?.();
         });
+        // A client that disconnects mid-run must also wake the pending await
+        // below — otherwise a run that never emits again (orphaned, no `done`)
+        // would leave this generator, and its RunBus subscription, alive forever.
+        const onClose = () => {
+          done = true;
+          resolve?.();
+        };
+        req.raw.on('close', onClose);
 
         try {
           while (true) {
@@ -84,6 +102,7 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
             };
           }
         } finally {
+          req.raw.off('close', onClose);
           unsubscribe();
           offDone();
         }

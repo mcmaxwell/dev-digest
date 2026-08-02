@@ -4,6 +4,16 @@ import { schema } from './schema.js';
 
 export type Db = PostgresJsDatabase<typeof schema>;
 
+/** The transaction handle Drizzle hands to a `db.transaction(tx => …)` callback. */
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+/**
+ * What a repository method should accept when it may run either standalone or
+ * as part of a service-owned transaction. Transaction BOUNDARIES belong to the
+ * service; repositories just honour the handle they are given.
+ */
+export type DbOrTx = Db | Tx;
+
 export interface DbHandle {
   db: Db;
   sql: postgres.Sql;

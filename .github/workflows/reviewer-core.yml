@@ -46,4 +46,8 @@ jobs:
 
       - run: npm run typecheck
 
+      # Engine purity: no fs/network/DB/GitHub imports, vendor SDKs confined to
+      # src/llm/ (see .dependency-cruiser.cjs).
+      - run: npm run arch:check
+
       - run: npm test

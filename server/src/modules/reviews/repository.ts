@@ -1,4 +1,4 @@
-import type { Db } from '../../db/client.js';
+import type { Db, DbOrTx } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
 
@@ -24,6 +24,15 @@ import * as pullRepo from './repository/pull.repo.js';
 
 export class ReviewRepository {
   constructor(private db: Db) {}
+
+  /**
+   * Run `fn` inside one transaction. The BOUNDARY is chosen by the caller
+   * (service / run executor); repository methods that accept a `DbOrTx` join
+   * whatever handle they are given.
+   */
+  transaction<T>(fn: (tx: DbOrTx) => Promise<T>): Promise<T> {
+    return this.db.transaction((tx) => fn(tx));
+  }
 
   // ---- PR lookup (workspace-scoped) --------------------------------------
 
@@ -51,12 +60,12 @@ export class ReviewRepository {
     summary: string | null;
     score: number | null;
     model: string | null;
-  }): Promise<ReviewRow> {
-    return reviewRepo.insertReview(this.db, values);
+  }, tx: DbOrTx = this.db): Promise<ReviewRow> {
+    return reviewRepo.insertReview(tx, values);
   }
 
-  insertFindings(reviewId: string, findings: Finding[]): Promise<FindingRow[]> {
-    return reviewRepo.insertFindings(this.db, reviewId, findings);
+  insertFindings(reviewId: string, findings: Finding[], tx: DbOrTx = this.db): Promise<FindingRow[]> {
+    return reviewRepo.insertFindings(tx, reviewId, findings);
   }
 
   /** Reviews for a PR (newest first), each with its findings. */
@@ -66,6 +75,27 @@ export class ReviewRepository {
 
   getReview(reviewId: string): Promise<ReviewRow | undefined> {
     return reviewRepo.getReview(this.db, reviewId);
+  }
+
+  // ---- PR-list aggregates (read by the pulls module via container.reviewRepo)
+
+  /** Scoring inputs for a batch of PRs, newest first, `kind='review'` only. */
+  reviewSummariesForPulls(
+    prIds: string[],
+  ): Promise<{ id: string; prId: string; agentId: string | null; score: number | null }[]> {
+    return reviewRepo.reviewSummariesForPulls(this.db, prIds);
+  }
+
+  /** Raw finding severities for a batch of reviews (caller groups + rolls up). */
+  findingSeveritiesForReviews(
+    reviewIds: string[],
+  ): Promise<{ reviewId: string; severity: string }[]> {
+    return reviewRepo.findingSeveritiesForReviews(this.db, reviewIds);
+  }
+
+  /** Total LLM spend per PR across all runs (unpriced runs omitted). */
+  totalCostByPull(prIds: string[]): Promise<{ prId: string; total: number }[]> {
+    return runRepo.totalCostByPull(this.db, prIds);
   }
 
   /** In-flight runs for a PR (status='running') — the server-side source of
@@ -166,13 +196,14 @@ export class ReviewRepository {
       /** Failure reason (status='failed') / cancellation note. Null clears it. */
       error?: string | null;
     },
+    tx: DbOrTx = this.db,
   ): Promise<void> {
-    return runRepo.completeAgentRun(this.db, runId, values);
+    return runRepo.completeAgentRun(tx, runId, values);
   }
 
   /** Record the head SHA a review ran against (PR-list freshness derivation). */
-  markReviewed(prId: string, sha: string): Promise<void> {
-    return pullRepo.markReviewed(this.db, prId, sha);
+  markReviewed(prId: string, sha: string, tx: DbOrTx = this.db): Promise<void> {
+    return pullRepo.markReviewed(tx, prId, sha);
   }
 
   /** Persist the WHOLE run log as ONE document. PK = runId → agent_runs. */

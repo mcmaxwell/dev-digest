@@ -7,6 +7,19 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## What Works
 
+- [2026-07-31] Give a repository a `transaction(fn)` method and let write
+  helpers take an optional `DbOrTx` (`src/db/client.ts`) defaulting to `this.db`.
+  The SERVICE picks the boundary, every existing single-write call site keeps
+  compiling unchanged, and joining a transaction is one extra argument — see
+  `run-executor.ts` persisting review + findings + markReviewed +
+  completeAgentRun as one unit.
+- [2026-07-31] When adding a FK to a column that never had one, ship a
+  `drizzle-kit generate --custom` migration BEFORE the generated one to heal
+  dangling rows (`0011_heal_dangling_review_refs.sql`). Postgres validates
+  existing rows when the constraint is added, so any developer database with an
+  orphaned reference would fail `db:migrate` — and hand-editing the generated
+  file is forbidden.
+
 ## What Doesn't Work
 
 - [2026-07-28] Rolling up PR-list aggregates from only the LATEST review
@@ -26,9 +39,23 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   it in `repository/run.repo.ts`) instead of re-counting severities; its
   `SeverityCounts` type lives in `@devdigest/shared` `contracts/findings.ts`,
   not in status.ts.
+  - [2026-07-31] MOVED to `src/modules/_shared/severity.ts`. Two modules need it
+    (pulls + reviews) and `no-cross-module-imports` in `.dependency-cruiser.cjs`
+    now rejects reaching into another module's folder for it.
 - [2026-07-28] Runs link to reviews only via `reviews.run_id` (no FK), and
   `reviews.kind` can be `'summary'` — any run↔findings aggregation must filter
   `kind = 'review'` and `run_id IS NOT NULL`, else summary rows skew counts.
+  - [2026-07-31] The FK now EXISTS: `reviews.run_id` → `agent_runs.id`
+    `ON DELETE cascade` and `reviews.agent_id` → `agents.id` `ON DELETE set null`
+    (migration 0012). `deleteAgentRun` is therefore a single DELETE — do not
+    re-add the manual "delete reviews first" compensation. The `kind`/`run_id`
+    filtering above still applies to aggregations.
+- [2026-07-31] Services are constructed as `new XService({ db } as unknown as
+  Container)` in tests (`test/agents-versions.it.test.ts:167`), so a service
+  MUST build its own repository from `container.db` rather than reading a
+  container getter — switching to `container.agentsRepo` compiles fine and then
+  fails at runtime with "Cannot read properties of undefined". Container
+  repository getters exist for CROSS-module access only.
 
 ## Tool & Library Notes
 
@@ -36,6 +63,22 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   wrap in `Number(...)` before putting it in a JSON response, or Zod
   `z.number()` contracts reject it (see the `total_cost_usd` aggregate in
   `src/modules/pulls/routes.ts`).
+
+- [2026-07-31] `pnpm arch:check` (dependency-cruiser) crashes with a missing
+  `styleText` export under old Node — it needs Node ≥ 22. If it fails right
+  after a shell start, check `node -v` before suspecting the config.
+
+- [2026-07-31] dependency-cruiser supports `$1` back-references from a capture
+  group in `from.path` inside `to.pathNot` — that is what makes the
+  "module A must not import module B" rule expressible in one rule
+  (`no-cross-module-imports`). Unknown keys on a rule fail with an unhelpful
+  "must NOT have additional properties"; `dependencyTypesNot: ['type-only']`
+  IS valid and is how cross-module `import type` stays allowed.
+
+- [2026-07-31] reviewer-core is an **npm** package (`package-lock.json`, CI runs
+  `npm ci`) while server/client use pnpm. Running `pnpm install` there creates a
+  stray `pnpm-lock.yaml` and a pnpm-shaped `node_modules` that break `npm ci` —
+  always use `npm` in `reviewer-core/`.
 
 ## Recurring Errors & Fixes
 

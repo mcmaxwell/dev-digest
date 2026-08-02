@@ -158,8 +158,16 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     }
     app.log.error(err);
     const e = err as { statusCode?: number; message?: string };
-    reply.status(e.statusCode ?? 500).send({
-      error: { code: 'internal_error', message: e.message ?? 'Internal error' },
+    const statusCode = e.statusCode ?? 500;
+    // 4xx messages come from framework-level rejections and are safe to relay.
+    // 5xx messages are internal (DB errors, filesystem paths, adapter output) —
+    // in production they are logged above and never sent to the client.
+    const leakable = statusCode < 500 || config.nodeEnv !== 'production';
+    reply.status(statusCode).send({
+      error: {
+        code: 'internal_error',
+        message: (leakable ? e.message : undefined) ?? 'Internal error',
+      },
     });
   });
 
