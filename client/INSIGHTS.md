@@ -48,6 +48,13 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Codebase Patterns
 
+- [2026-08-02] Adding a top-level page to the sidebar REQUIRES editing vendored
+  `src/vendor/ui/nav.ts` (`Sidebar.tsx` renders the `NAV` const directly; there is
+  no app-side extension point) — the one sanctioned exception to the vendored-UI
+  freeze, data-only. Everything else is automatic once the entry exists: g-nav
+  (`useGlobalShortcuts` scans `NAV[].gKey`), the command palette
+  (`useShellCommands` + `shell.json` `nav.<key>` label), and the active-key branch
+  in `app-shell/helpers.ts` (most keys are pre-wired there already).
 - [2026-07-28] `e2e/specs/04-pr-findings.flow.json` asserts the literal
   substring "2 findings" in the ReviewRunAccordion header — when changing that
   header, APPEND after the `N findings` prefix (as the severity breakdown

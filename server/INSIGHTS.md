@@ -22,6 +22,11 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## What Doesn't Work
 
+- [2026-08-02] Don't poll `agent_runs.status == 'done'` and then immediately read
+  `run_traces` in a test: the status flips INSIDE the persistence transaction in
+  `run-executor.ts` while `saveRunTrace` runs just after it, so the trace read can
+  race and return 404/empty. Poll for the trace document itself (see
+  `test/skills.it.test.ts`).
 - [2026-07-28] Rolling up PR-list aggregates from only the LATEST review
   diverges from the detail page, which flattens findings across ALL review
   runs (multi-agent: the newest run can be clean while others hold findings)
@@ -59,6 +64,14 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## Tool & Library Notes
 
+- [2026-08-02] Drizzle `text('col', { enum: [...] })` is TypeScript-only — the DB
+  has no CHECK constraint, so widening the enum (e.g. adding a `skills.source`
+  value) needs contract + schema edits but NO migration; `pnpm db:generate`
+  confirms with "No schema changes".
+- [2026-08-02] `@fastify/multipart` can be registered INSIDE one module's routes
+  plugin (`modules/skills/routes.ts`) — encapsulation keeps every other module
+  JSON-only, and the global plugins (helmet/cors/…) registered before modules
+  still apply. No need to touch `app.ts` for a single upload route.
 - [2026-07-28] Drizzle's `sum()` returns a STRING (SQL numeric), not a number —
   wrap in `Number(...)` before putting it in a JSON response, or Zod
   `z.number()` contracts reject it (see the `total_cost_usd` aggregate in
