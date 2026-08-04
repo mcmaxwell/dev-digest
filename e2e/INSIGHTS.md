@@ -33,6 +33,23 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Tool & Library Notes
 
+- [2026-08-04] `next dev` is NOT safe to run twice from one directory with
+  different `NEXT_PUBLIC_*` values: those vars are inlined at COMPILE time and
+  the build cache is keyed by directory alone, so the e2e stack baked
+  `NEXT_PUBLIC_API_BASE=http://localhost:3101` into `client/.next` and the dev
+  server on :3000 kept serving it ("Cannot reach the DevDigest engine at
+  http://localhost:3101"). Fix is a separate `distDir`
+  (`next.config.mjs` reads `NEXT_DIST_DIR`; `scripts/e2e.sh` exports
+  `.next-e2e`). Symptom to recognise: `grep -rl localhost:3101 client/.next`
+  returns files; cure is `rm -rf client/.next` + restart.
+- [2026-08-04] `next dev` also REWRITES two tracked files to match its distDir —
+  `next-env.d.ts` (the `/// <reference path>`) and `client/tsconfig.json` (adds
+  a `<distDir>/types` include and reformats the whole file). Any script that
+  runs `next dev` with a non-default distDir must snapshot both before and
+  restore them in its teardown, or every e2e run leaves a dirty working tree and
+  points `pnpm typecheck` at a directory that only exists after e2e has run
+  (`restore_snapshot` in `scripts/e2e.sh`).
+
 ## Recurring Errors & Fixes
 
 ## Session Notes

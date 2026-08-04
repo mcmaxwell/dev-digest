@@ -6,6 +6,8 @@ dist/
 !agent-runner/dist/**
 build/
 .next/
+# e2e's isolated Next build cache (scripts/e2e.sh NEXT_DIST_DIR)
+.next-e2e/
 out/
 coverage/
 *.tsbuildinfo
