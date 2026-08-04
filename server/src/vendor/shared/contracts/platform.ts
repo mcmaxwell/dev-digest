@@ -74,8 +74,11 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     id: 'conventions',
     label: 'Conventions',
     description: 'Extracts coding conventions from the repo.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-5.4',
+    // A scan fans out one call PER category, so per-call cost dominates. The
+    // work is extraction from supplied text, not reasoning — a cheap model does
+    // it well, and the verification/adherence stages catch what it gets wrong.
+    defaultProvider: 'openrouter',
+    defaultModel: 'deepseek/deepseek-v4-flash',
   },
 ];
 

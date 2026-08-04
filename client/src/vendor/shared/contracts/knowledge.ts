@@ -159,16 +159,121 @@ export const CommunitySkill = z.object({
 });
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
 
-// ---- Conventions ----
+// ---- Conventions (L02 — Conventions Extractor) ----
+/**
+ * The lens an extraction pass looked through. One LLM call per category (the
+ * fan-out) — a single "find the conventions" call returns a handful of vague
+ * rules, one scoped call per category returns specific ones.
+ */
+export const ConventionCategory = z.enum([
+  'naming',
+  'structure',
+  'error-handling',
+  'async',
+  'imports',
+  'types',
+  'testing',
+  'api-contract',
+  'logging',
+  'config',
+]);
+export type ConventionCategory = z.infer<typeof ConventionCategory>;
+
+/** User verdict on a candidate. Survives a re-scan (upsert keeps the status). */
+export const ConventionStatus = z.enum(['pending', 'accepted', 'rejected']);
+export type ConventionStatus = z.infer<typeof ConventionStatus>;
+
+/**
+ * Where the candidate came from:
+ *  - `config` — derived deterministically from eslint/tsconfig/prettier/package.json
+ *    (no model involved, so it cannot be hallucinated),
+ *  - `llm`    — proposed by an extraction pass and then grounded against the clone.
+ */
+export const ConventionOrigin = z.enum(['llm', 'config']);
+export type ConventionOrigin = z.infer<typeof ConventionOrigin>;
+
+/**
+ * One grounded occurrence of the rule. `verified` records HOW it was grounded:
+ * `exact` — the snippet sits at the cited line; `relocated` — the snippet exists
+ * in the file but at a different line (we corrected it). Evidence that cannot be
+ * found in the clone at all is dropped before persisting, never stored.
+ */
+export const ConventionEvidence = z.object({
+  path: z.string(),
+  line: z.number().int().positive(),
+  snippet: z.string(),
+  verified: z.enum(['exact', 'relocated']),
+  /**
+   * Commit the snippet was verified at — what pins a GitHub permalink that
+   * stays correct after the branch moves. Nullish for rows written before the
+   * field existed (the UI then renders plain text instead of a link).
+   */
+  sha: z.string().nullish(),
+});
+export type ConventionEvidence = z.infer<typeof ConventionEvidence>;
+
 export const ConventionCandidate = z.object({
   id: z.string(),
+  category: ConventionCategory,
   rule: z.string(),
-  evidence_path: z.string(),
-  evidence_snippet: z.string(),
+  rationale: z.string().nullish(),
+  /** At least one VERIFIED occurrence; `llm`-origin candidates need two. */
+  evidence: z.array(ConventionEvidence),
+  /** The model's own confidence (or 1 for `config` origin). */
   confidence: z.number().min(0).max(1),
-  accepted: z.boolean(),
+  /**
+   * MEASURED conformance: conforming matches / (conforming + violating), from
+   * running the candidate's counter-example probe over the clone. Null when the
+   * candidate shipped no probe — "the model believes it" instead of "the repo
+   * does it 94% of the time".
+   */
+  adherence: z.number().min(0).max(1).nullish(),
+  support: z.number().int().nullish(),
+  violations: z.number().int().nullish(),
+  origin: ConventionOrigin,
+  status: ConventionStatus,
+  /** The user rewrote the rule text — the skill body uses THEIR wording. */
+  edited: z.boolean(),
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+
+/** One extraction run over a repo. Drives the "last scan" header + busy state. */
+export const ConventionScan = z.object({
+  id: z.string(),
+  repo_id: z.string(),
+  status: z.enum(['running', 'done', 'error']),
+  /** Commit the samples were read at — later candidates render as stale. */
+  sha: z.string().nullish(),
+  provider: z.string().nullish(),
+  model: z.string().nullish(),
+  sample_count: z.number().int(),
+  candidate_count: z.number().int(),
+  error: z.string().nullish(),
+  started_at: z.string(),
+  finished_at: z.string().nullish(),
+});
+export type ConventionScan = z.infer<typeof ConventionScan>;
+
+/** GET /repos/:id/conventions — the whole page in one read. */
+export const ConventionsPage = z.object({
+  scan: ConventionScan.nullable(),
+  candidates: z.array(ConventionCandidate),
+});
+export type ConventionsPage = z.infer<typeof ConventionsPage>;
+
+/**
+ * A skill rendered from accepted candidates. Persists NOTHING — the modal shows
+ * it, the user edits it, and saving goes through the ordinary POST /skills.
+ */
+export const ConventionSkillDraft = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  /** Candidate ids merged into this draft (one draft per category in split mode). */
+  candidate_ids: z.array(z.string()),
+});
+export type ConventionSkillDraft = z.infer<typeof ConventionSkillDraft>;
 
 // ---- Agents ----
 export const Provider = z.enum(['openai', 'anthropic', 'openrouter']);

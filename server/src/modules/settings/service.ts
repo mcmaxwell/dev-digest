@@ -1,6 +1,8 @@
 import type {
   ConnTestProvider,
   ConnTestResult,
+  FeatureModelChoice,
+  FeatureModelId,
   SecretsStatus,
   Settings,
   SettingsUpdate,
@@ -9,6 +11,7 @@ import type { Container } from '../../platform/container.js';
 import { SettingsRepository } from './repository.js';
 import { rowsToSettings } from './helpers.js';
 import { GITHUB_PROVIDER, SECRET_KEY_BY_PROVIDER } from './constants.js';
+import { resolveFeatureModel } from './feature-models.js';
 
 /**
  * F1 — settings service. Non-secret workspace prefs plus the provider
@@ -24,6 +27,22 @@ export class SettingsService {
 
   async get(workspaceId: string): Promise<Settings> {
     return rowsToSettings(await this.repo.listForWorkspace(workspaceId));
+  }
+
+  /**
+   * Which provider+model a system LLM feature should use: the workspace's
+   * override, else the registry default.
+   *
+   * Exposed on the SERVICE (not just as a free function) because other modules
+   * reach settings through the documented "construct another module's service"
+   * seam — importing `settings/feature-models.ts` directly trips
+   * `no-cross-module-imports` in `pnpm arch:check`.
+   */
+  async resolveFeatureModel(
+    workspaceId: string,
+    id: FeatureModelId,
+  ): Promise<FeatureModelChoice> {
+    return resolveFeatureModel(this.container, workspaceId, id);
   }
 
   /** Which provider keys are configured — booleans only, values NEVER returned. */

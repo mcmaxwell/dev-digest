@@ -168,13 +168,120 @@ Additive changes (new optional field, new route) are fine — do not flag them.
 For each break, name the caller expectation that dies and suggest the compatible
 path (additive field, versioned route, deprecation window).`,
   },
+  {
+    name: 'api-response-schema',
+    description: 'Flag response-shape changes: renamed, retyped, newly-nullable or unit-changed fields.',
+    type: 'convention',
+    body: `# Response schema changes
+
+The response body is a contract. Every caller has already written code that reads
+these fields by name and assumes their type. Inspect each changed response schema,
+serializer, DTO or shared contract type and report:
+
+- **Renamed or removed field** → CRITICAL. Every caller reading it now gets \`undefined\`.
+- **Type change** (\`string\` → \`number\`, scalar → object, object → array) → CRITICAL.
+- **Nullability widened** (\`T\` → \`T | null\`) → CRITICAL: callers do not null-check
+  a field that was never null. Nullability NARROWED (\`T | null\` → \`T\`) is safe.
+- **Required → optional** → CRITICAL for the same reason.
+- **Casing or unit change** (\`created_at\` → \`createdAt\`, seconds → ms, cents → dollars)
+  → CRITICAL. The shape still validates; the values silently mean something else.
+- **Enum value removed or renamed** → CRITICAL; a new value ADDED is a WARNING
+  (exhaustive switches on the caller side break).
+
+A NEW OPTIONAL field is additive — never flag it.
+
+If the project vendors its contracts in more than one place, a schema changed on
+one side only is CONTRACT DRIFT — report it even when both sides still compile.
+
+## Bad — a silent break
+
+\`\`\`ts
+// before:  { user_id: string, created_at: number }   // seconds
+// after:
+return { userId: row.id, createdAt: row.createdAt.toISOString() };
+\`\`\`
+
+Three breaks in one line: \`user_id\` renamed, \`created_at\` renamed, and its type
+changed from epoch-seconds to an ISO string. Every caller breaks at runtime while
+the code and the types compile cleanly.
+
+## Good — additive, with a migration path
+
+\`\`\`ts
+return {
+  user_id: row.id,
+  created_at: row.createdAtSeconds,      // kept, still seconds
+  userId: row.id,                        // new preferred name
+  createdAtIso: row.createdAt.toISOString(),
+};
+\`\`\`
+
+Old callers keep working; new callers get the better shape; the old fields can be
+removed after a deprecation window.`,
+  },
+  {
+    name: 'api-semver-discipline',
+    description: 'Judge which version bump a contract change forces, and flag a breaking change shipped without one.',
+    type: 'convention',
+    body: `# Semver discipline
+
+Decide the bump the diff REQUIRES, then check whether the diff actually ships it
+(version field, route prefix, package version, changelog entry, migration note).
+
+- **MAJOR** — anything an existing caller cannot survive: removed/renamed route,
+  field or enum value; a retyped or newly-nullable response field; a
+  previously-optional request field becoming required; stricter validation that
+  rejects previously-valid payloads; a changed status code or error envelope.
+- **MINOR** — purely additive: a new endpoint, a new OPTIONAL request field, a new
+  response field, a new enum value on an output-only enum.
+- **PATCH** — no contract surface changes: internal refactor, performance, docs,
+  a bug fix that makes the code match its documented behaviour.
+
+Report a finding when a MAJOR-level change ships without a major bump, a new
+version route, or a documented migration path — that is the actual defect. Cite
+the specific change that forces the bump.
+
+A bug fix that changes documented behaviour is still a break for callers relying
+on the old behaviour: call it out as a WARNING with the compatibility note.
+
+## Bad
+
+\`\`\`ts
+// package.json: "version": "2.4.1"  →  "2.4.2"
+- app.get('/v1/orders/:id', ...)
++ app.get('/v1/orders/:orderId', ...)   // param renamed, path unchanged
+\`\`\`
+
+A patch bump on a route-signature change. Nothing warns the caller.
+
+## Good
+
+\`\`\`ts
+// package.json: "version": "2.4.1"  →  "3.0.0"  + CHANGELOG "BREAKING:" entry
+app.get('/v2/orders/:orderId', handler);
+app.get('/v1/orders/:id', deprecatedHandler);   // kept for the deprecation window
+\`\`\``,
+  },
 ];
 
-/** Agent name → its seeded skills, in prompt order. */
+/**
+ * Agent name → its seeded skills, in prompt order.
+ *
+ * The API Contract Reviewer's set is deliberately INCOMPLETE: its fourth skill,
+ * `api-deprecation-policy`, ships as `docs/skills-examples/api-deprecation-policy.md`
+ * and is added through Skills → Add Skill → Import from file, so the import path
+ * (preview → disabled → vet → enable → link) gets exercised on a skill that
+ * actually matters to an agent rather than on a throwaway.
+ */
 export const SEED_AGENT_SKILLS: Record<string, string[]> = {
   'General Reviewer': ['pr-quality-rubric', 'no-then-chains'],
   'Security Reviewer': ['pr-quality-rubric', 'secret-leakage-gate', 'lethal-trifecta'],
   'Performance Reviewer': ['pr-quality-rubric', 'no-then-chains'],
   'Test Quality Reviewer': ['uncovered-branches', 'overmocking-and-flakes', 'test-coverage-nudge'],
-  'API Contract Reviewer': ['api-contract-breaking-changes', 'phantom-api-gate'],
+  'API Contract Reviewer': [
+    'api-contract-breaking-changes',
+    'api-response-schema',
+    'api-semver-discipline',
+    'phantom-api-gate',
+  ],
 };

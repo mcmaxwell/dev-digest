@@ -10,6 +10,8 @@ import {
   API_CONTRACT_REVIEWER_PROMPT,
 } from './seed-prompts.js';
 import { SEED_SKILLS, SEED_AGENT_SKILLS } from './seed-skills.js';
+import { SEED_CONVENTIONS, SEED_SCAN_SHA } from './seed-conventions.js';
+import { ruleKeyFor } from '../modules/conventions/dedupe.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -292,6 +294,53 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
         .values({ agentId: agent.id, skillId, order: i })
         .onConflictDoNothing();
     }
+  }
+
+  // ---- demo conventions + their scan (L02 conventions extractor) ----
+  // Gives /conventions something to show before the first real scan (which
+  // needs a cloned repo and a model key), and keeps the browser e2e flow
+  // deterministic — no LLM call, same as the seeded review above.
+  const [existingScan] = await db
+    .select()
+    .from(t.conventionScans)
+    .where(eq(t.conventionScans.repoId, repoId));
+  if (!existingScan) {
+    const [scan] = await db
+      .insert(t.conventionScans)
+      .values({
+        workspaceId,
+        repoId,
+        status: 'done',
+        sha: SEED_SCAN_SHA,
+        provider: 'openrouter',
+        model: 'seed',
+        sampleCount: 18,
+        candidateCount: SEED_CONVENTIONS.length,
+        finishedAt: new Date(),
+      })
+      .returning();
+
+    await db
+      .insert(t.conventions)
+      .values(
+        SEED_CONVENTIONS.map((c) => ({
+          workspaceId,
+          repoId,
+          scanId: scan!.id,
+          category: c.category,
+          rule: c.rule,
+          rationale: c.rationale,
+          ruleKey: ruleKeyFor(c.rule),
+          evidence: c.evidence,
+          confidence: c.confidence,
+          adherence: c.adherence,
+          support: c.support,
+          violations: c.violations,
+          origin: c.origin,
+          status: 'pending' as const,
+        })),
+      )
+      .onConflictDoNothing();
   }
 
   return { workspaceId, userId };

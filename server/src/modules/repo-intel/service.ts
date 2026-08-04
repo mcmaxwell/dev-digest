@@ -632,6 +632,43 @@ export class RepoIntelService implements RepoIntel {
   }
 
   /**
+   * Ranked paths for one sampling stratum (L02 conventions extractor).
+   *
+   * `kind: 'tests'` inverts the test filter so the tests stratum is reachable at
+   * all; `perDirCap` caps how many files may come from the same top-level
+   * directory, which is what turns "12 files from whichever layer ranks highest"
+   * into "a spread across routes / services / components". Generated and config
+   * paths are excluded in BOTH modes — those are sampled deterministically
+   * elsewhere, not by rank.
+   */
+  async getRankedSample(
+    repoId: string,
+    opts: { n: number; kind?: 'source' | 'tests'; perDirCap?: number },
+  ): Promise<Array<{ path: string; rank: number }>> {
+    if (!this.container.config.repoIntelEnabled) return [];
+    const { n, kind = 'source', perDirCap } = opts;
+    if (n <= 0) return [];
+
+    const rows = await this.repo.getRankedPaths(repoId, Math.max(n * 20, 200));
+    const perDir = new Map<string, number>();
+    const out: Array<{ path: string; rank: number }> = [];
+
+    for (const r of rows) {
+      if (isGeneratedPath(r.path) || isConfigPath(r.path)) continue;
+      if (kind === 'tests' ? !isTestPath(r.path) : isTestPath(r.path)) continue;
+      if (perDirCap !== undefined) {
+        const dir = topLevelDir(r.path);
+        const used = perDir.get(dir) ?? 0;
+        if (used >= perDirCap) continue;
+        perDir.set(dir, used + 1);
+      }
+      out.push(r);
+      if (out.length >= n) break;
+    }
+    return out;
+  }
+
+  /**
    * Top-N file paths by rank DESC, dropping tests/configs/migrations and any
    * caller-supplied `exclude` substrings. Over-fetches by 10× before filtering
    * so the post-filter still yields N where possible.
@@ -706,30 +743,60 @@ export class RepoIntelService implements RepoIntel {
 const CRITICAL_PATH_ROOTS = 5;
 
 /**
- * Path kinds excluded from rank-driven file samples (conventions/onboarding):
- * tests, configs, declaration files, migrations, generated dirs. Substring
- * match on the repo-relative path (kept deliberately simple + deterministic).
+ * Path kinds excluded from rank-driven file samples (conventions/onboarding).
+ *
+ * Split into three predicates rather than one `isJunkPath` blob because the
+ * conventions sampler needs to ASK FOR tests (a stratum of its own) while still
+ * excluding configs and generated output. `isJunkPath` = the union, and is what
+ * `getTopFilesByRank` (onboarding, conventions samples) keeps using.
  */
-const JUNK_PATH_PATTERNS = [
+const TEST_PATH_PATTERNS = [
   '.test.',
   '.spec.',
-  '.d.ts',
   '__tests__/',
   '__mocks__/',
   '/test/',
   '/tests/',
-  '/migrations/',
   '/__fixtures__/',
+  '/e2e/',
+] as const;
+
+const CONFIG_PATH_PATTERNS = [
   '.config.',
   'vitest.',
   'jest.',
   'eslint',
   'prettier',
+  'tsconfig',
 ] as const;
 
-function isJunkPath(path: string): boolean {
+const GENERATED_PATH_PATTERNS = ['.d.ts', '/migrations/', '/dist/', '/build/', '.min.'] as const;
+
+function matchesAny(path: string, patterns: readonly string[]): boolean {
   const lower = path.toLowerCase();
-  return JUNK_PATH_PATTERNS.some((p) => lower.includes(p));
+  return patterns.some((p) => lower.includes(p));
+}
+
+function isTestPath(path: string): boolean {
+  return matchesAny(path, TEST_PATH_PATTERNS);
+}
+
+function isConfigPath(path: string): boolean {
+  return matchesAny(path, CONFIG_PATH_PATTERNS);
+}
+
+function isGeneratedPath(path: string): boolean {
+  return matchesAny(path, GENERATED_PATH_PATTERNS);
+}
+
+function isJunkPath(path: string): boolean {
+  return isTestPath(path) || isConfigPath(path) || isGeneratedPath(path);
+}
+
+/** First path segment, or `.` for a root-level file — the stratification key. */
+function topLevelDir(path: string): string {
+  const i = path.indexOf('/');
+  return i === -1 ? '.' : path.slice(0, i);
 }
 
 /** Enclosing top-level (bare-name) symbol for a line, from persistent rows. */

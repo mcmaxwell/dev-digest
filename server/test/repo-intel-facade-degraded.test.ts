@@ -96,6 +96,14 @@ describe('RepoIntel facade — degraded contract (flag off)', () => {
     await expect(svc.getCriticalPaths('r1')).resolves.toEqual([]);
   });
 
+  it('getRankedSample → [] for every stratum (conventions scan degrades, never throws)', async () => {
+    const svc = buildDegradedService({ flag: false });
+    await expect(svc.getRankedSample('r1', { n: 12, kind: 'source', perDirCap: 3 })).resolves.toEqual([]);
+    await expect(svc.getRankedSample('r1', { n: 3, kind: 'tests' })).resolves.toEqual([]);
+    // n <= 0 is a no-op rather than an unbounded query.
+    await expect(svc.getRankedSample('r1', { n: 0 })).resolves.toEqual([]);
+  });
+
   it('indexRepo / refreshIndex → degraded T1 skeleton (never throws)', async () => {
     const svc = buildDegradedService({ flag: false });
     const a = await svc.indexRepo('r1');

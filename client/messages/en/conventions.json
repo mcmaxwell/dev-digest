@@ -9,18 +9,80 @@
     "rescan": "Re-scan",
     "runExtraction": "Run extraction",
     "extractionFailed": "Extraction failed",
+    "updateFailed": "Could not update the convention — try again.",
     "loadError": "Could not load conventions.",
     "empty": {
       "title": "No conventions extracted yet",
       "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
       "cta": "Run extraction"
     },
-    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
+    "noRepo": {
+      "title": "Pick a repository",
+      "body": "Conventions are extracted per repository. Choose one in the sidebar to scan it."
+    },
+    "scanFailed": {
+      "title": "The last scan failed",
+      "notCloned": "This repository has not been cloned yet. Import it, wait for the clone to finish, then scan again."
+    },
+    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files",
+    "scanMeta": "Detected from {samples, plural, one {# sample file} other {# sample files}}",
+    "selection": {
+      "deselectAll": "Deselect all",
+      "counter": "{accepted} of {total} accepted",
+      "createSkill": "Create skill"
+    }
   },
   "card": {
     "confidence": "Confidence",
+    "adherence": "Followed in {pct}% of matching sites",
+    "adherenceDetail": "{support} conforming · {violations} violating",
+    "unmeasured": "Not measured",
     "accepted": "Accepted",
     "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "acceptAsSkill": "Accept as Skill",
+    "accept": "Accept",
+    "reject": "Reject",
+    "rejected": "Rejected",
+    "edit": "Edit rule",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edited": "edited",
+    "fromConfig": "from config",
+    "evidenceRelocated": "line corrected during verification",
+    "moreEvidence": "+{count} more"
+  },
+  "category": {
+    "naming": "Naming",
+    "structure": "Structure",
+    "error-handling": "Error handling",
+    "async": "Async",
+    "imports": "Imports",
+    "types": "Types",
+    "testing": "Testing",
+    "api-contract": "API contract",
+    "logging": "Logging",
+    "config": "Config"
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "mergedFrom": "Merged from {count, plural, one {# accepted convention} other {# accepted conventions}} in {repo}. Everything below is editable before you save.",
+    "name": "Name",
+    "description": "Description",
+    "type": "Type",
+    "enabled": "Enabled",
+    "enabledHint": "Whether this block is added to agents' prompts.",
+    "body": "Skill body",
+    "bodyHint": "Appended to the agent's prompt as a block. Edit freely before saving.",
+    "unsaved": "unsaved",
+    "linkAgent": "Attach to agent",
+    "linkAgentNone": "Don't attach yet",
+    "linkAgentHint": "The skill becomes a block in that agent's prompt on its next run.",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "creating": "Creating…",
+    "created": "Skill \"{name}\" created.",
+    "failed": "Could not create the skill.",
+    "loading": "Rendering draft…",
+    "draftFailed": "Could not render a draft from the selected conventions."
   }
 }

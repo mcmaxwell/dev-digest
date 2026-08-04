@@ -161,6 +161,20 @@ export interface RepoIntel {
   getUnresolvedReferences(repoId: string, files: string[]): Promise<RefRow[]>;
   /** Top-N file paths by rank, filtered of tests/configs. */
   getConventionSamples(repoId: string, n: number): Promise<string[]>;
+  /**
+   * Ranked paths for a SAMPLING stratum (L02 conventions extractor).
+   *
+   * Two things `getConventionSamples` cannot express:
+   *  - `kind: 'tests'` reaches test files, which the convention sampler
+   *    unconditionally drops — so "tests are named `*.it.test.ts`" is otherwise
+   *    structurally unextractable;
+   *  - `perDirCap` spreads the sample across top-level directories instead of
+   *    returning N files from whichever layer happens to rank highest.
+   */
+  getRankedSample(
+    repoId: string,
+    opts: { n: number; kind?: 'source' | 'tests'; perDirCap?: number },
+  ): Promise<Array<{ path: string; rank: number }>>;
 
   // --- T3: onboarding reading-path + critical paths (graph required) ------
   getTopFilesByRank(

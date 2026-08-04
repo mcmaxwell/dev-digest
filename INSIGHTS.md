@@ -7,6 +7,17 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## What Works
 
+- [2026-08-02] Before building a lesson feature, grep for its noun across the
+  whole repo — this starter pre-ships most of the scaffolding and it is easy to
+  rebuild something that already exists. "conventions" turned up an empty DB
+  table, a `ConventionCandidate` contract, a `conventions` entry in
+  `FEATURE_MODELS`, `repoIntel.getConventionSamples()`, a finished
+  `client/messages/en/conventions.json`, a pre-wired `activeKeyFor` branch, and
+  a comment in `adapters/mocks.ts` naming the intended two-step LLM flow
+  (`ConventionFileSelection` → `ConventionExtraction`). The mock adapters'
+  comments in particular document the SHAPE a lesson's model calls are meant to
+  take — read them before designing the pipeline.
+
 ## What Doesn't Work
 
 ## Codebase Patterns
