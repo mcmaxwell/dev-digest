@@ -21,6 +21,16 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Codebase Patterns
 
+- [2026-08-04] A flow that WRITES (accept, dismiss, toggle) must undo itself in
+  its last steps and re-assert the pre-state, or it only passes against a
+  freshly-seeded DB — `scripts/e2e.sh` reseeds every run, so CI stays green
+  while the flow is silently single-use against any persistent stack. Flow
+  `08-conventions` accepts a candidate, then closes the modal and clicks
+  "Deselect all" before re-asserting "0 of 3 accepted". Prove it by running the
+  suite TWICE against one stack (patch `scripts/e2e.sh`'s `(cd e2e && npm test)`
+  line into `… && …` and fix `ROOT` if you copy the script elsewhere) — a single
+  `e2e.sh` run can never detect this, because teardown hides it.
+
 ## Tool & Library Notes
 
 ## Recurring Errors & Fixes
