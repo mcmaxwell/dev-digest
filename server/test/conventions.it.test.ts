@@ -247,6 +247,30 @@ d('L02 conventions extractor (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('reaps a scan orphaned by a dead process on boot, so extract is not 409 forever', async () => {
+    // A process killed mid-scan leaves `running` behind and nothing will ever
+    // finish it — every later extract 409s and the page sticks on "Scanning…".
+    const [orphan] = await pg.handle.db
+      .insert(t.conventionScans)
+      .values({ workspaceId, repoId, status: 'running' })
+      .returning();
+
+    const app = await makeApp(); // boot = the reaper runs
+
+    const [row] = await pg.handle.db
+      .select()
+      .from(t.conventionScans)
+      .where(eq(t.conventionScans.id, orphan!.id));
+    expect(row!.status).toBe('error');
+    expect(row!.error).toMatch(/orphaned/);
+    expect(row!.finishedAt).not.toBeNull();
+
+    // …and a fresh extract is accepted again rather than rejected as duplicate.
+    const res = await app.inject({ method: 'POST', url: `/repos/${repoId}/conventions/extract` });
+    expect(res.statusCode).toBe(202);
+    await app.close();
+  });
+
   it('accept / reject / edit a candidate, and a re-scan preserves those verdicts', async () => {
     const app = await makeApp();
     const before = (

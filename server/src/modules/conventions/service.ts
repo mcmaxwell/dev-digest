@@ -19,6 +19,7 @@ import {
   CONFIG_FILES,
   CONFIG_SAMPLE_CAP,
   CONVENTIONS_EXTRACT_JOB_KIND,
+  CONVENTIONS_JOB_TIMEOUT_MS,
   DOC_FILES,
   DOC_SAMPLE_COUNT,
   EXTRACTION_CATEGORIES,
@@ -72,17 +73,26 @@ export class ConventionsService {
 
   /** Register the extraction job handler (called once at plugin load). */
   registerJobHandler(): void {
-    this.container.jobs.register(CONVENTIONS_EXTRACT_JOB_KIND, async (payload) => {
-      const { workspaceId, repoId, scanId } = payload as {
-        workspaceId: string;
-        repoId: string;
-        scanId: string;
-      };
-      await this.runExtraction(workspaceId, repoId, scanId);
-    });
+    this.container.jobs.register(
+      CONVENTIONS_EXTRACT_JOB_KIND,
+      async (payload) => {
+        const { workspaceId, repoId, scanId } = payload as {
+          workspaceId: string;
+          repoId: string;
+          scanId: string;
+        };
+        await this.runExtraction(workspaceId, repoId, scanId);
+      },
+      { timeoutMs: CONVENTIONS_JOB_TIMEOUT_MS },
+    );
   }
 
   // --- reads ---------------------------------------------------------------
+
+  /** Boot-time reaper — see `ConventionsRepository.reapStaleScans`. */
+  async reapStaleScans(): Promise<number> {
+    return this.repo.reapStaleScans();
+  }
 
   async getPage(workspaceId: string, repoId: string): Promise<ConventionsPage> {
     const [scan, rows] = await Promise.all([

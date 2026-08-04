@@ -35,6 +35,20 @@ export const EXTRACTION_CONCURRENCY = 4;
 export const LLM_TIMEOUT_MS = 90_000;
 export const LLM_MAX_RETRIES = 1;
 
+/**
+ * Whole-job ceiling, passed to `jobs.register` — the runner's 120s default is
+ * far below what this pipeline legitimately needs, and an under-budgeted job is
+ * marked `failed` while the pipeline keeps running, leaving the scan row
+ * dangling in `running` forever.
+ *
+ * Worst case, from the constants above: one selection call (90s) plus
+ * ceil(8 categories / 4 concurrent) = 2 batches, each bounded by its slowest
+ * call retried once (90s x 2 = 180s) -> 90 + 360 = 450s of model time, plus
+ * sampling I/O and the adherence probes (5s each). 900s leaves real headroom
+ * without letting a wedged job hold a queue slot indefinitely.
+ */
+export const CONVENTIONS_JOB_TIMEOUT_MS = 900_000;
+
 // --- Sampling strata --------------------------------------------------------
 
 /** Source files, spread across top-level directories rather than by rank alone. */

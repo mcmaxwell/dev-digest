@@ -60,6 +60,25 @@ export class ConventionsRepository {
     return !!row;
   }
 
+  /**
+   * On boot: any scan still `running` belongs to a process that died — nothing
+   * will ever finish it, and `isScanRunning` would 409 every future extract for
+   * that repo forever (the page just says "Scanning…" with the button disabled).
+   * Same reasoning and single-instance assumption as `reapStaleRunningRuns`.
+   */
+  async reapStaleScans(): Promise<number> {
+    const rows = await this.db
+      .update(t.conventionScans)
+      .set({
+        status: 'error',
+        error: 'orphaned: the process restarted before the scan finished',
+        finishedAt: new Date(),
+      })
+      .where(eq(t.conventionScans.status, 'running'))
+      .returning({ id: t.conventionScans.id });
+    return rows.length;
+  }
+
   async updateScan(
     scanId: string,
     patch: Partial<{
