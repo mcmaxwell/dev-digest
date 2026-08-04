@@ -35,6 +35,9 @@ const CATASTROPHIC_RE = /\([^)]*[+*]\s*\)\s*[+*]|\(\?:[^)]*[+*]\s*\)\s*[+*]/;
 /** Whether a model-authored pattern is safe enough to run. */
 export function isSafeProbePattern(pattern: string): boolean {
   if (!pattern || pattern.length > PROBE_MAX_PATTERN_LENGTH) return false;
+  // A leading dash is a valid regex but ALSO a valid CLI flag — a probe like
+  // `--pre=sh` must never reach a grep tool's argv as anything but a pattern.
+  if (pattern.startsWith('-')) return false;
   if (CATASTROPHIC_RE.test(pattern)) return false;
   try {
     // eslint-disable-next-line no-new

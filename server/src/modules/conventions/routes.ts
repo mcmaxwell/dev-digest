@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { ConventionCategory, ConventionStatus } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
-import { AppError, NotFoundError } from '../../platform/errors.js';
+import { NotFoundError } from '../../platform/errors.js';
 import { ConventionsService } from './service.js';
 
 /**
@@ -50,9 +50,6 @@ export default async function conventionsRoutes(appBase: FastifyInstance) {
     { schema: { params: IdParams } },
     async (req, reply) => {
       const { workspaceId } = await getContext(app.container, req);
-      if (await service.isScanRunning(workspaceId, req.params.id)) {
-        throw new AppError('scan_in_progress', 'A conventions scan is already running', 409);
-      }
       const result = await service.startScan(workspaceId, req.params.id);
       reply.code(202);
       return result;

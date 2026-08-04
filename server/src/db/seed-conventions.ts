@@ -22,6 +22,12 @@ export const SEED_SCAN_SHA = 'a1b2c3d4e5f6';
 export interface SeedConvention {
   category: ConventionCategory;
   rule: string;
+  /**
+   * Precomputed `ruleKeyFor(rule)`. Stored rather than computed so `db/` never
+   * imports application code from `modules/` — `test/seed-conventions.test.ts`
+   * asserts these stay in step with the real function.
+   */
+  ruleKey: string;
   rationale: string;
   evidence: ConventionEvidence[];
   confidence: number;
@@ -35,6 +41,7 @@ export const SEED_CONVENTIONS: SeedConvention[] = [
   {
     category: 'async',
     rule: 'Always use `async`/`await` instead of `.then()` chains.',
+    ruleKey: 'async-await-chain-instead-then',
     rationale:
       'Every data-access path in the sampled files awaits directly; a promise chain reads as foreign here and loses stack context on rejection.',
     evidence: [
@@ -62,6 +69,7 @@ export const SEED_CONVENTIONS: SeedConvention[] = [
   {
     category: 'api-contract',
     rule: 'All public route handlers return a typed `Result<T, ApiError>` rather than throwing.',
+    ruleKey: 'apierror-handler-public-rather-result-return-rout-than-throw-typ',
     rationale:
       'The public API layer converts failures into an explicit error value so the envelope stays uniform for callers.',
     evidence: [
@@ -89,6 +97,7 @@ export const SEED_CONVENTIONS: SeedConvention[] = [
   {
     category: 'structure',
     rule: 'Redis access goes through the `src/lib/redis.ts` singleton — never construct a client inline.',
+    ruleKey: 'acces-client-construct-goe-inlin-redi-singleton-src/lib/redis.ts-through',
     rationale:
       'One shared connection is created at module load; an inline client leaks a socket per request under the new rate limiter.',
     evidence: [

@@ -11,7 +11,6 @@ import {
 } from './seed-prompts.js';
 import { SEED_SKILLS, SEED_AGENT_SKILLS } from './seed-skills.js';
 import { SEED_CONVENTIONS, SEED_SCAN_SHA } from './seed-conventions.js';
-import { ruleKeyFor } from '../modules/conventions/dedupe.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -330,7 +329,7 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
           category: c.category,
           rule: c.rule,
           rationale: c.rationale,
-          ruleKey: ruleKeyFor(c.rule),
+          ruleKey: c.ruleKey,
           evidence: c.evidence,
           confidence: c.confidence,
           adherence: c.adherence,

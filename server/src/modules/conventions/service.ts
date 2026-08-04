@@ -7,6 +7,7 @@ import type {
   RepoRef,
 } from '@devdigest/shared';
 import type { Container } from '../../platform/container.js';
+import { AppError } from '../../platform/errors.js';
 import { withRetry, withTimeout } from '../../platform/resilience.js';
 // Cross-module read through the documented composition seam: a module may
 // construct another module's SERVICE (see .dependency-cruiser.cjs).
@@ -94,15 +95,18 @@ export class ConventionsService {
     };
   }
 
-  async isScanRunning(workspaceId: string, repoId: string): Promise<boolean> {
-    return this.repo.isScanRunning(workspaceId, repoId);
-  }
-
-  /** Open a scan row and enqueue the work. Returns the scan so the UI can poll. */
+  /**
+   * Open a scan row and enqueue the work. Returns the scan so the UI can poll.
+   * The one-scan-per-repo invariant lives HERE, not in the route — the handler
+   * stays a single service call and the 409 travels as an ordinary AppError.
+   */
   async startScan(
     workspaceId: string,
     repoId: string,
   ): Promise<{ scanId: string; jobId: string | null }> {
+    if (await this.repo.isScanRunning(workspaceId, repoId)) {
+      throw new AppError('scan_in_progress', 'A conventions scan is already running', 409);
+    }
     const scan = await this.repo.createScan(workspaceId, repoId);
     let jobId: string | null = null;
     try {

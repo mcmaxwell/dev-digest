@@ -77,6 +77,17 @@ module.exports = {
       from: { path: '^src/platform', pathNot: '^src/platform/container\\.ts$' },
       to: { path: '^src/modules' },
     },
+    {
+      name: 'db-independent-of-modules',
+      comment:
+        'db/ is infrastructure: schema, migrations and seed data. It may not ' +
+        'reach outward into application code — seed rows carry precomputed ' +
+        'values (see seed-conventions.ts ruleKey) instead of calling a module ' +
+        'helper, and a test asserts they stay in step.',
+      severity: 'error',
+      from: { path: '^src/db' },
+      to: { path: '^src/modules' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

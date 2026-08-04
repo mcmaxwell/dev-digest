@@ -39,6 +39,15 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   orphaned reference would fail `db:migrate` — and hand-editing the generated
   file is forbidden.
 
+- [2026-08-04] Any MODEL-AUTHORED string that reaches a spawned process must be
+  screened for a leading `-` AND passed after `-e` / `--`, not just validated as
+  well-formed. A conventions probe of `--pre=sh` is a legal regex that
+  `isSafeProbePattern` accepted, and `spawn(rg, [...flags, pattern, root])`
+  parsed it as ripgrep's `--pre` flag — which runs a command per searched file.
+  Fixed in both places (`modules/conventions/adherence.ts` rejects a leading
+  dash; `adapters/codeindex/ripgrep.ts` uses `-e pattern -- root`). Reachable
+  end-to-end because sampled repo text can prompt-inject the probe.
+
 ## What Doesn't Work
 
 - [2026-08-02] Don't poll `agent_runs.status == 'done'` and then immediately read
