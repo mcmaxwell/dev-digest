@@ -11,9 +11,9 @@
     { "cmd": ["wait", "--text", "src/api/users.ts:23"], "label": "evidence cites a real file:line" },
     { "cmd": ["wait", "--text", "Followed in 94% of matching sites"], "label": "measured adherence is shown, not just confidence" },
     { "cmd": ["wait", "--text", "0 of 3 accepted"], "label": "selection counter starts empty" },
-    { "cmd": ["click", "--text", "Accept"], "label": "accept the first candidate" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Accept", "--exact"], "label": "accept the first candidate" },
     { "cmd": ["wait", "--text", "1 of 3 accepted"], "label": "counter reflects the acceptance" },
-    { "cmd": ["click", "--text", "Create skill"], "label": "open the create-skill modal" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Create skill", "--exact"], "label": "open the create-skill modal" },
     { "cmd": ["wait", "--text", "Create skill from conventions"], "label": "modal opened" },
     { "cmd": ["wait", "--text", "payments-api-conventions"], "label": "draft is pre-filled from the accepted rule" }
   ]
