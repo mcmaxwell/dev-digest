@@ -48,6 +48,18 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   dash; `adapters/codeindex/ripgrep.ts` uses `-e pattern -- root`). Reachable
   end-to-end because sampled repo text can prompt-inject the probe.
 
+- [2026-08-04] A background job whose ceiling is BELOW its honest worst case
+  fails in the worst possible way: `withTimeout` only rejects the awaited
+  promise, it cannot cancel the work, so the job row goes `failed` while the
+  pipeline keeps running and whatever row it opened stays open. Conventions
+  needs ~450s (selection + 2 retryable batches) against JobRunner's 120s
+  default; a real repo measured 111s, i.e. it kept tripping a limit it sat just
+  under. Budget per kind at `jobs.register(kind, handler, {timeoutMs})` from the
+  module's own constants, and pair it with a boot reaper — ANY table with a
+  `running` status needs one (see `reapStaleScans` / `reapStaleRunningRuns`),
+  because a `running` row that also acts as a uniqueness guard turns one crash
+  into a permanently disabled feature.
+
 ## What Doesn't Work
 
 - [2026-08-02] Don't poll `agent_runs.status == 'done'` and then immediately read
