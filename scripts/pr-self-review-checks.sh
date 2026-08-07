@@ -98,6 +98,13 @@ run_checks() {
     case "$f" in
       server/clones/*)
         emit CRITICAL "$f" "server/clones/** is a runtime checkout — must never be edited or committed" ;;
+      # nav.ts is the APP's sidebar + shortcut registry that happens to sit
+      # inside the kit directory. It already carries this app's routes
+      # (/repos/:repoId/pulls, /skills, /agents), and every lesson that adds a
+      # page has to add its entry here — so flagging it as a vendored-kit edit
+      # is a false positive on every such PR. The kit itself stays protected.
+      client/src/vendor/ui/nav.ts)
+        : ;;
       client/src/vendor/ui/*)
         emit CRITICAL "$f" "client/src/vendor/ui/** is a vendored UI kit — do not modify" ;;
       .env|*/.env|.env.local|*/.env.local)

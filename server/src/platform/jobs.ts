@@ -30,6 +30,7 @@ export interface EnqueuedJob {
 export class JobRunner {
   private queue: PQueue;
   private handlers = new Map<string, JobHandler>();
+  private kindTimeouts = new Map<string, number>();
   private timeoutMs: number;
   private retries: number;
 
@@ -42,8 +43,16 @@ export class JobRunner {
     this.retries = opts.retries ?? 2;
   }
 
-  register(kind: string, handler: JobHandler): void {
+  /**
+   * `timeoutMs` overrides the runner default FOR THIS KIND. A handler whose
+   * honest worst case exceeds the default must say so here: the runner's
+   * timeout only rejects the awaited promise, it cannot cancel the work, so an
+   * under-budgeted job is marked `failed` while its pipeline keeps running and
+   * whatever row it opened is left dangling.
+   */
+  register(kind: string, handler: JobHandler, opts: { timeoutMs?: number } = {}): void {
     this.handlers.set(kind, handler);
+    if (opts.timeoutMs) this.kindTimeouts.set(kind, opts.timeoutMs);
   }
 
   async enqueue(workspaceId: string, kind: string, payload: unknown): Promise<EnqueuedJob> {
@@ -55,6 +64,7 @@ export class JobRunner {
       .values({ workspaceId, kind, payload: payload as object, status: 'queued' })
       .returning({ id: t.jobs.id });
     const jobId = row!.id;
+    const timeoutMs = this.kindTimeouts.get(kind) ?? this.timeoutMs;
 
     const done = this.queue.add(async () => {
       await this.db
@@ -64,7 +74,7 @@ export class JobRunner {
       try {
         await withRetry(
           () =>
-            withTimeout(handler(payload, { jobId }), this.timeoutMs).then(async () => {
+            withTimeout(handler(payload, { jobId }), timeoutMs).then(async () => {
               await this.db
                 .update(t.jobs)
                 .set({ attempts: 1 })

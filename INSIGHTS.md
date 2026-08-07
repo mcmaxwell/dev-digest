@@ -7,6 +7,17 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## What Works
 
+- [2026-08-02] Before building a lesson feature, grep for its noun across the
+  whole repo — this starter pre-ships most of the scaffolding and it is easy to
+  rebuild something that already exists. "conventions" turned up an empty DB
+  table, a `ConventionCandidate` contract, a `conventions` entry in
+  `FEATURE_MODELS`, `repoIntel.getConventionSamples()`, a finished
+  `client/messages/en/conventions.json`, a pre-wired `activeKeyFor` branch, and
+  a comment in `adapters/mocks.ts` naming the intended two-step LLM flow
+  (`ConventionFileSelection` → `ConventionExtraction`). The mock adapters'
+  comments in particular document the SHAPE a lesson's model calls are meant to
+  take — read them before designing the pipeline.
+
 ## What Doesn't Work
 
 ## Codebase Patterns
@@ -53,6 +64,16 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   NOT install e2e).
 
 ## Session Notes
+
+- [2026-08-04] L02 conventions extractor shipped end-to-end on
+  `feat/l02-conventions-extractor`: `modules/conventions` (stratified sampling →
+  config rules → per-category LLM fan-out → dedupe → evidence grounding →
+  probe-based adherence) + `/conventions` page + skill drafting through the
+  ordinary `POST /skills`. Contract change (`ConventionEvidence.sha`) landed in
+  BOTH vendored copies. Pre-PR self-review caught three real criticals, all
+  fixed: argv injection via a model-authored rg pattern, `db/` importing
+  `modules/` (now blocked by a new `db-independent-of-modules` depcruise rule),
+  and the scan-in-progress guard sitting in the route instead of the service.
 
 - [2026-07-28] L01 run-cost implemented end-to-end: `agent_runs.cost_usd`
   (migration 0010) → `RunStats`/`RunSummary`/`PrMeta.total_cost_usd` contracts

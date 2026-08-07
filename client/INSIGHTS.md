@@ -46,6 +46,15 @@ the root INSIGHTS.md. Format and quality gates:
   `./scripts/e2e.sh` (real dev server) did, so run e2e after touching the root
   layout or anything it imports.
 
+- [2026-08-04] Don't key a "fetch server draft → setState form fields" effect on
+  an array the parent derives inline (`acceptedOf(candidates)` returns a new
+  identity every render): any unrelated parent re-render (poll tick, toast)
+  re-fires the effect and the re-fetched draft silently overwrites everything
+  the user already typed. Key the effect on a joined-id STRING and memoize the
+  parent derivation — see `CreateSkillFromConventionsModal.tsx` (`idsKey`),
+  regression-tested by "requests the skill draft once" in
+  `ConventionsView.test.tsx`.
+
 ## Codebase Patterns
 
 - [2026-08-02] Adding a top-level page to the sidebar REQUIRES editing vendored
@@ -55,6 +64,23 @@ the root INSIGHTS.md. Format and quality gates:
   (`useGlobalShortcuts` scans `NAV[].gKey`), the command palette
   (`useShellCommands` + `shell.json` `nav.<key>` label), and the active-key branch
   in `app-shell/helpers.ts` (most keys are pre-wired there already).
+  - [2026-08-02] Confirmed adding `/conventions`: only `nav.ts` needed the entry
+    (plus its `SHORTCUTS` row for the `?` overlay); `activeKeyFor` already
+    branched on `"conventions"` and `shell.json` already had `nav.conventions`.
+    The design system ships these keys AHEAD of the lessons — grep
+    `helpers.ts`/`shell.json` for your key before writing any wiring.
+- [2026-08-02] A repo-scoped page that lives at a NON-repo URL (`/conventions`,
+  not `/repos/:id/…`) reads the repo from `useActiveRepo()` and must render a
+  "pick a repository" empty state for `activeRepo === null` — the sidebar
+  switcher legitimately starts empty on a fresh profile, and the repo-scoped
+  hook would otherwise fire with `undefined` in the path
+  (`app/conventions/_components/ConventionsView`).
+- [2026-08-02] For a list the user works through item by item (accept/reject),
+  patch the mutated row into the cache with `qc.setQueryData` instead of
+  `invalidateQueries` — an invalidate re-sorts the list under the cursor mid-pass
+  and the next card jumps away. See `useUpdateConvention` in
+  `lib/hooks/conventions.ts` vs `useUpdateSkill` (which may invalidate freely
+  because its grid is name-sorted and stable).
 - [2026-07-28] `e2e/specs/04-pr-findings.flow.json` asserts the literal
   substring "2 findings" in the ReviewRunAccordion header — when changing that
   header, APPEND after the `N findings` prefix (as the severity breakdown

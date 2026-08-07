@@ -41,6 +41,11 @@ export DATABASE_URL="postgres://${PG_USER}:${PG_PASS}@127.0.0.1:${PG_PORT}/${PG_
 export API_PORT WEB_PORT
 export NEXT_PUBLIC_API_BASE="http://localhost:${API_PORT}"
 export E2E_BASE_URL="http://localhost:${WEB_PORT}"
+# Next inlines NEXT_PUBLIC_* at COMPILE time and keys its build cache by
+# directory alone — sharing client/.next with a running dev server would leave
+# this run's `:3101` API base baked into the chunks that server keeps serving on
+# :3000. Own dist dir = the client build cache is hermetic too, not just PG/API.
+export NEXT_DIST_DIR="${E2E_NEXT_DIST_DIR:-.next-e2e}"
 
 log()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m! %s\033[0m\n' "$*"; }
@@ -64,11 +69,24 @@ kill_tree() {
   for kid in $(pgrep -P "$pid" 2>/dev/null || true); do kill_tree "$kid"; done
   kill "$pid" 2>/dev/null || true
 }
+restore_snapshot() {
+  local backup="$1" target="$2"
+  [ -n "$backup" ] && [ -f "$backup" ] || return 0
+  cp "$backup" "$target" 2>/dev/null || true
+  rm -f "$backup"
+}
 cleanup() {
   local code=$?
   log "tearing down hermetic e2e stack"
   kill_tree "$WEB_PID"
   kill_tree "$SERVER_PID"
+  # `next dev` REWRITES tracked files to match the distDir it ran with:
+  # next-env.d.ts gets a new /// <reference>, and tsconfig.json gains a
+  # `.next-e2e/types` include (plus a full reformat). Left alone, an e2e run
+  # dirties the working tree and points typecheck at a dir that only exists
+  # after e2e has run. Put the committed versions back.
+  restore_snapshot "$NEXT_ENV_BACKUP" "$ROOT/client/next-env.d.ts"
+  restore_snapshot "$TSCONFIG_BACKUP" "$ROOT/client/tsconfig.json"
   # Backstop: reap whatever still holds the ISOLATED ports (never the dev stack's
   # 3000/3001 — only the alt ports this script started).
   for port in "$WEB_PORT" "$API_PORT"; do
@@ -144,6 +162,12 @@ done
 log "API healthy"
 
 # --- web on :$WEB_PORT (next dev → reads NEXT_PUBLIC_API_BASE from env) -------
+# Snapshot the tracked files `next dev` rewrites for its distDir; cleanup()
+# restores them so an e2e run leaves the working tree exactly as it found it.
+NEXT_ENV_BACKUP="$(mktemp -t devdigest-next-env)"
+TSCONFIG_BACKUP="$(mktemp -t devdigest-tsconfig)"
+cp "$ROOT/client/next-env.d.ts" "$NEXT_ENV_BACKUP"
+cp "$ROOT/client/tsconfig.json" "$TSCONFIG_BACKUP"
 log "starting web on :$WEB_PORT"
 (cd client && pnpm exec next dev -p "$WEB_PORT") &
 WEB_PID=$!

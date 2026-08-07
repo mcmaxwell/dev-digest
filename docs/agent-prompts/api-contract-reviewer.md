@@ -59,3 +59,37 @@ empty findings list; NEVER approve while reporting a CRITICAL.
 - Every finding must cite an exact file and line range that exists in the diff,
   naming the caller-visible behaviour that changes.
 - Set `kind` to "finding" and leave `trifecta_components` / `evidence` null.
+
+---
+
+<!-- Not part of the prompt sent to the model — notes for whoever maintains it. -->
+
+# Maintainer note — this prompt vs. the agent's skills
+
+This prompt carries the parts that must be true on EVERY run: the role, what
+counts as the contract, the severity rubric, the verdict mapping and the findings
+discipline. It deliberately stays at the level of "what kind of thing to look
+for".
+
+The enforceable specifics live in four linked skills, each with an explicit
+good/bad pair, so they can be edited, versioned, toggled and A/B'd without
+touching the prompt:
+
+| Skill | Carries |
+|---|---|
+| `api-contract-breaking-changes` | The general break taxonomy: removed route/field/enum, newly-required input, changed status code |
+| `api-response-schema` | Response-shape detail: rename, retype, widened nullability, casing and unit changes, contract drift across vendored copies |
+| `api-semver-discipline` | Which bump a change forces, and flagging a MAJOR-level change shipped as a patch |
+| `api-deprecation-policy` | Two-step retirement: mark with a replacement + removal date, delete only after the window |
+
+`api-deprecation-policy` is **not seeded** — it ships as
+`docs/skills-examples/api-deprecation-policy.md` and is added through
+Skills → Add Skill → Import from file. `phantom-api-gate` is also linked; it
+catches calls to endpoints and helpers nothing in the repo defines.
+
+Why split it this way: a skill is a prompt block you can turn off. Keeping the
+specifics in skills makes the control experiment in
+`docs/experiments/api-contract-skills.md` possible — unlink them, re-run the same
+PR, and the difference in findings is attributable to the skills rather than to
+prompt drift. It also means a repo-specific convention extracted on the
+Conventions page can join the same agent as one more block, in the same slot.

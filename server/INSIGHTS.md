@@ -13,12 +13,52 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   compiling unchanged, and joining a transaction is one extra argument — see
   `run-executor.ts` persisting review + findings + markReviewed +
   completeAgentRun as one unit.
+- [2026-08-02] For any candidate an LLM proposes about the repo, make the
+  UPSERT KEY a normalized form of the claim (`conventions.rule_key` =
+  sorted content tokens of the rule, unique per repo) and never recompute it
+  when the USER edits the text. The key is the claim's identity across scans;
+  recomputing it on edit makes the next scan fail to recognise the rule it
+  already proposed, so the model's original phrasing reappears as a second
+  pending card beside the user's edited one. With a stable key the upsert
+  refreshes evidence/scores while `status` and the edited wording survive —
+  which is what makes a re-scan non-destructive
+  (`modules/conventions/{service,repository}.ts`, regression-tested in
+  `test/conventions.it.test.ts` "an edit must not fork the card").
+- [2026-08-02] To grade an LLM claim about a codebase, have the model emit a
+  MACHINE-CHECKABLE probe alongside the claim (`{positive, negative}` regexes)
+  and run both through `container.codeIndex.grep`: `adherence = pos/(pos+neg)`
+  turns "the model believes this" into "the repo does this 94% of the time".
+  Verified evidence only proves the pattern EXISTS; counting violations is what
+  proves it is the rule (`modules/conventions/adherence.ts`). Treat a
+  failed/timed-out probe as UNMEASURED (cap confidence), never as a violation —
+  deleting the candidate would turn an infra hiccup into a lost finding.
 - [2026-07-31] When adding a FK to a column that never had one, ship a
   `drizzle-kit generate --custom` migration BEFORE the generated one to heal
   dangling rows (`0011_heal_dangling_review_refs.sql`). Postgres validates
   existing rows when the constraint is added, so any developer database with an
   orphaned reference would fail `db:migrate` — and hand-editing the generated
   file is forbidden.
+
+- [2026-08-04] Any MODEL-AUTHORED string that reaches a spawned process must be
+  screened for a leading `-` AND passed after `-e` / `--`, not just validated as
+  well-formed. A conventions probe of `--pre=sh` is a legal regex that
+  `isSafeProbePattern` accepted, and `spawn(rg, [...flags, pattern, root])`
+  parsed it as ripgrep's `--pre` flag — which runs a command per searched file.
+  Fixed in both places (`modules/conventions/adherence.ts` rejects a leading
+  dash; `adapters/codeindex/ripgrep.ts` uses `-e pattern -- root`). Reachable
+  end-to-end because sampled repo text can prompt-inject the probe.
+
+- [2026-08-04] A background job whose ceiling is BELOW its honest worst case
+  fails in the worst possible way: `withTimeout` only rejects the awaited
+  promise, it cannot cancel the work, so the job row goes `failed` while the
+  pipeline keeps running and whatever row it opened stays open. Conventions
+  needs ~450s (selection + 2 retryable batches) against JobRunner's 120s
+  default; a real repo measured 111s, i.e. it kept tripping a limit it sat just
+  under. Budget per kind at `jobs.register(kind, handler, {timeoutMs})` from the
+  module's own constants, and pair it with a boot reaper — ANY table with a
+  `running` status needs one (see `reapStaleScans` / `reapStaleRunningRuns`),
+  because a `running` row that also acts as a uniqueness guard turns one crash
+  into a permanently disabled feature.
 
 ## What Doesn't Work
 
@@ -93,7 +133,31 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   stray `pnpm-lock.yaml` and a pnpm-shaped `node_modules` that break `npm ci` —
   always use `npm` in `reviewer-core/`.
 
+- [2026-08-02] `drizzle-kit generate` turns INTERACTIVE ("is X created or renamed
+  from another column?") whenever one table both gains and drops columns in the
+  same diff, and it hangs forever with a piped stdin (`yes '' | pnpm db:generate`
+  never returns). Split the schema edit into two passes — keep the doomed columns
+  while adding the new ones (`generate` → additions only, non-interactive), then
+  delete them (`generate` → deletions only, non-interactive). Two migrations, no
+  TTY needed, and it works in CI. See `0013_yielding_johnny_blaze` +
+  `0014_square_agent_zero`.
+- [2026-08-02] `MockGitClient.readFile` resolves a MISSING path to `''` instead of
+  rejecting (`src/adapters/mocks.ts`), so any "read these optional files" sampler
+  must treat blank content as absent or it fills its budget with empty slices.
+  Guard with `raw && raw.trim().length > 0`, not `raw !== null`.
+
 ## Recurring Errors & Fixes
+
+- [2026-08-02] `pnpm exec vitest run .it.test` failing en masse with
+  `No space left on device` / `Health check failed: unhealthy` is the DOCKER VM
+  disk, not the code — each `*.it.test.ts` file starts its own Postgres via
+  testcontainers and 8 at once exhausts it. Re-run with
+  `--no-file-parallelism` (one container at a time) before debugging anything.
+  Check with `docker run --rm alpine df -h /`. NOTE: `docker volume prune -f`
+  only frees the anonymous testcontainers volumes and leaves `devdigest_pgdata`
+  alone WHILE the dev Postgres container is running — if the dev stack is
+  stopped, that volume is dangling and prune deletes it with every imported repo
+  and review. Verify with `docker volume ls --filter name=devdigest` first.
 
 ## Session Notes
 

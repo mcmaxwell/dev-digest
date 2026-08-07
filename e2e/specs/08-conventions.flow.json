@@ -1,0 +1,23 @@
+{
+  "name": "Conventions page lists seeded candidates and opens the create-skill modal",
+  "description": "Loads /conventions, confirms the seeded candidates render with their grounded file:line evidence and measured adherence, accepts one, and opens the 'Create skill from conventions' modal. Deterministic — the candidates are seeded, so no model call is made. Accepting a candidate WRITES, so the flow reverts it at the end (close the modal, Deselect all) and re-asserts the empty counter: the flow must be re-runnable against a stack it does not own.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/conventions"], "label": "load the conventions page" },
+    { "cmd": ["wait", "--url", "/conventions"], "label": "conventions route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "conventions fetch settles" },
+    { "cmd": ["wait", "--text", "payments-api"], "label": "heading names the active repo" },
+    { "cmd": ["wait", "--text", "Detected from 18 sample files"], "label": "scan header reports what was sampled" },
+    { "cmd": ["wait", "--text", "Always use `async`/`await` instead of `.then()` chains."], "label": "seeded candidate rule is visible" },
+    { "cmd": ["wait", "--text", "src/api/users.ts:23"], "label": "evidence cites a real file:line" },
+    { "cmd": ["wait", "--text", "Followed in 94% of matching sites"], "label": "measured adherence is shown, not just confidence" },
+    { "cmd": ["wait", "--text", "0 of 3 accepted"], "label": "selection counter starts empty" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Accept", "--exact"], "label": "accept the first candidate" },
+    { "cmd": ["wait", "--text", "1 of 3 accepted"], "label": "counter reflects the acceptance" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Create skill", "--exact"], "label": "open the create-skill modal" },
+    { "cmd": ["wait", "--text", "Create skill from conventions"], "label": "modal opened" },
+    { "cmd": ["wait", "--text", "payments-api-conventions"], "label": "draft is pre-filled from the accepted rule" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Cancel", "--exact"], "label": "close the modal without saving a skill" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Deselect all", "--exact"], "label": "revert the acceptance" },
+    { "cmd": ["wait", "--text", "0 of 3 accepted"], "label": "counter is back to its seeded state" }
+  ]
+}
