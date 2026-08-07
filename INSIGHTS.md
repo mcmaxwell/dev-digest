@@ -35,6 +35,16 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   CLAUDE.md's do-not-touch note implies — path checks/greps must match
   `server/src/db/schema(\.ts|/)` or they miss real schema changes
   (bit `scripts/pr-self-review-checks.sh`'s migrations-without-schema check).
+- [2026-08-07] `CLAUDE.md` is a SYMLINK to `AGENTS.md` at the repo root and in
+  all four packages (`ls -la CLAUDE.md` → `CLAUDE.md -> AGENTS.md`). Any
+  instruction to "update both files" is wrong, and writing `CLAUDE.md` as a new
+  file would replace the link. There is one file per scope; edit `AGENTS.md`.
+- [2026-08-07] Only `client/` has a `lint` script. `server/` has
+  `typecheck test arch:check db:*` and `reviewer-core/` has
+  `typecheck build arch:check test` — the mechanical boundary check on the
+  backend is `arch:check` (dependency-cruiser), NOT lint. `.claude/agents/`
+  docs used to imply `pnpm lint` was available server-side; an agent told to
+  run it just fails.
 
 ## Tool & Library Notes
 

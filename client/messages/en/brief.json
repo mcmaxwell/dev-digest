@@ -10,6 +10,33 @@
   "overlap": "{count} overlap",
   "unavailable": "Brief not available yet.",
   "unavailableHint": "Run a review or open the PR to compute it.",
+  "description": "Description",
+  "intent": {
+    "detect": "Detect intent",
+    "redetect": "Re-run detection",
+    "detecting": "Detecting…",
+    "emptyTitle": "Intent not detected yet",
+    "emptyBody": "Read this PR’s title, description, linked issue and changed files to state what it sets out to do.",
+    "errorTitle": "Could not load the intent",
+    "inScope": "In scope",
+    "outOfScope": "Out of scope",
+    "riskAreas": "Risk areas",
+    "nothingStated": "Nothing stated.",
+    "confidence": "{level} confidence",
+    "stale": "Head moved",
+    "missingTitle": "Missing context",
+    "missingItem": "{kind} {ref} — {status}",
+    "detectedWith": "{provider} · {model}",
+    "status": {
+      "absent": "not present on this PR",
+      "unreachable": "could not be read"
+    },
+    "level": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    }
+  },
   "why": {
     "title": "git-why",
     "blame": "blame",

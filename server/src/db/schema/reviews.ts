@@ -60,13 +60,48 @@ export const findings = pgTable(
   }),
 );
 
+/**
+ * L03 — the derived intent of one PR (owned by `modules/intent`).
+ *
+ * The drizzle property is `summary` while the SQL column stays `intent`: this
+ * migration must be purely ADDITIVE, because `drizzle-kit generate` turns
+ * interactive (and hangs on piped stdin) as soon as one table both gains and
+ * drops columns in the same diff. Renaming the property is free; renaming the
+ * column is not.
+ *
+ * No index: `pr_id` is the primary key and the only access path.
+ * `confidence` uses drizzle's TS-only enum — no DB CHECK, repo-wide precedent.
+ */
 export const prIntent = pgTable('pr_intent', {
   prId: uuid('pr_id')
     .primaryKey()
     .references(() => pullRequests.id, { onDelete: 'cascade' }),
-  intent: text('intent').notNull(),
+  summary: text('intent').notNull(),
   inScope: jsonb('in_scope').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   outOfScope: jsonb('out_of_scope').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  riskAreas: jsonb('risk_areas')
+    .$type<{ label: string; kind: string }[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  /** Per-source resolution outcome — ids and statuses only, never source text. */
+  sources: jsonb('sources')
+    .$type<{ kind: string; ref: string; status: string; chars: number }[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  confidence: text('confidence', { enum: ['high', 'medium', 'low'] })
+    .notNull()
+    .default('low'),
+  provider: text('provider'),
+  model: text('model'),
+  /** The commit this intent was derived from; `stale` is derived from it on read. */
+  headSha: text('head_sha'),
+  generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
+  /**
+   * The classifier's full prompt + call stats. DB-only, never logged: it is a
+   * deliberate, bounded exception to "no source text leaves the process", and
+   * contains nothing that is not already in `pull_requests.body`.
+   */
+  trace: jsonb('trace'),
 });
 
 export const prBrief = pgTable('pr_brief', {

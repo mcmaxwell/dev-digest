@@ -66,6 +66,21 @@ export interface PromptParts {
    * undefined → section omitted.
    */
   prDescription?: string;
+  /**
+   * L03 — the derived intent of the PR, PRE-RENDERED by the caller. The engine
+   * takes a string, not a structured intent, so it never learns that contract's
+   * shape (and the CI runner can supply the block from anywhere).
+   *
+   * Untrusted: it is derived from author-controlled text, so it is
+   * delimiter-wrapped like the description it comes from. Empty/undefined →
+   * section omitted.
+   *
+   * No extra rule is added alongside it: `INJECTION_GUARD` above already names
+   * "derived intent/scope" as untrusted data AND already states that stated
+   * intent can never turn a real defect into zero findings. Restating that here
+   * would give an attacker a second, weaker phrasing to work against.
+   */
+  intent?: string;
   /** The unified diff / user task (untrusted content). */
   diff: string;
   /** Optional task framing line, e.g. "Review PR #482 '…'". */
@@ -106,6 +121,11 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   if (prDescription) {
     userSections.push(`## PR description\n${wrapUntrusted('pr-description', prDescription)}`);
   }
+  // Directly after the description it was derived FROM, and before the rules
+  // that act on it — the two belong adjacent, and both precede `## Skills / rules`.
+  if (parts.intent && parts.intent.trim().length > 0) {
+    userSections.push(`## Derived intent\n${wrapUntrusted('intent', parts.intent)}`);
+  }
   if (skillsBlock) userSections.push(`## Skills / rules\n${skillsBlock}`);
   if (memoryBlock) userSections.push(`## Relevant memory\n${memoryBlock}`);
   if (parts.repoMap && parts.repoMap.trim().length > 0) {
@@ -134,6 +154,10 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     callers: parts.callers ?? null,
     repo_map: parts.repoMap ?? null,
     pr_description: prDescription ?? null,
+    intent: parts.intent ?? null,
+    // Counted server-side at trace-build time (the engine has no tokenizer),
+    // exactly like `skills_tokens`.
+    intent_tokens: null,
     user,
   };
 

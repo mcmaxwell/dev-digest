@@ -34,6 +34,15 @@ export {
 // Map-reduce helpers (reduce partials, slice a file's diff).
 export { reduceReviews, sliceDiff } from './review/reduce.js';
 
+// L03 — the deterministic scope filter (a CRITICAL is never dropped).
+export {
+  applyScopeFilter,
+  scopeSuppressionNote,
+  DEFAULT_SCOPE_KEEP_AT_OR_ABOVE,
+  type ScopeFilterOptions,
+  type ScopeFilterResult,
+} from './review/scope.js';
+
 // The engine entry point: given (diff + resolved agent inputs + LLM) → grounded Review.
 export {
   reviewPullRequest,

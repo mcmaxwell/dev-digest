@@ -61,6 +61,16 @@ export const FindingShape = z.object({
   suggestion: z.string().nullish(), // markdown
   confidence: z.number().min(0).max(1),
   kind: FindingKind.nullish(),
+  /**
+   * L03 — whether this finding is about something the PR set out to change.
+   *
+   * An LLM-only field with no column in `findings` (the precedent `evidence`
+   * sets below), read by the DETERMINISTIC scope filter in reviewer-core. It can
+   * only ever cause a finding BELOW the severity threshold to be suppressed:
+   * a CRITICAL is never dropped for being out of scope, and a null scope is
+   * never dropped at all.
+   */
+  scope: z.enum(['in_scope', 'out_of_scope']).nullish(),
   // Lethal-trifecta variant fields (present only when kind === 'lethal_trifecta')
   trifecta_components: z.array(TrifectaComponent).nullish(),
   evidence: z.array(TrifectaEvidence).nullish(),

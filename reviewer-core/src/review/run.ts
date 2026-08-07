@@ -4,12 +4,18 @@ import type {
   PromptAssembly,
   Review,
   RunEventKind,
+  Severity,
   UnifiedDiff,
 } from '@devdigest/shared';
 import { Review as ReviewSchema } from '@devdigest/shared';
 import { assemblePrompt } from '../prompt.js';
 import { groundFindings, groundingSummary } from '../grounding.js';
 import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
+import {
+  applyScopeFilter,
+  DEFAULT_SCOPE_KEEP_AT_OR_ABOVE,
+  scopeSuppressionNote,
+} from './scope.js';
 
 /**
  * reviewPullRequest — the review engine entry point.
@@ -71,12 +77,24 @@ export interface ReviewInput {
   /** PR author's description/body (untrusted; truncated + delimiter-wrapped in
       the prompt). Empty/undefined → section omitted. */
   prDescription?: string;
+  /**
+   * L03 — pre-rendered `## Derived intent` block (untrusted; delimiter-wrapped
+   * in the prompt). Empty/undefined → section omitted, and the review then
+   * behaves exactly as it did before intent existed.
+   */
+  intent?: string;
   /** Task framing line, e.g. "Review PR #482 …". */
   task?: string;
   /** Override the structured-output retry budget. */
   maxRetries?: number;
   /** Override the map-reduce line threshold. */
   mapThresholdLines?: number;
+  /**
+   * L03 — severity at or above which a finding is immune to the scope filter.
+   * Defaults to CRITICAL; lowering it is a deliberate act, raising it above
+   * CRITICAL is not possible because CRITICAL is the top of the scale.
+   */
+  scopeKeepAtOrAbove?: Severity;
   /**
    * OpenRouter session id — forwarded on every LLM call so all chunks of this
    * review group into one session in the OpenRouter dashboard.
@@ -99,6 +117,12 @@ export interface ReviewOutcome {
   grounding: string;
   /** Findings dropped by grounding, with reasons (for logs / "never go silent"). */
   dropped: { finding: Finding; reason: string }[];
+  /**
+   * L03 — findings dropped by the SCOPE filter, kept separate from `dropped` so
+   * "the citation gate rejected this" and "the PR did not set out to do this"
+   * never get conflated in the trace.
+   */
+  scopeDropped: { finding: Finding; reason: string }[];
   /** Which path ran. */
   mode: ReviewMode;
   /** Prompt assembly (for the run trace). Single-pass: the one call; map-reduce: the whole-diff assembly. */
@@ -135,6 +159,7 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     callers: input.callers,
     repoMap: input.repoMap,
     prDescription: input.prDescription,
+    intent: input.intent,
     task: input.task,
   };
 
@@ -201,13 +226,32 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   }
   emit('result', `Citation grounding: ${grounding}`);
 
+  // L03 — deterministic scope filter. Runs AFTER grounding (so it can never let
+  // an ungrounded finding through) and BEFORE the score is recomputed (so the
+  // score describes exactly the findings the user is shown). A CRITICAL is never
+  // dropped, and a finding with no scope is never dropped at all — which is why
+  // a review with no intent behaves identically to a pre-L03 one.
+  const scoped = applyScopeFilter(ground.kept, {
+    keepAtOrAbove: input.scopeKeepAtOrAbove ?? DEFAULT_SCOPE_KEEP_AT_OR_ABOVE,
+  });
+  for (const d of scoped.dropped) {
+    emit('info', `scope dropped "${d.finding.title}": ${d.reason}`);
+  }
+  // Never silent: the suppression is stated in the summary the user reads, on
+  // top of the Live Log lines above and `scopeDropped` in the trace.
+  const summary =
+    scoped.dropped.length > 0
+      ? `${merged.summary}\n\n${scopeSuppressionNote(scoped.dropped.length)}`
+      : merged.summary;
+
   // Score is derived from the findings that SURVIVED grounding (not the model's
   // self-reported number, and not the pre-grounding set) so the score, the
   // findings list, and the deterministic event always agree.
   return {
-    review: { ...merged, findings: ground.kept, score: scoreFromFindings(ground.kept) },
+    review: { ...merged, summary, findings: scoped.kept, score: scoreFromFindings(scoped.kept) },
     grounding,
     dropped: ground.dropped,
+    scopeDropped: scoped.dropped,
     mode,
     assembly,
     chunks: chunks.map((c) => ({ label: c.label })),

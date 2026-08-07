@@ -4,7 +4,12 @@ import { waitForPrRuns } from './helpers/runs.js';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
-import { MockLLMProvider, MockEmbedder, MockGitClient } from '../src/adapters/mocks.js';
+import {
+  MockLLMProvider,
+  MockEmbedder,
+  MockGitClient,
+  MockSecretsProvider,
+} from '../src/adapters/mocks.js';
 import * as t from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import type { Review } from '@devdigest/shared';
@@ -117,6 +122,11 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
       overrides: {
         embedder: new MockEmbedder(),
         git: new MockGitClient({ diff: DIFF }),
+        // No stored keys. Without this the container falls back to the
+        // DEVELOPER'S ~/.devdigest/secrets.json, and L03's intent classifier
+        // (which resolves `review_intent` → openrouter) would make a real,
+        // billable network call on every review run in this file.
+        secrets: new MockSecretsProvider({}),
         llm: {
           [provider]: new MockLLMProvider(provider, { structured }),
         },

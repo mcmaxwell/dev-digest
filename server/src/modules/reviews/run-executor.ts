@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Container } from '../../platform/container.js';
 import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers, wrapUntrusted } from '@devdigest/reviewer-core';
@@ -7,7 +8,15 @@ import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
-import { loadDiff } from './diff-loader.js';
+import { loadDiff } from '../_shared/diff-loader.js';
+import {
+  logPromptAssembly,
+  REVIEW_SECTION_SOURCES,
+  type PromptSectionInput,
+} from '../../platform/prompt-log.js';
+// Cross-module read through the documented composition seam: a module may
+// construct another module's SERVICE (see .dependency-cruiser.cjs).
+import { IntentService } from '../intent/service.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -95,15 +104,42 @@ export class ReviewRunExecutor {
 
     let diff: UnifiedDiff;
     try {
-      diff = await runLog.step('Loading PR diff', () => loadDiff(this.container, this.repo, workspaceId, pull, repo), {
-        kind: 'tool',
-      });
+      diff = await runLog.step(
+        'Loading PR diff',
+        () =>
+          loadDiff(
+            this.container,
+            this.repo,
+            { owner: repo.owner, name: repo.name },
+            pull.base,
+            pull.headSha,
+            pull.id,
+          ),
+        { kind: 'tool' },
+      );
     } catch (err) {
       runLog.error(`Failed to load PR diff: ${(err as Error).message}`);
       await failAll(`Failed to load PR diff: ${(err as Error).message}`);
       return;
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
+
+    // One id for this whole user action, spanning the cheap classifier call and
+    // every agent's review call. It is what lets someone reading the logs line
+    // up two model calls that are minutes and several records apart, and it
+    // travels to the provider as `sessionId` so their side groups identically.
+    const correlationId = randomUUID();
+
+    // L03 — derived intent. Shared pre-work like the diff: ONE classification per
+    // review request, fanned out into every queued agent's prompt and Live Log.
+    const intentBlock = await this.buildIntentBlock(
+      workspaceId,
+      pull,
+      diff,
+      runLog,
+      correlationId,
+      logger,
+    );
 
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
@@ -112,7 +148,18 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(
+          workspaceId,
+          pull,
+          repo,
+          diff,
+          intentBlock,
+          agent,
+          runId,
+          runLog,
+          correlationId,
+          logger,
+        );
         logger?.info(
           {
             runId,
@@ -141,9 +188,12 @@ export class ReviewRunExecutor {
     pull: PullRow,
     repo: typeof schema.repos.$inferSelect,
     diff: UnifiedDiff,
+    intentBlock: string | undefined,
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    correlationId: string,
+    logger?: Logger,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -211,14 +261,54 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // L03 — the pre-rendered `## Derived intent` block. Omitted when the PR
+        // has no intent, in which case the prompt is byte-identical to pre-L03.
+        ...(intentBlock ? { intent: intentBlock } : {}),
         task,
-        sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
+        // The correlation id doubles as the provider-side session id, so a
+        // review and the intent call that fed it group together on both sides.
+        sessionId: correlationId,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
         checkCancelled: () => {
           if (this.container.runBus.isCancelled(runId)) throw new RunCancelledError();
         },
       });
       const { tokensIn, tokensOut, costUsd, grounding } = outcome;
+
+      // Metadata-only record of what went into this prompt. The content itself
+      // is persisted in the run trace below; this is the part that is safe to
+      // ship to a log aggregator. See platform/prompt-log.ts.
+      logPromptAssembly(
+        logger,
+        this.container.config.promptLog,
+        {
+          correlationId,
+          call: 'review',
+          provider: agent.provider,
+          model: agent.model,
+          prId: pull.id,
+          runId,
+          agent: agent.name,
+        },
+        (
+          [
+            'system',
+            'intent',
+            'skills',
+            'memory',
+            'specs',
+            'repo_map',
+            'callers',
+            'pr_description',
+            'user',
+          ] as const
+        ).map<PromptSectionInput>((section) => ({
+          section,
+          source: REVIEW_SECTION_SOURCES[section] ?? 'unknown',
+          text: outcome.assembly[section],
+        })),
+        (text) => this.container.tokenizer.count(text),
+      );
 
       const keptFindings = outcome.review.findings;
 
@@ -296,6 +386,12 @@ export class ReviewRunExecutor {
             outcome.assembly.skills != null
               ? this.container.tokenizer.count(outcome.assembly.skills)
               : null,
+          // L03 — same per-block attribution for the intent slot ("what did
+          // intent add to this prompt").
+          intent_tokens:
+            outcome.assembly.intent != null
+              ? this.container.tokenizer.count(outcome.assembly.intent)
+              : null,
         },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
@@ -306,6 +402,14 @@ export class ReviewRunExecutor {
         raw_output: outcome.raw,
         memory_pulled: [],
         specs_read: [],
+        // L03 — what the scope filter suppressed. The Live Log carries the same
+        // drops, but it scrolls; this is the record that survives.
+        scope_dropped: outcome.scopeDropped.map(({ finding, reason }) => ({
+          severity: finding.severity,
+          title: finding.title,
+          file: finding.file,
+          reason,
+        })),
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
@@ -371,6 +475,54 @@ export class ReviewRunExecutor {
         skill.source === 'manual' ? skill.body : wrapUntrusted(`skill:${skill.name}`, skill.body);
       return `### Skill: ${skill.name}\n${body}`;
     });
+  }
+
+  /**
+   * L03 — resolve the PR's derived intent into the prompt's `## Derived intent`
+   * block, classifying it first when there is none or when the head has moved
+   * since the stored one was built.
+   *
+   * Freshness comes from `PrIntent.stale`, which the intent module already
+   * derives by comparing the stored head against the PR's current one. Reading
+   * the repository directly would be a second, workspace-unscoped route into
+   * `pr_intent` (the table has no `workspace_id`; the guard lives in
+   * `IntentService`), and it would re-implement a comparison that already has
+   * an owner.
+   *
+   * Best-effort in the same way skills and repo-intel are: a classifier failure
+   * (no key, provider down, bad JSON) degrades to an intent-less prompt — which
+   * is byte-identical to the pre-L03 prompt — never to a failed review. The
+   * failure is still surfaced in the Live Log, so it is never silent.
+   */
+  private async buildIntentBlock(
+    workspaceId: string,
+    pull: PullRow,
+    diff: UnifiedDiff,
+    runLog: RunLogger,
+    correlationId: string,
+    logger?: Logger,
+  ): Promise<string | undefined> {
+    const service = new IntentService(this.container);
+    try {
+      const stored = await service.get(workspaceId, pull.id);
+      const current = stored != null && !stored.stale;
+      const intent = current
+        ? stored
+        : await service.classify(workspaceId, pull.id, {
+            diff,
+            correlationId,
+            onEvent: (msg) => runLog.info(msg),
+            ...(logger ? { logger } : {}),
+          });
+      if (!intent) return undefined;
+      if (current) {
+        runLog.info(`intent: reusing stored intent for ${pull.headSha.slice(0, 8)}`);
+      }
+      return service.renderBlock(intent);
+    } catch (err) {
+      runLog.info(`intent: classification failed — ${(err as Error).message}`);
+      return undefined;
+    }
   }
 
   /**

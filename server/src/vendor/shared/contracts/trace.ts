@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SeverityCounts } from './findings.js';
+import { Severity, SeverityCounts } from './findings.js';
 
 /**
  * Run trace. The ENTIRE trace of one run is persisted as a SINGLE
@@ -51,6 +51,10 @@ export const PromptAssembly = z.object({
   repo_map: z.string().nullish(),
   /** PR author's description/body (truncated); null when absent. */
   pr_description: z.string().nullish(),
+  /** L03 — the pre-rendered `## Derived intent` block; null when absent. */
+  intent: z.string().nullish(),
+  /** Token count of the intent block (tokenizer estimate); null when absent. */
+  intent_tokens: z.number().int().nullish(),
   user: z.string(),
 });
 export type PromptAssembly = z.infer<typeof PromptAssembly>;
@@ -72,6 +76,22 @@ export const RunStats = z.object({
 });
 export type RunStats = z.infer<typeof RunStats>;
 
+/**
+ * L03 — one entry per finding the scope filter suppressed.
+ *
+ * The filter is never allowed to be invisible: a drop also emits a Live Log
+ * line and appends a sentence to the review summary, and this is the record
+ * that survives after the log scrolls away. A CRITICAL never appears here,
+ * because it is never dropped.
+ */
+export const ScopeDropped = z.object({
+  severity: Severity,
+  title: z.string(),
+  file: z.string(),
+  reason: z.string(),
+});
+export type ScopeDropped = z.infer<typeof ScopeDropped>;
+
 /** The single-document trace stored in `run_traces.trace`. */
 export const RunTrace = z.object({
   config: z.object({
@@ -88,6 +108,7 @@ export const RunTrace = z.object({
   raw_output: z.string(),
   memory_pulled: z.array(MemoryPulled),
   specs_read: z.array(z.string()),
+  scope_dropped: z.array(ScopeDropped).nullish(),
   log: z.array(RunLogLine),
 });
 export type RunTrace = z.infer<typeof RunTrace>;

@@ -36,6 +36,14 @@ const EnvSchema = z.object({
     (v) => (v === '' ? undefined : v),
     z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
   ),
+  // How much of the prompt-assembly structure reaches the logs. Metadata only
+  // at every level: no level of this setting ever emits prompt CONTENT. See
+  // platform/prompt-log.ts. `verbose` is a local debugging aid and is refused
+  // in production (see loadConfig).
+  PROMPT_LOG: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['off', 'summary', 'verbose']).optional(),
+  ),
 });
 
 export type AppConfig = {
@@ -59,10 +67,27 @@ export type AppConfig = {
    * EXACTLY like the ripgrep-only baseline.
    */
   repoIntelEnabled: boolean;
+  /**
+   * Prompt-assembly logging level. `summary` (default) emits one metadata
+   * record per model call: section, source, chars, tokens, content fingerprint.
+   * `verbose` adds each section's structural outline (block headings and
+   * untrusted-source wrappers) for local debugging. `off` emits nothing.
+   *
+   * NO level emits prompt content, a diff body, a spec body, or a secret —
+   * that is a property of `platform/prompt-log.ts`, not of this setting.
+   * `verbose` is additionally refused in production.
+   */
+  promptLog: 'off' | 'summary' | 'verbose';
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
+  const promptLogRaw = parsed.PROMPT_LOG ?? 'summary';
+  // `verbose` is a local debugging aid: the structural outline it adds is much
+  // more useful to an attacker reading logs than the summary is, so a
+  // production deployment cannot opt into it however the env is set.
+  const promptLog =
+    promptLogRaw === 'verbose' && parsed.NODE_ENV === 'production' ? 'summary' : promptLogRaw;
   const cloneDirRaw =
     parsed.DEVDIGEST_CLONE_DIR ?? join(homedir(), '.devdigest', 'workspace');
   const cloneDir = isAbsolute(cloneDirRaw) ? cloneDirRaw : resolve(process.cwd(), cloneDirRaw);
@@ -77,5 +102,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: `http://localhost:${parsed.WEB_PORT}`,
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
+    promptLog,
   };
 }
