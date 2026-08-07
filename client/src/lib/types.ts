@@ -33,6 +33,16 @@ export type {
 
 export type { Review, Finding, Severity, SeverityCounts, Verdict } from "@devdigest/shared";
 export type { PrBrief, SmartDiff } from "@devdigest/shared";
+export type {
+  PrIntent,
+  PrIntentResponse,
+  IntentConfidence,
+  IntentSource,
+  IntentSourceKind,
+  IntentSourceStatus,
+  RiskArea,
+  RiskAreaKind,
+} from "@devdigest/shared";
 
 /** UI-only view model for a PR list row (derives display fields from PrMeta). */
 export interface PrRowView {

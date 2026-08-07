@@ -53,8 +53,11 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     id: 'review_intent',
     label: 'PR Review · Intent',
     description: 'Derives a PR’s intent and scope before review.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-4.1',
+    // One metadata-only call per PR whose head moved, on top of every review —
+    // per-call cost dominates and the work is summarisation of supplied text,
+    // not reasoning. Same choice `onboarding` and `conventions` already make.
+    defaultProvider: 'openrouter',
+    defaultModel: 'deepseek/deepseek-v4-flash',
   },
   {
     id: 'risk_brief',

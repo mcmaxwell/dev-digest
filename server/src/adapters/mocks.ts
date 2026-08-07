@@ -125,6 +125,13 @@ export interface MockGitHubOptions {
   login?: string;
   /** Existing inline review comments returned by listReviewComments. */
   comments?: PrReviewComment[];
+  /**
+   * Make `getIssue` REJECT instead of resolving — the only way to exercise the
+   * "linked issue exists but could not be read" path (L03 intent sources), where
+   * a resolved-but-empty issue and a failed fetch must not be confused.
+   * `true` throws a generic error; a string is used as the message.
+   */
+  issueError?: boolean | string;
 }
 
 export class MockGitHubClient implements GitHubClient {
@@ -231,6 +238,11 @@ export class MockGitHubClient implements GitHubClient {
   }
 
   async getIssue(_repo: RepoRef, n: number): Promise<IssueMeta> {
+    if (this.opts.issueError) {
+      throw new Error(
+        typeof this.opts.issueError === 'string' ? this.opts.issueError : `Issue #${n} not found`,
+      );
+    }
     return { number: n, title: `Issue #${n}`, body: 'mock issue', state: 'open' };
   }
 

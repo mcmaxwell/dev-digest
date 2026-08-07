@@ -60,7 +60,38 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   because a `running` row that also acts as a uniqueness guard turns one crash
   into a permanently disabled feature.
 
+- [2026-08-05] Any API that RETURNS a promise for optional awaiting (JobRunner
+  `enqueue()`'s `EnqueuedJob.done`, which rethrows so tests can await the
+  failure) must mark it handled at creation — `done.catch(() => {})` before
+  returning; awaiting callers still observe the rejection. Every production
+  enqueue is fire-and-forget, and in Node ≥ 15 one exhausted-retries job
+  failure (a 403 `git clone`) became an unhandled rejection that killed the
+  whole API mid-flight. Regression: `test/jobs.test.ts` asserts zero
+  `unhandledRejection` events around `onIdle()` while `done` still rejects.
+
+- [2026-08-07] When a schema change would BOTH add and rename a column, rename
+  the DRIZZLE PROPERTY and leave the SQL column name alone — `text('intent')`
+  exposed as `summary` in `db/schema/reviews.ts`. `drizzle-kit generate` then
+  sees a pure ADD COLUMN diff and stays non-interactive (`0015_warm_barracuda`),
+  which is the only way it works in CI. The property name is what every call
+  site reads, so nothing is lost; the column name only ever appears in the
+  migration. Cheaper than the two-pass split noted below, and it works when the
+  two-pass trick cannot (a rename is not an add-then-drop you can sequence).
+
 ## What Doesn't Work
+
+- [2026-08-07] An integration test that passes `llm: {}` (or omits a provider
+  from `overrides.llm`) is NOT hermetic: `Container.buildLlm` falls back to
+  `LocalSecretsProvider(~/.devdigest/secrets.json)`, so on any developer machine
+  with a real key it builds a REAL provider and makes billable network calls.
+  This is invisible until a feature resolves a provider the test did not mock —
+  L03 wiring the intent classifier (`review_intent` → openrouter) into the review
+  path turned `reviews.it.test.ts` and `skills.it.test.ts` red with 10s timeouts
+  and no error message. ALWAYS pass `secrets: new MockSecretsProvider({})` in
+  `buildApp` overrides for a test that must not spend money. Proof technique:
+  `mv ~/.devdigest/secrets.json` aside and re-run — if it goes green, the test
+  was reading the developer's keys. `test/conventions.it.test.ts`'s "every LLM
+  call fails" case still has this bug at the time of writing.
 
 - [2026-08-02] Don't poll `agent_runs.status == 'done'` and then immediately read
   `run_traces` in a test: the status flips INSIDE the persistence transaction in
@@ -79,6 +110,18 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## Codebase Patterns
 
+- [2026-08-07] Prompt observability splits by DESTINATION, not by verbosity:
+  logs get metadata (`platform/prompt-log.ts` — section, source, chars, tokens,
+  `sha8`, model, correlation id), the DB gets content (`run_traces.trace`,
+  `pr_intent.trace`). A "log level" that decides whether to print a prompt is
+  the wrong axis — content in a log aggregator is permanent and unscoped, and
+  no level of a setting should be able to put it there. The function takes text
+  and returns only measurements of it, so the guarantee is structural.
+  The `sha8` fingerprint is what makes metadata actionable without content:
+  matching per-section hashes across two runs prove the prompts were
+  byte-identical, so a behaviour change came from the model, not from assembly.
+  `PROMPT_LOG=verbose` adds structural outline only (headings and
+  `<untrusted source="…">` tags) and is refused when `NODE_ENV=production`.
 - [2026-07-28] `rollupSeverities` in `src/modules/pulls/status.ts` is the
   canonical per-severity findings rollup — reuse it (the reviews module imports
   it in `repository/run.repo.ts`) instead of re-counting severities; its
@@ -101,6 +144,40 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   container getter — switching to `container.agentsRepo` compiles fine and then
   fails at runtime with "Cannot read properties of undefined". Container
   repository getters exist for CROSS-module access only.
+  - [2026-08-05] Corollary: a service method MAY use container getters for a
+    cross-module read (`SkillsService.stats` → `agentsRepo`/`reviewRepo`), but
+    then that METHOD needs a real Container — keep such methods isolated so
+    bare-`{ db }` construction still covers the module's own CRUD, and test
+    them through `buildApp` + `app.inject` (`test/skills-versions.it.test.ts`).
+- [2026-08-05] Version rollback = restore-as-new-version THROUGH the normal
+  update path (`SkillsService.rollback` re-saves the old snapshot's body via
+  `repo.update`), never a rewrite of the versions table: the existing
+  `bodyChanged` logic yields version+1 plus the snapshot for free, and
+  restoring the CURRENT body is automatically a no-op. Apply the same shape to
+  any future agent-version rollback.
+- [2026-08-05] Per-skill usage stats cannot be attributed per run —
+  `run_traces` stores the RENDERED skills prompt string + token count, not
+  skill ids — so `GET /skills/:id/stats` attributes transitively:
+  `agent_skills` → those agents' `agent_runs` + review findings
+  (`statsForAgents` in `reviews/repository/run.repo.ts`, which must keep the
+  `kind='review'` / `run_id IS NOT NULL` filter). Exact per-run attribution
+  would require recording linked skill ids on the run itself
+  (`agent_versions.configJson.skills` already pins them per config version).
+
+- [2026-08-07] A table whose rows are keyed by a PR/repo id but which carries NO
+  `workspace_id` column (`pr_intent`) gets its tenancy from the layer above:
+  `IntentService` resolves the PR via `container.reviewRepo.getPull(workspaceId,
+  prId)` and 404s BEFORE calling its own repository. Say so in the repository's
+  doc comment — otherwise the next reader sees unscoped `where(eq(prId))` queries
+  and either "fixes" them or copies the pattern into a table that does need
+  scoping.
+- [2026-08-07] When a feature's output is fed to a model AND rendered to a user,
+  make the LLM structured-output schema the SHARED contract itself
+  (`modules/intent/schemas.ts` re-exports `IntentClassification` from
+  `vendor/shared`) rather than a module-local mirror. Conventions needed a
+  separate extraction schema because what the model returns is not what is
+  persisted; intent persists exactly what it receives, so a second definition
+  could only drift.
 
 ## Tool & Library Notes
 

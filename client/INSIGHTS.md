@@ -86,6 +86,15 @@ the root INSIGHTS.md. Format and quality gates:
   header, APPEND after the `N findings` prefix (as the severity breakdown
   does), never replace it, or the e2e flow breaks.
 
+- [2026-08-07] The run-trace drawer's prompt-assembly section enumerates every
+  slot BY HAND (`RunTraceDrawer/_components/TraceBody/TraceBody.tsx:75-100`), so
+  adding a field to `PromptAssembly` in `vendor/shared` shows up in the API and
+  in the DB but is INVISIBLE in the UI until you add a `<PromptBlock>` there plus
+  a colour in `RunTraceDrawer/constants.ts` and a `trace.prompt.*` string in
+  `messages/en/runs.json`. Typecheck cannot catch the omission. (`pr_description`
+  has been in the contract since A2 and still has no block — that is the failure
+  mode, not a deliberate choice.)
+
 ## Tool & Library Notes
 
 - [2026-07-31] Every route under `src/app` is a whole-page `"use client"`
@@ -120,6 +129,14 @@ the root INSIGHTS.md. Format and quality gates:
   as a sibling import and trips the rule.
 
 ## Recurring Errors & Fixes
+
+- [2026-08-05] "invariant expected app router to be mounted" in a jsdom test
+  means a component under test (or a CHILD of it) calls `next/navigation`'s
+  `useRouter` — there is no global mock in `src/test/setup.ts`, so the test
+  file needs `vi.mock("next/navigation", () => ({ useRouter: () => ({ push:
+  vi.fn(), replace: vi.fn() }) }))`. Watch the blast radius: adding navigation
+  to a shared child (SkillPreviewDrawer's "Open editor" button) broke the
+  OTHER feature's existing suite (`SkillsView.test.tsx`), not the new one.
 
 - [2026-07-31] A `useRef` flag that's set `true` on one condition and read
   (but never reset) on another, inside a `useEffect` keyed on a prop callback,

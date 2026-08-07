@@ -44,8 +44,9 @@
     },
     "prompt": {
       "system": "System",
+      "intent": "Derived intent (dynamic)",
       "skills": "Skills (dynamic)",
-      "skillsTokens": "≈{count} tok",
+      "tokens": "≈{count} tok",
       "memory": "Memory (dynamic)",
       "repoMap": "Repo skeleton — repo-intel (dynamic)",
       "specs": "Project context (dynamic)",
@@ -69,7 +70,7 @@
     "running": "running",
     "completed": "completed",
     "copyRawOutput": "Copy raw output",
-  "copied": "Copied!",
+    "copied": "Copied!",
     "tracePending": "Trace is written when the run completes — see the Live log tab.",
     "loadingTrace": "Loading trace…",
     "noTrace": "No trace available yet."

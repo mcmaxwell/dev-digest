@@ -73,6 +73,18 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
 
       <TraceSection icon="FileText" title={t("trace.promptAssembly")} defaultOpen={false}>
         <PromptBlock label={t("trace.prompt.system")} text={trace.prompt_assembly.system} color={PROMPT_COLORS.system} />
+        {trace.prompt_assembly.intent != null && (
+          <PromptBlock
+            label={t("trace.prompt.intent")}
+            text={trace.prompt_assembly.intent}
+            color={PROMPT_COLORS.intent}
+            meta={
+              trace.prompt_assembly.intent_tokens != null
+                ? t("trace.prompt.tokens", { count: trace.prompt_assembly.intent_tokens })
+                : undefined
+            }
+          />
+        )}
         {trace.prompt_assembly.skills != null && (
           <PromptBlock
             label={t("trace.prompt.skills")}
@@ -80,7 +92,7 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
             color={PROMPT_COLORS.skills}
             meta={
               trace.prompt_assembly.skills_tokens != null
-                ? t("trace.prompt.skillsTokens", { count: trace.prompt_assembly.skills_tokens })
+                ? t("trace.prompt.tokens", { count: trace.prompt_assembly.skills_tokens })
                 : undefined
             }
           />
