@@ -3,13 +3,22 @@ import { GRID } from "./constants";
 
 /** Co-located styles for the PR list page (extracted from inline styles). */
 export const s = {
-  row: (hover: boolean): CSSProperties => ({
+  /**
+   * `isLast` rounds the bottom corners itself instead of relying on the card to
+   * clip them. The card cannot clip: it holds the FINDINGS hover card, and
+   * `overflow: hidden` on an ancestor clips absolutely-positioned descendants —
+   * which cut the popover off mid-card. See `tableCard`.
+   */
+  row: (hover: boolean, isLast = false): CSSProperties => ({
     display: "grid",
     gridTemplateColumns: GRID,
     alignItems: "center",
     gap: 14,
     padding: "12px 20px",
-    borderBottom: "1px solid var(--border)",
+    // The card's own border already draws the last row's bottom edge.
+    borderBottom: isLast ? "none" : "1px solid var(--border)",
+    borderBottomLeftRadius: isLast ? 10 : undefined,
+    borderBottomRightRadius: isLast ? 10 : undefined,
     cursor: "pointer",
     background: hover ? "var(--bg-surface)" : "transparent",
     transition: "background .1s",
@@ -89,7 +98,10 @@ export const s = {
     margin: "14px 32px 44px",
     border: "1px solid var(--border)",
     borderRadius: 10,
-    overflow: "hidden",
+    // Deliberately NOT `overflow: hidden`. The FINDINGS column opens a hover
+    // card that is positioned absolutely and extends past the last row; any
+    // clipping ancestor cuts it off inside the table. The corners it used to
+    // clip are rounded by the last row itself — see `row(hover, isLast)`.
     background: "var(--bg-elevated)",
   } satisfies CSSProperties,
   headRow: {
