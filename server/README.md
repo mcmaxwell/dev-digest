@@ -98,7 +98,43 @@ flowchart TB
 | `REPO_INTEL_ENABLED` | `true` | repo skeleton + callers in the prompt; `false` → ripgrep-only |
 | `DEVDIGEST_CLONE_DIR` | `./clones` | imported-repo checkouts (git-ignored) |
 | `LOG_LEVEL` | `info` (`silent` in test) | pino level |
+| `PROMPT_LOG` | `summary` | prompt-assembly logging: `off` \| `summary` \| `verbose`. See below |
 | `NODE_ENV` | `development` | `test` → silent logs + global rate-limit disabled |
+
+### Prompt-assembly logging
+
+Every model call emits one structured record describing how its prompt was
+built — `platform/prompt-log.ts`. It is metadata only, at every level:
+
+```
+prompt assembled (review)
+  correlation_id  9f3c…  call review  provider openrouter  model deepseek/deepseek-v4-flash
+  run_id …  agent "Security Reviewer"  pr_id …
+  sections
+    system          agents.system_prompt + INJECTION_GUARD   1284 chars  312 tok  sha8 4b1e9a02
+    intent          pr_intent (derived, cheap model)          412 chars   98 tok  sha8 7c0d81f5
+    skills          skills table (imports untrusted-wrapped)  3120 chars  742 tok  sha8 a19f30cc
+    pr_description  github:pr.body (untrusted-wrapped)         860 chars  201 tok  sha8 02ee6b47
+    user            composed user message (includes the diff) 48210 chars 11890 tok sha8 dd5410b8
+  totals  5 sections  53886 chars  13243 tok
+```
+
+`correlation_id` ties the cheap intent classifier call and the reviewer call of
+one user action together, and travels to the provider as the session id so both
+sides group the same way. `sha8` is `sha256(section)[:8]`: two runs whose
+fingerprints match had byte-identical prompts, so a behaviour change came from
+the model rather than from assembly.
+
+**No level of this setting logs prompt content, a diff body, a spec body, or a
+secret.** That is a property of the module, not of the setting — the function
+takes text and returns only measurements of it. Content is persisted in
+`run_traces.trace.prompt_assembly` and `pr_intent.trace`: in the database, per
+run, behind an authenticated route.
+
+`PROMPT_LOG=verbose` adds each section's structural outline (markdown headings
+and `<untrusted source="…">` wrapper tags, capped and secret-scrubbed) so you
+can see the shape of a prompt while debugging locally. It is refused when
+`NODE_ENV=production` and silently falls back to `summary`.
 
 Secrets (API keys, `GITHUB_TOKEN`) are **not** part of `AppConfig` — they go
 through `SecretsProvider` (`~/.devdigest/secrets.json`, mode `0600`, with
