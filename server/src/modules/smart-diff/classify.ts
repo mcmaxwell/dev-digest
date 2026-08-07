@@ -5,6 +5,10 @@ import {
   BOILERPLATE_INFIXES,
   BOILERPLATE_ROOT_DIRS,
   BOILERPLATE_SUFFIXES,
+  CONTEXT_DIRS,
+  CONTEXT_FILES,
+  CONTEXT_GITHUB_PREFIXES,
+  CONTEXT_INFIXES,
   MAX_PLUMBING_LINE_CHARS,
   ROLE_ORDER,
   SPLIT_DIR_DEPTH,
@@ -64,6 +68,28 @@ function isBoilerplate(path: string): boolean {
   if (segs.length > 1 && BOILERPLATE_ROOT_DIRS.some((d) => d === segs[0])) return true;
   if (BOILERPLATE_SUFFIXES.some((sfx) => name.endsWith(sfx))) return true;
   if (BOILERPLATE_INFIXES.some((inf) => name.includes(inf))) return true;
+  return false;
+}
+
+/**
+ * Company / assistant context kept beside the code: `.company/`, `.claude/`,
+ * `.cursor/`, a `MEMORY.md` anywhere, and Copilot's instruction files inside
+ * `.github`. It lands in the collapsed group for a different reason than
+ * boilerplate does — it is prose the team maintains, not generated bulk — so it
+ * gets its own predicate rather than being folded into the lists above.
+ */
+function isCompanyContext(path: string): boolean {
+  const segs = segments(path);
+  const name = basename(path);
+  if (segs.slice(0, -1).some((seg) => CONTEXT_DIRS.some((d) => d === seg))) return true;
+  if (CONTEXT_FILES.some((f) => f === name)) return true;
+  if (CONTEXT_INFIXES.some((inf) => name.includes(inf))) return true;
+  if (
+    segs.slice(0, -1).some((seg) => seg === '.github') &&
+    CONTEXT_GITHUB_PREFIXES.some((p) => name.startsWith(p))
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -133,7 +159,10 @@ export function isPlumbingOnlyPatch(patch: string | null): boolean {
  * default, so an unrecognised path is always reviewed rather than skimmed.
  */
 export function roleFor(path: string, patch: string | null = null): SmartDiffRole {
-  if (isBoilerplate(path)) return 'boilerplate';
+  // Both collapse, for different reasons — see each predicate. Checked before
+  // wiring so `.claude/settings.json` and `.github/copilot-instructions.md`
+  // read as context rather than as config.
+  if (isBoilerplate(path) || isCompanyContext(path)) return 'boilerplate';
   if (isWiringPath(path)) return 'wiring';
   if (isPlumbingOnlyPatch(patch)) return 'wiring';
   return 'core';

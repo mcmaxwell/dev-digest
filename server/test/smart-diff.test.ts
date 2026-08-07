@@ -76,6 +76,17 @@ describe('roleFor', () => {
     ['build/release.js', 'boilerplate'],
     ['src/out/handlers.ts', 'core'],
     ['src/build/pipeline.ts', 'core'],
+
+    // company / assistant context — collapsed, at any depth
+    ['.company/onboarding.md', 'boilerplate'],
+    ['.company/memory/decisions.md', 'boilerplate'],
+    ['packages/api/.company/notes.md', 'boilerplate'],
+    ['.claude/settings.json', 'boilerplate'],
+    ['.cursor/rules/style.mdc', 'boilerplate'],
+    ['MEMORY.md', 'boilerplate'],
+    ['docs/memory.md', 'boilerplate'],
+    ['docs/team.memory.md', 'boilerplate'],
+    ['.github/copilot-instructions.md', 'boilerplate'],
   ];
 
   it.each(cases)('%s → %s', (path, role) => {
@@ -89,6 +100,30 @@ describe('roleFor', () => {
 
   it('defaults to core so an unknown path is reviewed, never skimmed', () => {
     expect(roleFor('')).toBe('core');
+  });
+
+  describe('company / assistant context', () => {
+    it('does not swallow real code that merely mentions the words', () => {
+      // The context rules are name-scoped on purpose: a source file is never
+      // demoted to "skim" just because of what it is called.
+      expect(roleFor('src/company/billing.ts')).toBe('core');
+      expect(roleFor('src/memory/cache.ts')).toBe('core');
+      expect(roleFor('src/memory-store.ts')).toBe('core');
+      expect(roleFor('src/copilot-session.ts')).toBe('core');
+    });
+
+    it('keeps the rest of .github as wiring', () => {
+      // .github is a wiring dir; only Copilot's instruction files are context.
+      expect(roleFor('.github/workflows/e2e-web.yml')).toBe('wiring');
+      expect(roleFor('.github/copilot-instructions.md')).toBe('boilerplate');
+    });
+
+    it('collapses context even when the filename looks like wiring', () => {
+      // Context is checked BEFORE wiring, so a config file inside .claude/
+      // reads as context rather than as toolchain config.
+      expect(roleFor('.claude/settings.json')).toBe('boilerplate');
+      expect(roleFor('.company/index.ts')).toBe('boilerplate');
+    });
   });
 });
 

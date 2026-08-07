@@ -37,6 +37,11 @@ On the client, `useSmartDiff` supplies the grouping and `usePrReviews` (already 
 - **Severity is not in the contract.**
   The server owns *which* lines are flagged (`finding_lines`); the client colours them from the reviews it already holds. This keeps the endpoint a pure grouping of files, and keeps the marks in step with the findings list the user is looking at — including one they just dismissed.
   A line the server flagged but the client cannot colour still renders (as `INFO`); a lookup miss must never silently drop a flagged line.
+- **Company / assistant context collapses, but is its own rule.**
+  `.company/`, `.claude/`, `.cursor/` (at any depth), a `MEMORY.md` or `*.memory.*` anywhere, and `.github/copilot-*` are knowledge a team keeps beside the code — not application code, and not what the PR is about.
+  They join the `boilerplate` group rather than earning a fourth role, because a new `SmartDiffRole` would change the Zod enum in both vendored contract copies for a difference the reviewer does not act on: both groups mean "collapsed, skim".
+  They get a separate predicate (`isCompanyContext`) rather than being folded into the boilerplate lists, because the *reason* differs — boilerplate is generated bulk, this is maintained prose — and the next person changing one list should not silently change the other.
+  Every rule is name-scoped so real code is never demoted: `src/company/billing.ts`, `src/memory/cache.ts` and `src/copilot-session.ts` all stay `core`, and `.github` stays wiring apart from the Copilot files.
 - **Most specific wins, and `core` is the default.**
   Boilerplate beats wiring beats core, so a generated `index.ts` under `dist/` is build output rather than a barrel. An unrecognised path is always `core`, so the failure mode is "reviewed unnecessarily", never "skimmed by mistake".
 - **A patch of nothing but imports/exports is wiring wherever it lives.**

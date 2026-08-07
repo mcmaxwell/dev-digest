@@ -76,6 +76,31 @@ export const BOILERPLATE_SUFFIXES = [
 /** Infix matches for the `*.generated.*` / `*.gen.*` naming conventions. */
 export const BOILERPLATE_INFIXES = ['.generated.', '.gen.', '.g.'] as const;
 
+/**
+ * Company / assistant context: knowledge a team keeps beside the code —
+ * decisions, onboarding notes, agent instructions. It is not application code
+ * and reviewing it line by line is not what the PR is about, so it joins the
+ * collapsed group. It is kept SEPARATE from the boilerplate lists above because
+ * the reason differs: boilerplate is mechanical bulk, this is prose context.
+ *
+ * Matched as a path segment at any depth, so `packages/api/.company/notes.md`
+ * counts as well as a root-level `.company/`.
+ */
+export const CONTEXT_DIRS = ['.company', '.claude', '.cursor'] as const;
+
+/** Exact basenames (lower-cased) that are company memory wherever they sit. */
+export const CONTEXT_FILES = ['memory.md'] as const;
+
+/** Infix match, so `team.memory.md` / `product.memory.mdx` count too. */
+export const CONTEXT_INFIXES = ['.memory.'] as const;
+
+/**
+ * Copilot's instruction files, which live INSIDE `.github` — a directory that
+ * is otherwise wiring. Matched as a basename prefix scoped to `.github`, so a
+ * real `src/copilot-session.ts` is untouched.
+ */
+export const CONTEXT_GITHUB_PREFIXES = ['copilot-'] as const;
+
 /** Exact basenames that hook code together rather than implement behaviour. */
 export const WIRING_FILES = [
   'package.json',
