@@ -37,7 +37,7 @@ A server test importing `test/helpers/pg.ts` MUST be named `*.it.test.ts`.
 
 ## Server modules
 
-`server/src/modules/`: _shared, agents, conventions, intent, polling, pulls, repo-intel, repos, reviews, settings, skills, workspace
+`server/src/modules/`: _shared, agents, conventions, intent, polling, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
 
 Registered statically in `server/src/modules/index.ts` (one import + one entry).
 Shared helpers live in `modules/_shared/`: context.ts, diff-loader.ts, logger.ts, schemas.ts, severity.ts

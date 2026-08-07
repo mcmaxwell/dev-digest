@@ -33,6 +33,18 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Tool & Library Notes
 
+- [2026-08-07] `agent-browser wait --text` matches the RENDERED `innerText`, so
+  it sees `text-transform` applied. Any assertion on text inside a
+  `SectionLabel` (which uppercases via CSS) must be written UPPERCASE —
+  `wait --text "Reviewer-ordered diff"` times out while
+  `wait --text "REVIEWER-ORDERED DIFF"` passes, even though the JSX and the
+  `messages/en/*.json` string are title-case. Same trap for any `filesCount`-style
+  ICU plural rendered inside one (`"FILES CHANGED · 9 FILES"`). Failure looks
+  like a missing element, not a case mismatch, so check the CSS before the copy.
+- [2026-08-07] Seeded PR metadata and seeded `pr_files` are independent: PR #482
+  reports `files_count: 9` but materialises 4 file rows, so a header driven by
+  `pr.files_count` says "9 files" above 4 cards. Assert whichever number the
+  component actually reads — don't count the rendered cards and assume.
 - [2026-08-04] `next dev` is NOT safe to run twice from one directory with
   different `NEXT_PUBLIC_*` values: those vars are inlined at COMPILE time and
   the build cache is keyed by directory alone, so the e2e stack baked

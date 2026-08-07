@@ -110,6 +110,24 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## Codebase Patterns
 
+- [2026-08-07] A module that only JOINS other modules' data needs no
+  `repository.ts` at all. `modules/smart-diff` reads everything through
+  `container.reviewRepo` (`getPull` / `getPrFiles` / `reviewsForPull`), so it
+  never imports the drizzle query builder and both
+  `queries-live-in-repositories` and `no-cross-module-imports` hold with zero
+  allowlist entries. Reach for a repository when a module OWNS a table; a
+  read-only composition over existing tables is a service plus a pure function.
+  Keep the pure part in its own file (`classify.ts` — no I/O, no Container) so
+  the rules are testable as a table without Postgres, and put every pattern and
+  threshold in `constants.ts` so they can be read without reading the algorithm.
+- [2026-08-07] "The latest review of a PR" is NOT `reviewsForPull(prId)[0]`.
+  Group by `run_id` instead: take the newest `kind = 'review'` row, then keep
+  every review sharing its `run_id` (falling back to that single row when
+  `run_id` is null — the seeded review and any pre-run-tracking row). Taking
+  only the newest row silently drops all but one agent's findings the moment
+  multi-agent runs land (L07), and the bug is invisible until then. See
+  `modules/smart-diff/service.ts::latestReviewFindings`; complements the
+  2026-07-28 `kind`/`run_id` entry above.
 - [2026-08-07] Prompt observability splits by DESTINATION, not by verbosity:
   logs get metadata (`platform/prompt-log.ts` — section, source, chars, tokens,
   `sha8`, model, correlation id), the DB gets content (`run_traces.trace`,
@@ -235,6 +253,17 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   alone WHILE the dev Postgres container is running — if the dev stack is
   stopped, that volume is dangling and prune deletes it with every imported repo
   and review. Verify with `docker volume ls --filter name=devdigest` first.
+  - [2026-08-07] `--no-file-parallelism` is not always enough: after enough
+    runs the ORPHANED anonymous volumes alone fill the VM, and then even ONE
+    container dies with `initdb: could not write to file "pg_wal/xlogtemp.NN":
+    No space left on device` → testcontainers reports only
+    `Health check failed: unhealthy`, and `scripts/e2e.sh` reports only
+    "isolated Postgres did not become healthy in time". Read `docker logs` on
+    the dead container to see the real cause. Safest cure, and better than
+    `docker volume prune` because it cannot touch a named volume even if the
+    dev stack is down: remove only the anonymous ones —
+    `docker volume ls --format '{{.Name}}' | grep -E '^[0-9a-f]{64}$' | xargs -n1 docker volume rm`.
+    Also `docker rm -f` any leftover `testcontainers-ryuk-*` container.
 
 ## Session Notes
 

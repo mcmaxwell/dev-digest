@@ -122,12 +122,96 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       })
       .returning();
 
-    // pr_files (subset)
+    // pr_files (subset). Each carries the FIRST hunk of its patch — real
+    // GitHub patches are truncated too, which is why `additions`/`deletions`
+    // describe the whole file while the patch text shows only part of it.
+    // The hunks are line-accurate where it matters: the seeded findings below
+    // point at src/config.ts:12 and src/api/users.ts:45, and those are exactly
+    // the lines these patches add, so the diff viewer can anchor them.
     await db.insert(t.prFiles).values([
-      { prId: pr!.id, path: 'src/middleware/ratelimit.ts', additions: 84, deletions: 0 },
-      { prId: pr!.id, path: 'src/api/public/webhooks.ts', additions: 31, deletions: 6 },
-      { prId: pr!.id, path: 'src/config.ts', additions: 4, deletions: 0 },
-      { prId: pr!.id, path: 'src/api/users.ts', additions: 7, deletions: 2 },
+      {
+        prId: pr!.id,
+        path: 'src/middleware/ratelimit.ts',
+        additions: 84,
+        deletions: 0,
+        patch: [
+          '@@ -22,4 +22,13 @@',
+          " import { redis } from '../lib/redis';",
+          ' ',
+          ' export async function rateLimit(req: Req, res: Res, next: Next) {',
+          '+  const key = bucketKey(req);',
+          '+  const count = await redis.incr(key);',
+          '+  if (count === 1) await redis.expire(key, 3600);',
+          '+',
+          '+  if (count > limitFor(req)) {',
+          '+    return res.status(429).end();',
+          '+  }',
+          '+',
+          '+  return next();',
+          ' }',
+        ].join('\n'),
+      },
+      {
+        prId: pr!.id,
+        path: 'src/api/public/webhooks.ts',
+        additions: 31,
+        deletions: 6,
+        patch: [
+          '@@ -58,4 +58,9 @@',
+          ' export async function webhookHandler(req: Req, res: Res) {',
+          '-  const account = await db.accounts.find(req.accountId);',
+          '-  return res.status(202).end();',
+          '+  const target = req.body.callback_url;',
+          '+  const account = await db.accounts.find(req.accountId);',
+          '+  const token = account.apiToken;',
+          '+',
+          '+  await fetch(target, { headers: { Authorization: token } });',
+          '+  return res.status(202).end();',
+          ' }',
+        ].join('\n'),
+      },
+      {
+        prId: pr!.id,
+        path: 'src/config.ts',
+        additions: 4,
+        deletions: 0,
+        // The `sk_live_` literal lands on line 12 — the CRITICAL finding below.
+        patch: [
+          '@@ -8,5 +8,9 @@',
+          " import { env } from './env';",
+          ' ',
+          ' export const config = {',
+          '   port: Number(process.env.PORT ?? 3000),',
+          '+  stripeKey: "sk_live_51H8xq2Ka9Vn3PqLm7Rd0bZ4Xc",',
+          '+  rateLimitWindowMs: 60_000,',
+          '+  rateLimitMax: 120,',
+          '+  redisUrl: process.env.REDIS_URL,',
+          ' };',
+        ].join('\n'),
+      },
+      {
+        prId: pr!.id,
+        path: 'src/api/users.ts',
+        additions: 7,
+        deletions: 2,
+        // The per-user query lands on line 45 — the WARNING finding below.
+        patch: [
+          '@@ -42,6 +42,11 @@',
+          ' export async function listUsers(req: Req, res: Res) {',
+          ' ',
+          '   const users = await db.users.findMany();',
+          '-  const result = users.map(toDto);',
+          '-  return res.json(result);',
+          '+  const result = [];',
+          '+  for (const u of users) {',
+          '+    const orders = await db.orders.findByUser(u.id);',
+          '+    result.push({ ...toDto(u), orderCount: orders.length });',
+          '+  }',
+          '+',
+          '+  return res.json(result);',
+          ' }',
+        ].join('\n'),
+      },
     ]);
 
     // pr_commits

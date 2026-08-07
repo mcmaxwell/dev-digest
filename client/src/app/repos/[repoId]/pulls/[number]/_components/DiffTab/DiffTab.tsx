@@ -1,11 +1,15 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { SectionLabel, Button } from "@devdigest/ui";
 import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
 import { usePrComments, useCreatePrComment } from "@/lib/hooks/reviews";
 import { notify } from "@/lib/toast";
 import type { PrFile } from "@devdigest/shared";
+import { SmartDiffViewer } from "../SmartDiffViewer";
+import { OrderToggle } from "../OrderToggle";
+import type { DiffOrder } from "../OrderToggle/constants";
 
 interface DiffTabProps {
   prId: string | null;
@@ -16,10 +20,14 @@ interface DiffTabProps {
 }
 
 export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
+  const t = useTranslations("prReview");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
   // Comments start hidden so the diff is clean by default — toggle to reveal.
   const [showComments, setShowComments] = React.useState(false);
+  // Smart order is the default: the whole point of the feature is that the
+  // reviewer meets the substance of the change first, without opting in.
+  const [order, setOrder] = React.useState<DiffOrder>("smart");
 
   const commentCount = comments?.length ?? 0;
 
@@ -40,26 +48,42 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
     },
   };
 
+  const plainDiff = <DiffViewer files={files} commenting={commenting} />;
+
   return (
     <section>
       <SectionLabel
         icon="Code"
         right={
-          commentCount > 0 ? (
-            <Button
-              kind="ghost"
-              size="sm"
-              icon={showComments ? "EyeOff" : "Eye"}
-              onClick={() => setShowComments((v) => !v)}
-            >
-              {showComments ? "Hide comments" : "Show comments"} ({commentCount})
-            </Button>
-          ) : undefined
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {commentCount > 0 && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon={showComments ? "EyeOff" : "Eye"}
+                onClick={() => setShowComments((v) => !v)}
+              >
+                {t(showComments ? "files.hideComments" : "files.showComments", {
+                  count: commentCount,
+                })}
+              </Button>
+            )}
+            <OrderToggle value={order} onChange={setOrder} />
+          </div>
         }
       >
-        Files changed · {filesCount} files
+        {order === "smart" ? t("smartDiff.sectionLabel") : t("files.heading", { count: filesCount })}
       </SectionLabel>
-      <DiffViewer files={files} commenting={commenting} />
+      {order === "smart" ? (
+        <SmartDiffViewer
+          prId={prId}
+          files={files}
+          commenting={commenting}
+          onUnavailable={plainDiff}
+        />
+      ) : (
+        plainDiff
+      )}
     </section>
   );
 }

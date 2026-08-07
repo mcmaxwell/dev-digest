@@ -4,7 +4,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon } from "@devdigest/ui";
+import { Icon, SEV, type Severity } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "@/components/diff-viewer/constants";
 import { parsePatch, type Line } from "@/components/diff-viewer/helpers";
@@ -19,6 +19,15 @@ import { s, chevronFor } from "@/components/diff-viewer/styles";
 import { CodeLine } from "@/components/diff-viewer/CodeLine";
 import { OutdatedComments } from "@/components/diff-viewer/OutdatedComments";
 
+/** Worst-first, so a file's badge reports its most serious finding. */
+const SEVERITY_RANK: Severity[] = ["CRITICAL", "WARNING", "SUGGESTION", "INFO"];
+
+function worstSeverity(flags: ReadonlyMap<number, Severity> | undefined): Severity | null {
+  if (!flags?.size) return null;
+  const present = new Set(flags.values());
+  return SEVERITY_RANK.find((sev) => present.has(sev)) ?? null;
+}
+
 /** Threads anchored to a given parsed line (RIGHT=new, LEFT=old). */
 function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): CommentThread[] {
   if (matched.size === 0) return [];
@@ -30,12 +39,46 @@ function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): Commen
   return out;
 }
 
-export function FileCard({ file, commenting }: { file: PrFile; commenting?: DiffCommentApi }) {
+export function FileCard({
+  file,
+  commenting,
+  flags,
+  defaultOpen,
+}: {
+  file: PrFile;
+  commenting?: DiffCommentApi;
+  /** New-side line number → severity of the finding on it (Smart Diff). */
+  flags?: ReadonlyMap<number, Severity>;
+  /** Overrides the size heuristic below — Smart Diff decides per role. */
+  defaultOpen?: boolean;
+}) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
-    (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
+    defaultOpen ?? (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
   );
+  const bodyRef = React.useRef<HTMLDivElement>(null);
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
+  const findingCount = flags?.size ?? 0;
+
+  // `open` is seeded once at mount, and the card's key is the stable file path,
+  // so a file that only LATER gains a finding (a review finishing while the user
+  // sits on this tab) would get its marks but stay collapsed. Re-open on the
+  // rising edge only, so a deliberate collapse of an already-flagged file sticks.
+  const wasDefaultOpen = React.useRef(defaultOpen);
+  React.useEffect(() => {
+    if (defaultOpen && !wasDefaultOpen.current) setOpen(true);
+    wasDefaultOpen.current = defaultOpen;
+  }, [defaultOpen]);
+
+  // Jump to the first flagged line. The file may be collapsed when the badge is
+  // clicked, so the scroll waits a frame for the body to mount.
+  const jumpToFirstFinding = (e: React.MouseEvent) => {
+    e.stopPropagation(); // the header itself toggles; the badge must not close it
+    setOpen(true);
+    requestAnimationFrame(() =>
+      bodyRef.current?.querySelector("[data-flagged]")?.scrollIntoView({ block: "center" })
+    );
+  };
 
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
@@ -51,6 +94,7 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
   const commentCount = commenting
     ? commenting.comments.filter((c) => c.path === file.path).length
     : 0;
+  const worst = worstSeverity(flags);
 
   return (
     <div style={s.fileCard}>
@@ -64,6 +108,19 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>
         </span>
+        {worst && (
+          <button
+            type="button"
+            onClick={jumpToFirstFinding}
+            style={{ ...s.findingBtn, color: SEV[worst].c }}
+            aria-label={t("diffViewer.jumpToFinding", { count: findingCount })}
+          >
+            {React.createElement(Icon[SEV[worst].icon], { size: 12.5 })}
+            <span className="tnum" style={{ fontSize: 12, fontWeight: 600 }}>
+              {t("diffViewer.findingCount", { count: findingCount })}
+            </span>
+          </button>
+        )}
         {commentCount > 0 && (
           <span
             style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-muted)" }}
@@ -74,7 +131,7 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
         )}
       </div>
       {open && (
-        <div style={s.fileBody}>
+        <div ref={bodyRef} style={s.fileBody}>
           {lines.length === 0 ? (
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
           ) : (
@@ -88,6 +145,7 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
+                flag={ln.newNo != null ? flags?.get(ln.newNo) : undefined}
               />
             ))
           )}

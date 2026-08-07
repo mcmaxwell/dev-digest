@@ -3,6 +3,7 @@
 "use client";
 
 import React from "react";
+import { SEV, SeverityBadge, type Severity } from "@devdigest/ui";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "@/components/diff-viewer/comments";
 import { type Line } from "@/components/diff-viewer/helpers";
 import { s, lineRowFor, lineSignFor } from "@/components/diff-viewer/styles";
@@ -14,11 +15,14 @@ export function CodeLine({
   path,
   threads,
   commenting,
+  flag,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
+  /** Severity of a review finding anchored to this line (Smart Diff). */
+  flag?: Severity;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -41,7 +45,7 @@ export function CodeLine({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
+      <div style={lineRowFor(ln.kind, flag && SEV[flag].c)} data-flagged={flag ? "true" : undefined}>
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button
@@ -62,6 +66,8 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
+        {/* Icon + label, never colour alone — the rail is a duplicate cue. */}
+        {flag && <SeverityBadge severity={flag} />}
       </div>
 
       {commenting &&

@@ -51,14 +51,28 @@
     "blockers": " · {count} blockers"
   },
   "smartDiff": {
-    "coreLabel": "Core",
+    "coreLabel": "Core logic",
+    "coreDesc": "The substance of the change — review closely",
     "wiringLabel": "Wiring",
+    "wiringDesc": "Hooks the core into the app",
     "boilerplateLabel": "Boilerplate",
-    "largeTitle": "This PR is large ({lines} changed lines)",
+    "boilerplateDesc": "Generated / mechanical — skim",
+    "largeTitle": "This PR is large ({lines, number} changed lines)",
     "largeBody": "Consider splitting it into smaller, focused PRs for easier review:",
-    "filesCount": "{count} files",
+    "filesCount": "{count, plural, one {# file} other {# files}}",
     "findingLines": "{count} finding-lines",
-    "groupedByRole": "Smart Diff · grouped by role"
+    "groupedByRole": "Smart Diff · grouped by role",
+    "sectionLabel": "Reviewer-ordered diff",
+    "orderLabel": "Diff order",
+    "smartOrder": "Smart order",
+    "originalOrder": "Original order",
+    "loading": "Grouping changed files…",
+    "error": "Couldn't group the changed files. Showing them in the original order instead."
+  },
+  "files": {
+    "heading": "Files changed · {count, plural, one {# file} other {# files}}",
+    "showComments": "Show comments ({count})",
+    "hideComments": "Hide comments ({count})"
   },
   "list": {
     "breadcrumb": "Pull Requests",

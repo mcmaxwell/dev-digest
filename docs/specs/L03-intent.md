@@ -22,7 +22,7 @@ The whole feature is built around one non-negotiable: **a CRITICAL finding is ne
    It runs after grounding and before scoring.
 6. **Intent card** — the PR page's Overview tab shows the summary, IN SCOPE / OUT OF SCOPE columns, RISK AREAS chips, a confidence badge, a stale badge, a missing-context notice, and a re-run control.
 
-Out of scope: Blast Radius, PR Brief composition, Smart Diff, the separate `risk_brief` feature (the card *section* ships, the feature does not), arbitrary-URL fetching, pino-level log redaction as infrastructure, and a user-editable intent.
+Out of scope: Blast Radius, PR Brief composition, Smart Diff (L03's other half — shipped separately, see `L03-smart-diff.md`), the separate `risk_brief` feature (the card *section* ships, the feature does not), arbitrary-URL fetching, pino-level log redaction as infrastructure, and a user-editable intent.
 
 ## Data flow
 

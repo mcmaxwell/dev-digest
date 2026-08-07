@@ -26,6 +26,7 @@ import {
   useInvalidateActiveRuns,
   useInvalidateRunHistory,
 } from "@/lib/hooks/reviews";
+import { useInvalidateSmartDiff } from "@/lib/hooks/smart-diff";
 import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { ApiError } from "@/lib/api";
 import { githubPrUrl } from "@/lib/github-urls";
@@ -65,14 +66,19 @@ export default function PRDetailPage() {
   // When a run settles (done OR failed) refresh the full run history too, so a
   // just-failed run shows up in "Run history" immediately — no page reload.
   const invalidateRunHistory = useInvalidateRunHistory(prId);
+  // The Smart Diff's `finding_lines` is server-derived from the latest review,
+  // so refetching the reviews alone would leave the Files tab marking the
+  // PREVIOUS run's lines for anyone watching a review finish from that tab.
+  const invalidateSmartDiff = useInvalidateSmartDiff(prId);
   // Stable identity: RunStatus's effect depends on `onDone` and only re-fires
   // it when `running` flips, but an inline arrow here would get a fresh
   // identity on every render — see RunStatus.tsx for the fallout that causes.
   const handleRunDone = React.useCallback(() => {
     invalidateActiveRuns();
     invalidateRunHistory();
+    invalidateSmartDiff();
     refetchReviews();
-  }, [invalidateActiveRuns, invalidateRunHistory, refetchReviews]);
+  }, [invalidateActiveRuns, invalidateRunHistory, invalidateSmartDiff, refetchReviews]);
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
