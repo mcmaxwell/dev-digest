@@ -10,15 +10,25 @@ import type { Severity } from "@devdigest/ui";
  */
 
 /**
- * Mirrors the server's `latestReviewFindings`: newest review first, and when it
- * belongs to a run, every review from that same run (so a multi-agent run
- * contributes all of its agents). Summaries carry no findings and are skipped.
+ * Mirrors the server's `latestReviewFindings`: each AGENT's latest review,
+ * unioned. `usePrReviews` is newest-first, so the first row seen per agent is
+ * that agent's current verdict.
+ *
+ * Not "the latest run": a review over N agents creates N runs, so keying on the
+ * newest run drops every other agent the moment the last one to finish reports
+ * nothing — the file's marks disappear while its badge still counts them.
  */
 export function latestReviews(reviews: readonly ReviewRecord[] | undefined): ReviewRecord[] {
-  const real = (reviews ?? []).filter((r) => r.kind === "review");
-  const newest = real[0];
-  if (!newest) return [];
-  return newest.run_id ? real.filter((r) => r.run_id === newest.run_id) : [newest];
+  const seenAgents = new Set<string>();
+  const out: ReviewRecord[] = [];
+  for (const r of reviews ?? []) {
+    if (r.kind !== "review") continue;
+    const agentKey = r.agent_id ?? `review:${r.id}`;
+    if (seenAgents.has(agentKey)) continue;
+    seenAgents.add(agentKey);
+    out.push(r);
+  }
+  return out;
 }
 
 /**

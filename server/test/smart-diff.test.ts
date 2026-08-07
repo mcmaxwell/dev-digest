@@ -290,29 +290,46 @@ describe('buildSmartDiff', () => {
 });
 
 describe('latestReviewFindings', () => {
-  const review = (runId: string | null, kind = 'review') => ({ runId, kind });
+  let seq = 0;
+  const review = (agentId: string | null, kind = 'review') => ({
+    id: `rev-${seq++}`,
+    agentId,
+    kind,
+  });
 
-  it('takes only the newest review when it predates run tracking', () => {
+  it('supersedes an agent’s older review with its newest one', () => {
+    const rows = [
+      { review: review('sec'), findings: [finding({ file: 'new.ts', startLine: 1 })] },
+      { review: review('sec'), findings: [finding({ file: 'old.ts', startLine: 2 })] },
+    ];
+    expect(latestReviewFindings(rows).map((f) => f.file)).toEqual(['new.ts']);
+  });
+
+  // The regression that made a reviewed PR show no marks at all: running N
+  // agents creates N separate runs, so keying on the newest RUN threw away
+  // every other agent's findings whenever the last one to finish found nothing.
+  it('keeps every agent, so a later clean run cannot hide another agent', () => {
+    const rows = [
+      { review: review('general'), findings: [] },
+      { review: review('security'), findings: [finding({ file: 'auth.ts', startLine: 7 })] },
+      { review: review('perf'), findings: [finding({ file: 'query.ts', startLine: 9 })] },
+    ];
+    expect(latestReviewFindings(rows).map((f) => f.file)).toEqual(['auth.ts', 'query.ts']);
+  });
+
+  it('treats a review whose agent was deleted as its own agent', () => {
     const rows = [
       { review: review(null), findings: [finding({ file: 'a.ts', startLine: 1 })] },
       { review: review(null), findings: [finding({ file: 'b.ts', startLine: 2 })] },
     ];
-    expect(latestReviewFindings(rows).map((f) => f.file)).toEqual(['a.ts']);
-  });
-
-  it('takes every review from the newest run, so a multi-agent run is whole', () => {
-    const rows = [
-      { review: review('run-2'), findings: [finding({ file: 'a.ts', startLine: 1 })] },
-      { review: review('run-2'), findings: [finding({ file: 'b.ts', startLine: 2 })] },
-      { review: review('run-1'), findings: [finding({ file: 'old.ts', startLine: 3 })] },
-    ];
+    // Two deleted-agent reviews are NOT the same agent, so neither is dropped.
     expect(latestReviewFindings(rows).map((f) => f.file)).toEqual(['a.ts', 'b.ts']);
   });
 
-  it('ignores summary rows when picking the newest review', () => {
+  it('ignores summary rows', () => {
     const rows = [
-      { review: review('run-2', 'summary'), findings: [] },
-      { review: review('run-2'), findings: [finding({ file: 'a.ts', startLine: 1 })] },
+      { review: review('sec', 'summary'), findings: [finding({ file: 'nope.ts', startLine: 1 })] },
+      { review: review('sec'), findings: [finding({ file: 'a.ts', startLine: 1 })] },
     ];
     expect(latestReviewFindings(rows).map((f) => f.file)).toEqual(['a.ts']);
   });

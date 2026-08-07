@@ -9,28 +9,37 @@ import type { FindingRow } from '../../db/rows.js';
 
 /** One review row plus its findings, as `reviewRepo.reviewsForPull` returns them. */
 export type ReviewWithFindings = {
-  review: { runId: string | null; kind: string };
+  review: { id: string; agentId: string | null; kind: string };
   findings: FindingRow[];
 };
 
 /**
- * The findings of the LATEST review only — an older run's findings describe an
- * older head and would mark lines the reviewer already dealt with.
+ * Each AGENT's latest review, unioned — the same rule `worstLatestScoreByPr`
+ * applies to the PR list's score (`modules/pulls/status.ts`), and for the same
+ * reason: a failing Security review must not be hidden behind a later clean run
+ * from another agent.
  *
- * `reviewsForPull` is newest-first. When the newest review belongs to an
- * `agent_run` we keep every review from that same run, so a future multi-agent
- * run (L07) contributes all of its agents' findings rather than one agent's.
- * A review with no `run_id` predates run tracking (the seeded review is one),
- * and stands alone.
+ * Grouping by RUN instead is wrong, and wrong in the worst direction. Running a
+ * review over N agents creates N runs, each with its own review row, so "the
+ * newest run" is one agent's verdict: when that agent happens to find nothing,
+ * every other agent's findings vanish from the diff while the PR list still
+ * counts them — a file quietly loses its marks and looks clean.
+ *
+ * `reviewsForPull` is newest-first, so the first row seen per agent is that
+ * agent's current verdict and older ones are superseded. A review whose agent
+ * was deleted (`agentId` null) counts as its own agent, keyed by review id.
  */
 export function latestReviewFindings(rows: readonly ReviewWithFindings[]): FindingRow[] {
-  const reviews = rows.filter((r) => r.review.kind === 'review');
-  const newest = reviews[0];
-  if (!newest) return [];
-  const inLatest = newest.review.runId
-    ? reviews.filter((r) => r.review.runId === newest.review.runId)
-    : [newest];
-  return inLatest.flatMap((r) => r.findings);
+  const seenAgents = new Set<string>();
+  const out: FindingRow[] = [];
+  for (const row of rows) {
+    if (row.review.kind !== 'review') continue;
+    const agentKey = row.review.agentId ?? `review:${row.review.id}`;
+    if (seenAgents.has(agentKey)) continue;
+    seenAgents.add(agentKey);
+    out.push(...row.findings);
+  }
+  return out;
 }
 
 /**
