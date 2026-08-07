@@ -6,7 +6,13 @@ import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
 import * as t from '../src/db/schema.js';
-import { MockCodeIndex, MockEmbedder, MockGitClient, MockLLMProvider } from '../src/adapters/mocks.js';
+import {
+  MockCodeIndex,
+  MockEmbedder,
+  MockGitClient,
+  MockLLMProvider,
+  MockSecretsProvider,
+} from '../src/adapters/mocks.js';
 import type { ConventionCandidate, ConventionsPage, ConventionSkillDraft, Skill } from '@devdigest/shared';
 
 const hasDocker = await dockerAvailable();
@@ -457,6 +463,11 @@ d('L02 conventions extractor (Testcontainers pg)', () => {
         codeIndex: new MockCodeIndex(),
         git: new MockGitClient({ files: FILES }),
         repoIntel: repoIntelStub,
+        // `llm: {}` alone is NOT hermetic: with no provider override the
+        // container falls back to the developer's ~/.devdigest/secrets.json and
+        // makes real, billable calls. An empty secrets provider is what forces
+        // the ConfigError this test is actually asserting on.
+        secrets: new MockSecretsProvider({}),
         llm: {},
       },
     });
