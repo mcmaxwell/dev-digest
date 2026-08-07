@@ -25,3 +25,16 @@ test-results/
 
 # emdash worktree config (local)
 .emdash.json
+
+# Handoff state between agents, not source: the implementer writes it, the
+# reviewers read it, and it describes one working tree at one moment.
+.claude/last-change.json
+
+# `server/src/vendor/**` and `client/src/vendor/**` are checked in on purpose:
+# the canonical Zod contracts and the vendored UI kit. A personal global
+# gitignore with a bare `vendor` pattern swallows NEW files there while every
+# already-tracked file keeps working, so the breakage is invisible locally and
+# only surfaces as a broken barrel export on a fresh clone. A repo .gitignore
+# outranks core.excludesFile, so these two lines make that impossible.
+!server/src/vendor/
+!client/src/vendor/
