@@ -1,4 +1,5 @@
 /** Pure helpers for the DiffViewer. */
+import type { Severity } from "@devdigest/ui";
 import { HUNK_HEADER_RE } from "./constants";
 
 export interface Line {
@@ -6,6 +7,18 @@ export interface Line {
   text: string;
   oldNo?: number;
   newNo?: number;
+}
+
+/**
+ * A review finding anchored to one rendered line (Smart Diff). It carries the
+ * finding's id, not just its severity, so the mark can open that exact
+ * FindingCard on the Findings tab rather than merely colouring the row.
+ * `findingId` is optional: the server owns which lines are flagged, and a line
+ * it flagged that the client cannot resolve to a finding still gets a mark.
+ */
+export interface FindingFlag {
+  severity: Severity;
+  findingId?: string;
 }
 
 /** Parse unified-diff patch text into renderable lines with old/new line numbers. */

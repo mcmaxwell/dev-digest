@@ -1,0 +1,196 @@
+{
+  "name": "Files changed opens in Smart Diff order and toggles back to the original",
+  "description": "From PR #482, open the Files changed tab and confirm the reviewer-ordered diff (L03 Smart Diff): the seeded files group into Core logic and Wiring, each group carries the description that says how much attention it deserves, and src/config.ts — flagged CRITICAL on line 12 by the seeded review — reports its finding in the file header and marks the line. The seeded PR is 134 changed lines, so the 'This PR is large' split banner must NOT appear. Finally a severity mark is clicked to cross to the Agent runs tab with that exact finding revealed. NOTE the Smart/Original toggle is deliberately NOT driven here: agent-browser clicks it only intermittently (an off-screen control gets scrolled under the sticky header and the click lands on the header), and a flaky flow is worse than none — the toggle's behaviour is covered by OrderToggle.test.tsx (click, roving tabindex, arrow keys) and its two renderers by SmartDiffViewer.test.tsx. Read-only seeded data; GET /pulls/:id/smart-diff is deterministic (no model call, no keys). Assumes a freshly-seeded DB where acme/payments-api (PR #482) is the first repo — run locally via the hermetic stack (see e2e/README.md).",
+  "steps": [
+    {
+      "cmd": [
+        "open",
+        "{BASE}/"
+      ],
+      "label": "load the app root"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls"
+      ],
+      "label": "land on the PR list"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Add rate limiting to public API endpoints"
+      ],
+      "label": "the seeded PR row has rendered (the list fetch attempts a GitHub sync first, so clicking on --url alone races it)"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Add rate limiting to public API endpoints",
+        "click"
+      ],
+      "label": "open the PR row"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls/482"
+      ],
+      "label": "navigate to the PR detail route"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "PR detail data settles"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Files changed"
+      ],
+      "label": "switch to the Files changed tab"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "tab=diff"
+      ],
+      "label": "diff tab is active in the URL"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "the smart-diff fetch settles"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "REVIEWER-ORDERED DIFF"
+      ],
+      "label": "the section is labelled as reviewer-ordered (SectionLabel uppercases it)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Core logic"
+      ],
+      "label": "the core group is rendered"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "The substance of the change"
+      ],
+      "label": "the core group explains how closely to read it"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Wiring"
+      ],
+      "label": "the wiring group is rendered"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "src/middleware/ratelimit.ts"
+      ],
+      "label": "the largest core file is listed"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "src/config.ts"
+      ],
+      "label": "the flagged wiring file is listed"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "1 finding"
+      ],
+      "label": "the flagged file reports its seeded finding"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "sk_live_51H8xq2Ka9Vn3PqLm7Rd0bZ4Xc"
+      ],
+      "label": "the flagged file is expanded, showing the line the finding points at"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "CRITICAL"
+      ],
+      "label": "the flagged line carries its severity as icon + label, not colour alone"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "const key = bucketKey(req);"
+      ],
+      "label": "core files are expanded by default"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Open the Warning finding on line 45 on the Agent runs tab"
+      ],
+      "label": "click the WARNING mark on src/api/users.ts:45 (on screen; its name carries the severity and line)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "tab=findings"
+      ],
+      "label": "the mark crosses to the Agent runs tab"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "finding="
+      ],
+      "label": "and names the finding it opened, so the card is revealed"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "N+1 query in user list endpoint"
+      ],
+      "label": "the seeded finding's card is on screen"
+    }
+  ]
+}

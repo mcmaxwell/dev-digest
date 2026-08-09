@@ -64,6 +64,27 @@ export const s = {
     color: "var(--text-primary)",
     paddingRight: 12,
   } satisfies CSSProperties,
+  /** Wraps the severity mark so it can open its finding; the badge draws itself. */
+  flagBtn: {
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    margin: 0,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+  } satisfies CSSProperties,
+  /** The "N findings" control in a file header — a button, so it must not inherit one. */
+  findingBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    cursor: "pointer",
+    font: "inherit",
+  } satisfies CSSProperties,
 } as const;
 
 /** Chevron rotates 90deg when the file card is open. */
@@ -75,10 +96,22 @@ export function chevronFor(open: boolean): CSSProperties {
   };
 }
 
-/** Row background per line kind (add/del tinted, others transparent). */
-export function lineRowFor(kind: Line["kind"]): CSSProperties {
+/**
+ * Row background per line kind (add/del tinted, others transparent). A flagged
+ * line additionally gets a severity-coloured rail down its left edge — drawn as
+ * an inset shadow rather than a border so flagging a line never shifts the
+ * gutter by a pixel relative to its unflagged neighbours.
+ */
+export function lineRowFor(kind: Line["kind"], flagColor?: string): CSSProperties {
   const background = kind === "add" ? "var(--code-add)" : kind === "del" ? "var(--code-del)" : "transparent";
-  return { display: "flex", alignItems: "stretch", fontSize: 13, lineHeight: "20px", background };
+  return {
+    display: "flex",
+    alignItems: "stretch",
+    fontSize: 13,
+    lineHeight: "20px",
+    background,
+    ...(flagColor ? { boxShadow: `inset 3px 0 0 ${flagColor}` } : null),
+  };
 }
 
 /** Gutter sign colour per line kind. */

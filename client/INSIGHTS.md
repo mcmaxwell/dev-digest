@@ -57,6 +57,24 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Codebase Patterns
 
+- [2026-08-07] A control that TWO sibling features under the same `_components/`
+  both render must be promoted to their common ancestor's `_components/`, not
+  imported across — `pnpm lint`'s `no-restricted-imports` rejects
+  `../SmartDiffViewer/_components/OrderToggle` with "Don't import a sibling
+  feature's _components", and `pnpm typecheck` passes happily, so this only
+  surfaces at lint. Move the component's `constants.ts`/`styles.ts` with it;
+  leaving them behind just re-creates the same cross-import one file down.
+  (`DiffTab` + `SmartDiffViewer` both needed the Smart/Original toggle →
+  `pulls/[number]/_components/OrderToggle/`.)
+- [2026-08-07] To give a shared `src/components/**` component a new capability
+  for one caller, add OPTIONAL props and keep the old default — never fork it.
+  `FileCard` gained `defaultOpen?` (overriding, not replacing, its
+  `AUTO_EXPAND_MAX_LINES` heuristic) and `flags?: ReadonlyMap<number, Severity>`;
+  `CodeLine` gained `flag?`. Every existing `DiffViewer` call site kept
+  compiling and rendering identically, and the two viewers cannot drift because
+  there is still one implementation. Export the inner piece from the package
+  barrel (`diff-viewer/index.ts` now exports `FileCard`) rather than letting the
+  new caller deep-import it.
 - [2026-08-02] Adding a top-level page to the sidebar REQUIRES editing vendored
   `src/vendor/ui/nav.ts` (`Sidebar.tsx` renders the `NAV` const directly; there is
   no app-side extension point) — the one sanctioned exception to the vendored-UI

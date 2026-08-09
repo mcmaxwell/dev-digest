@@ -17,11 +17,14 @@ export function FindingsPanel({
   prId,
   repoFullName,
   headSha,
+  focusFindingId,
 }: {
   findings: FindingRecord[];
   prId: string;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Reveal this finding: focus it, expand it, scroll it into view. */
+  focusFindingId?: string | null;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
@@ -29,6 +32,38 @@ export function FindingsPanel({
   const [focusIdx, setFocusIdx] = React.useState(0);
 
   const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  // Revealing the finding a severity mark pointed at is a ONE-SHOT command, not
+  // an invariant. Held as an invariant it fights the user: `hide low
+  // confidence` would spring straight back on every toggle for as long as
+  // `?finding=` sat in the URL, and j/k focus would be yanked back to the
+  // target. `revealed` disarms it, mirroring the `targetNonce` seam that
+  // ReviewRunAccordion uses for exactly this reason.
+  const revealed = React.useRef<string | null>(null);
+  const [pendingReveal, setPendingReveal] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!focusFindingId || revealed.current === focusFindingId) return;
+    revealed.current = focusFindingId;
+    setPendingReveal(focusFindingId);
+  }, [focusFindingId]);
+
+  React.useEffect(() => {
+    if (!pendingReveal) return;
+    const idx = shown.findIndex((f) => f.id === pendingReveal);
+    if (idx === -1) {
+      // Filtered out rather than absent → lift the filter once and let this
+      // effect run again against the wider list.
+      if (hideLow && findings.some((f) => f.id === pendingReveal)) setHideLow(false);
+      else setPendingReveal(null); // not this panel's finding at all
+      return;
+    }
+    setFocusIdx(idx);
+    listRef.current
+      ?.querySelector(`[data-finding-id="${pendingReveal}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setPendingReveal(null);
+  }, [pendingReveal, shown, hideLow, findings]);
 
   // Re-clamp focus when the filtered list shrinks (e.g. toggling hideLow) —
   // otherwise focusIdx can point past the end, the focus ring vanishes, and
@@ -61,7 +96,7 @@ export function FindingsPanel({
         </div>
       </div>
 
-      <div style={s.list}>
+      <div ref={listRef} style={s.list}>
         {shown.length === 0 ? (
           <EmptyState icon="Filter" title={t("panel.noMatchTitle")} body={t("panel.noMatchBody")} />
         ) : (
@@ -70,7 +105,7 @@ export function FindingsPanel({
               key={f.id}
               f={f}
               focused={i === focusIdx}
-              defaultExpanded={i === 0}
+              defaultExpanded={i === 0 || f.id === focusFindingId}
               pending={action.isPending}
               repoFullName={repoFullName}
               headSha={headSha}

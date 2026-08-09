@@ -15,6 +15,7 @@ import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
+import { DIFF_ORDERS, type DiffOrder } from "./_components/OrderToggle/constants";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
 import { usePullDetailByNumber } from "@/lib/hooks";
 import {
@@ -26,6 +27,7 @@ import {
   useInvalidateActiveRuns,
   useInvalidateRunHistory,
 } from "@/lib/hooks/reviews";
+import { useInvalidateSmartDiff } from "@/lib/hooks/smart-diff";
 import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { ApiError } from "@/lib/api";
 import { githubPrUrl } from "@/lib/github-urls";
@@ -65,24 +67,49 @@ export default function PRDetailPage() {
   // When a run settles (done OR failed) refresh the full run history too, so a
   // just-failed run shows up in "Run history" immediately — no page reload.
   const invalidateRunHistory = useInvalidateRunHistory(prId);
+  // The Smart Diff's `finding_lines` is server-derived from the latest review,
+  // so refetching the reviews alone would leave the Files tab marking the
+  // PREVIOUS run's lines for anyone watching a review finish from that tab.
+  const invalidateSmartDiff = useInvalidateSmartDiff(prId);
   // Stable identity: RunStatus's effect depends on `onDone` and only re-fires
   // it when `running` flips, but an inline arrow here would get a fresh
   // identity on every render — see RunStatus.tsx for the fallout that causes.
   const handleRunDone = React.useCallback(() => {
     invalidateActiveRuns();
     invalidateRunHistory();
+    invalidateSmartDiff();
     refetchReviews();
-  }, [invalidateActiveRuns, invalidateRunHistory, refetchReviews]);
+  }, [invalidateActiveRuns, invalidateRunHistory, invalidateSmartDiff, refetchReviews]);
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
-  const setParam = (key: string, val: string | null) => {
+  // Which finding to reveal on the Findings tab. In the URL (like `tab`/`trace`)
+  // so the jump survives a reload and can be shared, and so the Files tab can
+  // drive it across a tab switch without lifting the Findings tab's state.
+  const focusFindingId = search.get("finding");
+  // Also in the URL: the tab unmounts on every switch, so component state would
+  // silently drop the reader back to Smart order each time they came back.
+  const rawOrder = search.get("order");
+  // Validated against DIFF_ORDERS, not a hand-written literal: a third order
+  // would otherwise render as Smart while the toggle showed it selected.
+  const diffOrder: DiffOrder = DIFF_ORDERS.includes(rawOrder as DiffOrder)
+    ? (rawOrder as DiffOrder)
+    : "smart";
+  const setParams = (entries: Record<string, string | null>, opts?: { scroll?: boolean }) => {
     const sp = new URLSearchParams(search.toString());
-    if (val == null) sp.delete(key);
-    else sp.set(key, val);
-    router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
+    for (const [key, val] of Object.entries(entries)) {
+      if (val == null) sp.delete(key);
+      else sp.set(key, val);
+    }
+    router.replace(
+      `/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`,
+      opts,
+    );
   };
-  const setTab = (t: string) => setParam("tab", t);
+  const setParam = (key: string, val: string | null) => setParams({ [key]: val });
+  // Clearing `finding` on a plain tab change keeps a stale jump from re-firing
+  // every time the user comes back to Findings by hand.
+  const setTab = (t: string) => setParams({ tab: t, finding: null });
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = React.useMemo(() => reviews ?? [], [reviews]);
@@ -158,6 +185,7 @@ export default function PRDetailPage() {
             repoFullName={repoFullName}
             headSha={pr.head_sha}
             cancelMutation={cancel}
+            focusFindingId={focusFindingId}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {
               if (window.confirm(t("detail.confirmDeleteRun"))) deleteRun.mutate(id);
@@ -172,6 +200,15 @@ export default function PRDetailPage() {
             filesCount={pr.files_count}
             files={pr.files}
             canComment={pr.status === "open"}
+            order={diffOrder}
+            onOrderChange={(next) => setParam("order", next === "smart" ? null : next)}
+            // Clicking a severity mark in the diff crosses to the Findings tab
+            // and reveals that exact card — both params move in one navigation.
+            // `scroll: false` because the App Router otherwise jumps to the top
+            // AFTER the panel has scrolled the card into view, undoing the jump.
+            onOpenFinding={(id) =>
+              setParams({ tab: "findings", finding: id }, { scroll: false })
+            }
           />
         )}
       </div>

@@ -33,6 +33,9 @@
   "diffViewer": {
     "noDiffText": "No diff text available (binary or unfetched patch).",
     "noChangedFiles": "No changed files.",
+    "findingCount": "{count, plural, one {# finding} other {# findings}}",
+    "jumpToFinding": "Jump to the first of {count, plural, one {# finding} other {# findings}} in this file",
+    "openFinding": "Open the {severity} finding on line {line} on the Agent runs tab",
     "commentPlaceholder": "Leave a comment… (⌘/Ctrl+Enter to post)",
     "post": "Comment",
     "posting": "Posting…",

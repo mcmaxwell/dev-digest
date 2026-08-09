@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "verify:l03": "vitest run test/smart-diff.test.ts test/smart-diff.it.test.ts",
     "arch:check": "depcruise src --config .dependency-cruiser.cjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",

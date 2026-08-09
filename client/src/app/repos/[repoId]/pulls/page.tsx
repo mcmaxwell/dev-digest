@@ -125,7 +125,14 @@ export default function PullsPage() {
             }
           />
         ) : (
-          filtered.map((pr) => <PRRow key={pr.number} pr={pr} repoId={repoId} />)
+          filtered.map((pr, i) => (
+            <PRRow
+              key={pr.number}
+              pr={pr}
+              repoId={repoId}
+              isLast={i === filtered.length - 1}
+            />
+          ))
         )}
       </div>
     </>

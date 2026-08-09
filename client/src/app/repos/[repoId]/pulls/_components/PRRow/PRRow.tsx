@@ -19,7 +19,16 @@ const SEVERITY_CELLS: { severity: Severity; key: "critical" | "warning" | "sugge
   { severity: "SUGGESTION", key: "suggestion" },
 ];
 
-export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
+export function PRRow({
+  pr,
+  repoId,
+  isLast,
+}: {
+  pr: PrMeta;
+  repoId: string;
+  /** Rounds this row's bottom corners — the card no longer clips them. */
+  isLast?: boolean;
+}) {
   const t = useTranslations("prReview");
   const router = useRouter();
   const [h, setH] = React.useState(false);
@@ -35,7 +44,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
       onClick={() => router.push(`/repos/${repoId}/pulls/${pr.number}`)}
-      style={s.row(h)}
+      style={s.row(h, isLast)}
     >
       <div style={s.rowTitleCell}>
         <Icon.GitPullRequest size={15} style={s.rowIcon(st.c)} />
