@@ -41,6 +41,16 @@ the root INSIGHTS.md. Format and quality gates:
   `messages/en/*.json` string are title-case. Same trap for any `filesCount`-style
   ICU plural rendered inside one (`"FILES CHANGED · 9 FILES"`). Failure looks
   like a missing element, not a case mismatch, so check the CSS before the copy.
+- [2026-08-09] A control that has scrolled ABOVE the fold is not reliably
+  clickable by `find text|role … click`: agent-browser scrolls it to the top of
+  the viewport, where the app's sticky header sits over it, and the click lands
+  on the header instead — silently, because the `find … click` step still exits
+  0. Symptom: a click step passes but nothing changed, and the failure
+  screenshot in `test-results/` shows a header dropdown open. `scroll up 4000`
+  first does NOT reliably fix it. Order the flow so controls are exercised while
+  they are on screen (assert the toggle before a tab round-trip, not after), and
+  when a click step "passes" but the next assertion fails, read the screenshot
+  before touching the app — this looked exactly like an app bug and was not one.
 - [2026-08-07] Seeded PR metadata and seeded `pr_files` are independent: PR #482
   reports `files_count: 9` but materialises 4 file rows, so a header driven by
   `pr.files_count` says "9 files" above 4 cards. Assert whichever number the

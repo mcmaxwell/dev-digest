@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Icon, SEV, type Severity } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "@/components/diff-viewer/constants";
-import { parsePatch, type Line } from "@/components/diff-viewer/helpers";
+import { parsePatch, type FindingFlag, type Line } from "@/components/diff-viewer/helpers";
 import {
   buildThreads,
   keysForLine,
@@ -22,9 +22,9 @@ import { OutdatedComments } from "@/components/diff-viewer/OutdatedComments";
 /** Worst-first, so a file's badge reports its most serious finding. */
 const SEVERITY_RANK: Severity[] = ["CRITICAL", "WARNING", "SUGGESTION", "INFO"];
 
-function worstSeverity(flags: ReadonlyMap<number, Severity> | undefined): Severity | null {
+function worstSeverity(flags: ReadonlyMap<number, FindingFlag> | undefined): Severity | null {
   if (!flags?.size) return null;
-  const present = new Set(flags.values());
+  const present = new Set([...flags.values()].map((f) => f.severity));
   return SEVERITY_RANK.find((sev) => present.has(sev)) ?? null;
 }
 
@@ -44,13 +44,16 @@ export function FileCard({
   commenting,
   flags,
   defaultOpen,
+  onOpenFinding,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
-  /** New-side line number → severity of the finding on it (Smart Diff). */
-  flags?: ReadonlyMap<number, Severity>;
+  /** New-side line number → the finding anchored to it (Smart Diff). */
+  flags?: ReadonlyMap<number, FindingFlag>;
   /** Overrides the size heuristic below — Smart Diff decides per role. */
   defaultOpen?: boolean;
+  /** Opens a flagged line’s finding on the Findings tab. */
+  onOpenFinding?: (findingId: string) => void;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
@@ -146,6 +149,7 @@ export function FileCard({
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
                 flag={ln.newNo != null ? flags?.get(ln.newNo) : undefined}
+                onOpenFinding={onOpenFinding}
               />
             ))
           )}

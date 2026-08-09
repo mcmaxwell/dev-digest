@@ -7,7 +7,7 @@
  * diff still reachable when the grouping call fails.
  */
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
+import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { PrFile, ReviewRecord, SmartDiffResponse } from "@devdigest/shared";
 import prReview from "../../../../../../../../messages/en/prReview.json";
@@ -237,6 +237,26 @@ describe("SmartDiffViewer", () => {
     prReviews.mockReturnValue({ data: undefined });
     renderViewer();
     expect(screen.getByText("1 finding")).toBeInTheDocument();
+    expect(screen.getByText("Info")).toBeInTheDocument();
+  });
+
+  it("opens the finding behind a severity mark when it is clicked", () => {
+    const onOpenFinding = vi.fn();
+    renderViewer({ onOpenFinding });
+    const wiring = screen.getByRole("region", { name: "Wiring" });
+    fireEvent.click(
+      within(wiring).getByRole("button", { name: /Open this finding/i }),
+    );
+    // The id of the CRITICAL on src/config.ts:12 — not the line, not the file.
+    expect(onOpenFinding).toHaveBeenCalledWith("f1");
+  });
+
+  it("leaves the mark inert when the finding cannot be resolved", () => {
+    // Server says line 12 is flagged, but no review supplies the finding, so
+    // there is nothing to open — the mark must not look clickable.
+    prReviews.mockReturnValue({ data: undefined });
+    renderViewer({ onOpenFinding: vi.fn() });
+    expect(screen.queryByRole("button", { name: /Open this finding/i })).not.toBeInTheDocument();
     expect(screen.getByText("Info")).toBeInTheDocument();
   });
 

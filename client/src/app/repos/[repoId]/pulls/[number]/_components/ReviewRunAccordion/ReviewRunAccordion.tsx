@@ -31,6 +31,7 @@ export function ReviewRunAccordion({
   headSha,
   targetRunId = null,
   targetNonce = 0,
+  focusFindingId = null,
 }: {
   review: ReviewRecord;
   prId: string;
@@ -41,6 +42,8 @@ export function ReviewRunAccordion({
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
   targetNonce?: number;
+  /** When this run owns the finding, the accordion opens and scrolls to it. */
+  focusFindingId?: string | null;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -53,6 +56,15 @@ export function ReviewRunAccordion({
   }, [targetRunId, targetNonce, review.run_id]);
   const del = useDeleteReview(prId);
   const findings = review.findings;
+
+  // A severity mark in the diff names a finding, not a run — so each accordion
+  // decides for itself whether it owns it. Keying off the finding rather than
+  // `run_id` also works for a review that predates run tracking (run_id null),
+  // which the targetRunId path above cannot match.
+  const ownsFocused = !!focusFindingId && findings.some((f) => f.id === focusFindingId);
+  React.useEffect(() => {
+    if (ownsFocused) setOpen(true);
+  }, [ownsFocused, focusFindingId]);
   const blockers = findings.filter((f) => f.severity === "CRITICAL" && !f.dismissed_at).length;
   // Severity breakdown for the header, e.g. "2 critical · 1 warning" (zero
   // counts omitted; empty string when the review has no findings).
@@ -160,6 +172,7 @@ export function ReviewRunAccordion({
             prId={prId}
             repoFullName={repoFullName}
             headSha={headSha}
+            focusFindingId={ownsFocused ? focusFindingId : null}
           />
         </div>
       )}

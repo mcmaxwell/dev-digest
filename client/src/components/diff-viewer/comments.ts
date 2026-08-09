@@ -108,6 +108,16 @@ export function partitionThreads(
 // ---- styles (layout only; cards/inputs/buttons reuse @devdigest/ui) ----
 export const cs = {
   rowWrap: { position: "relative" } satisfies CSSProperties,
+  /** Wraps the severity mark so it can open its finding; the badge draws itself. */
+  flagBtn: {
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    margin: 0,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+  },
   addBtn: {
     position: "absolute",
     left: 2,

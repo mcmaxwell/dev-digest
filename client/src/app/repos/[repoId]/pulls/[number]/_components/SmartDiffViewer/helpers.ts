@@ -1,5 +1,6 @@
 import type { PrFile, ReviewRecord, SmartDiffFile } from "@devdigest/shared";
 import type { Severity } from "@devdigest/ui";
+import type { FindingFlag } from "@/components/diff-viewer/helpers";
 
 /**
  * Which lines the server flagged is the server's answer (`finding_lines`); what
@@ -32,15 +33,17 @@ export function latestReviews(reviews: readonly ReviewRecord[] | undefined): Rev
 }
 
 /**
- * `path → (line → severity)`. Only the latest review's live findings count; a
+ * `path → (line → flag)`. Only the latest review's live findings count; a
  * dismissed one is gone from the diff the moment it is dismissed. When two
- * findings land on the same line the more severe one wins the colour.
+ * findings land on the same line the more severe one wins — both the colour
+ * and the finding the mark opens, so the click lands on the one the reader is
+ * being warned about.
  */
 export function severityByPath(
   reviews: readonly ReviewRecord[] | undefined,
-): Map<string, Map<number, Severity>> {
+): Map<string, Map<number, FindingFlag>> {
   const rank: Severity[] = ["CRITICAL", "WARNING", "SUGGESTION", "INFO"];
-  const out = new Map<string, Map<number, Severity>>();
+  const out = new Map<string, Map<number, FindingFlag>>();
   for (const review of latestReviews(reviews)) {
     for (const f of review.findings) {
       if (f.dismissed_at) continue;
@@ -48,8 +51,8 @@ export function severityByPath(
       if (!byLine) out.set(f.file, (byLine = new Map()));
       const current = byLine.get(f.start_line);
       const severity = f.severity as Severity;
-      if (!current || rank.indexOf(severity) < rank.indexOf(current)) {
-        byLine.set(f.start_line, severity);
+      if (!current || rank.indexOf(severity) < rank.indexOf(current.severity)) {
+        byLine.set(f.start_line, { severity, findingId: f.id });
       }
     }
   }
@@ -64,10 +67,12 @@ export function severityByPath(
  */
 export function flagsFor(
   file: SmartDiffFile,
-  severities: Map<string, Map<number, Severity>>,
-): Map<number, Severity> {
+  severities: Map<string, Map<number, FindingFlag>>,
+): Map<number, FindingFlag> {
   const byLine = severities.get(file.path);
-  return new Map(file.finding_lines.map((line) => [line, byLine?.get(line) ?? "INFO"]));
+  return new Map(
+    file.finding_lines.map((line) => [line, byLine?.get(line) ?? { severity: "INFO" }]),
+  );
 }
 
 /**

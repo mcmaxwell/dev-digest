@@ -17,11 +17,14 @@ export function FindingsPanel({
   prId,
   repoFullName,
   headSha,
+  focusFindingId,
 }: {
   findings: FindingRecord[];
   prId: string;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Reveal this finding: focus it, expand it, scroll it into view. */
+  focusFindingId?: string | null;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
@@ -29,6 +32,24 @@ export function FindingsPanel({
   const [focusIdx, setFocusIdx] = React.useState(0);
 
   const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  // Reveal the finding a severity mark in the diff pointed at. `hideLow` can
+  // filter it out of `shown`, so the filter is lifted rather than leaving the
+  // user on a tab that jumped nowhere.
+  const focusedIdx = focusFindingId ? shown.findIndex((f) => f.id === focusFindingId) : -1;
+  const focusedHidden =
+    !!focusFindingId && focusedIdx === -1 && findings.some((f) => f.id === focusFindingId);
+  React.useEffect(() => {
+    if (focusedHidden) setHideLow(false);
+  }, [focusedHidden]);
+  React.useEffect(() => {
+    if (focusedIdx < 0) return;
+    setFocusIdx(focusedIdx);
+    listRef.current
+      ?.querySelector(`[data-finding-id="${focusFindingId}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusedIdx, focusFindingId]);
 
   // Re-clamp focus when the filtered list shrinks (e.g. toggling hideLow) —
   // otherwise focusIdx can point past the end, the focus ring vanishes, and
@@ -61,21 +82,22 @@ export function FindingsPanel({
         </div>
       </div>
 
-      <div style={s.list}>
+      <div ref={listRef} style={s.list}>
         {shown.length === 0 ? (
           <EmptyState icon="Filter" title={t("panel.noMatchTitle")} body={t("panel.noMatchBody")} />
         ) : (
           shown.map((f, i) => (
+            <div key={f.id} data-finding-id={f.id} style={s.cardAnchor}>
             <FindingCard
-              key={f.id}
               f={f}
               focused={i === focusIdx}
-              defaultExpanded={i === 0}
+              defaultExpanded={i === 0 || f.id === focusFindingId}
               pending={action.isPending}
               repoFullName={repoFullName}
               headSha={headSha}
               onAction={(act) => action.mutate({ findingId: f.id, action: act, prId })}
             />
+            </div>
           ))
         )}
       </div>

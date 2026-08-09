@@ -20,12 +20,15 @@ export function SmartDiffViewer({
   files,
   commenting,
   onUnavailable,
+  onOpenFinding,
 }: {
   prId: string | null;
   files: PrFile[];
   commenting?: DiffCommentApi;
   /** Rendered instead of an error state — the plain diff is always a valid fallback. */
   onUnavailable?: React.ReactNode;
+  /** Opens a flagged line's finding on the Findings tab. */
+  onOpenFinding?: (findingId: string) => void;
 }) {
   const t = useTranslations("prReview.smartDiff");
   const { data, isLoading, isError } = useSmartDiff(prId);
@@ -60,6 +63,7 @@ export function SmartDiffViewer({
                 file={file}
                 commenting={commenting}
                 flags={flagsFor(entry, severities)}
+                onOpenFinding={onOpenFinding}
                 // A flagged file opens whatever its role: a finding in a lock
                 // file is exactly the one boilerplate change worth reading.
                 defaultOpen={

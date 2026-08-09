@@ -34,6 +34,12 @@ On the client, `useSmartDiff` supplies the grouping and `usePrReviews` (already 
 
 - **`pseudocode_summary` is always `null`.**
   The contract keeps the field, and the UI omits the row. Filling it means either an LLM call — which contradicts the feature's premise — or a mechanical "adds foo(), imports bar" line that reads worse than no line at all. The seam stays open for a later lesson.
+- **A severity mark is a control, not decoration.**
+  Clicking one crosses to the Agent runs tab with that exact `FindingCard` opened, focused and scrolled to, via `?finding=<id>` in the URL — so the jump survives a reload and can be shared.
+  The mark carries the finding's **id**, not just its severity, which is why `flags` is `Map<line, FindingFlag>`; a line the server flagged that the client cannot resolve to a finding still renders, but stays inert rather than looking clickable and doing nothing.
+  Each accordion decides for itself whether it owns the finding, rather than the tab resolving a run id — that also works for a review predating run tracking, which the existing `targetRunId` path cannot match.
+- **The Smart/Original choice lives in `?order=`, not component state.**
+  The tab unmounts on every switch, so component state silently dropped the reader back to Smart order each time they came back from Findings — which is precisely the trip the severity marks now encourage.
 - **Severity is not in the contract.**
   The server owns *which* lines are flagged (`finding_lines`); the client colours them from the reviews it already holds. This keeps the endpoint a pure grouping of files, and keeps the marks in step with the findings list the user is looking at — including one they just dismissed.
   A line the server flagged but the client cannot colour still renders (as `INFO`); a lookup miss must never silently drop a flagged line.
@@ -67,6 +73,8 @@ On the client, `useSmartDiff` supplies the grouping and `usePrReviews` (already 
 - Clicking a file's finding badge expands it and scrolls its first flagged line into view.
 - Toggling to **Original order** renders the pre-existing `DiffViewer` unchanged, and inline GitHub commenting works in both orders.
 - A PR with no reviews still groups correctly, with every `finding_lines` empty.
+- Clicking a severity mark on a flagged line opens the Agent runs tab with `?finding=<id>`, that finding's card expanded and focused, and the run's accordion open.
+- `cd server && pnpm verify:l03` runs the whole lesson's suite in one command, and self-skips the DB-backed half when Docker is unavailable.
 - `GET /pulls/:id/smart-diff` 404s for an unknown id and for a PR in another workspace, and 422s on a non-uuid id before the handler runs.
 - A PR over 400 changed lines or 20 files gets the split banner; one whose files share a single directory gets the banner with no proposed splits.
 - `pnpm arch:check` passes in `server/` with no new allowlist entry, and `diff` reports both vendored copies of `contracts/brief.ts` and `contracts/review-api.ts` identical and unchanged.

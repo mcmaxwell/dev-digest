@@ -24,4 +24,6 @@ export const s = {
     color: "var(--text-secondary)",
   } satisfies CSSProperties,
   list: { display: "flex", flexDirection: "column", gap: 12 } satisfies CSSProperties,
+  /** Scroll anchor around each card; margin keeps it clear of the sticky header. */
+  cardAnchor: { scrollMarginTop: 24 } satisfies CSSProperties,
 } as const;

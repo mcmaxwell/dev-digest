@@ -3,9 +3,10 @@
 "use client";
 
 import React from "react";
-import { SEV, SeverityBadge, type Severity } from "@devdigest/ui";
+import { useTranslations } from "next-intl";
+import { SEV, SeverityBadge } from "@devdigest/ui";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "@/components/diff-viewer/comments";
-import { type Line } from "@/components/diff-viewer/helpers";
+import { type FindingFlag, type Line } from "@/components/diff-viewer/helpers";
 import { s, lineRowFor, lineSignFor } from "@/components/diff-viewer/styles";
 import { CommentThreadView } from "@/components/diff-viewer/CommentThreadView";
 import { InlineComposer } from "@/components/diff-viewer/InlineComposer";
@@ -16,16 +17,21 @@ export function CodeLine({
   threads,
   commenting,
   flag,
+  onOpenFinding,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
-  /** Severity of a review finding anchored to this line (Smart Diff). */
-  flag?: Severity;
+  /** A review finding anchored to this line (Smart Diff). */
+  flag?: FindingFlag;
+  /** Opens that finding on the Findings tab. Omit to render the mark inert. */
+  onOpenFinding?: (findingId: string) => void;
 }) {
+  const t = useTranslations("shell");
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
+  const openFindingLabel = t("diffViewer.openFinding");
 
   if (ln.kind === "hunk") {
     return (
@@ -45,7 +51,10 @@ export function CodeLine({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind, flag && SEV[flag].c)} data-flagged={flag ? "true" : undefined}>
+      <div
+        style={lineRowFor(ln.kind, flag && SEV[flag.severity].c)}
+        data-flagged={flag ? "true" : undefined}
+      >
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button
@@ -66,8 +75,24 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
-        {/* Icon + label, never colour alone — the rail is a duplicate cue. */}
-        {flag && <SeverityBadge severity={flag} />}
+        {/* Icon + label, never colour alone — the rail is a duplicate cue.
+            When the finding is resolvable the mark is a button that opens it on
+            the Findings tab; otherwise it stays inert rather than looking
+            clickable and doing nothing. */}
+        {flag &&
+          (flag.findingId && onOpenFinding ? (
+            <button
+              type="button"
+              onClick={() => onOpenFinding(flag.findingId!)}
+              title={openFindingLabel}
+              aria-label={openFindingLabel}
+              style={cs.flagBtn}
+            >
+              <SeverityBadge severity={flag.severity} />
+            </button>
+          ) : (
+            <SeverityBadge severity={flag.severity} />
+          ))}
       </div>
 
       {commenting &&

@@ -17,17 +17,27 @@ interface DiffTabProps {
   files: PrFile[];
   /** Inline commenting is offered only on open PRs (GitHub rejects otherwise). */
   canComment?: boolean;
+  /** Opens a flagged line's finding on the Findings tab. */
+  onOpenFinding?: (findingId: string) => void;
+  /** Lifted to the URL so the choice survives a trip to another tab. */
+  order: DiffOrder;
+  onOrderChange: (next: DiffOrder) => void;
 }
 
-export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
+export function DiffTab({
+  prId,
+  filesCount,
+  files,
+  canComment,
+  onOpenFinding,
+  order,
+  onOrderChange,
+}: DiffTabProps) {
   const t = useTranslations("prReview");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
   // Comments start hidden so the diff is clean by default — toggle to reveal.
   const [showComments, setShowComments] = React.useState(false);
-  // Smart order is the default: the whole point of the feature is that the
-  // reviewer meets the substance of the change first, without opting in.
-  const [order, setOrder] = React.useState<DiffOrder>("smart");
 
   const commentCount = comments?.length ?? 0;
 
@@ -68,7 +78,7 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
                 })}
               </Button>
             )}
-            <OrderToggle value={order} onChange={setOrder} />
+            <OrderToggle value={order} onChange={onOrderChange} />
           </div>
         }
       >
@@ -80,6 +90,7 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
           files={files}
           commenting={commenting}
           onUnavailable={plainDiff}
+          onOpenFinding={onOpenFinding}
         />
       ) : (
         plainDiff
