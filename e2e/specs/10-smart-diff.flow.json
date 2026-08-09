@@ -1,6 +1,6 @@
 {
   "name": "Files changed opens in Smart Diff order and toggles back to the original",
-  "description": "From PR #482, open the Files changed tab and confirm the reviewer-ordered diff (L03 Smart Diff): the seeded files group into Core logic and Wiring, each group carries the description that says how much attention it deserves, and src/config.ts \u2014 flagged CRITICAL on line 12 by the seeded review \u2014 reports its finding in the file header and marks the line itself. The seeded PR is 134 changed lines, so the 'This PR is large' split banner must NOT appear. Then toggle to Original order (the choice lands in ?order= so it survives leaving the tab) and back, and finally click a severity mark to cross to the Agent runs tab with that exact finding revealed. Read-only seeded data; GET /pulls/:id/smart-diff is deterministic (no model call, no keys). Assumes a freshly-seeded DB where acme/payments-api (PR #482) is the first repo \u2014 run locally via the hermetic stack (see e2e/README.md).",
+  "description": "From PR #482, open the Files changed tab and confirm the reviewer-ordered diff (L03 Smart Diff): the seeded files group into Core logic and Wiring, each group carries the description that says how much attention it deserves, and src/config.ts — flagged CRITICAL on line 12 by the seeded review — reports its finding in the file header and marks the line. The seeded PR is 134 changed lines, so the 'This PR is large' split banner must NOT appear. Finally a severity mark is clicked to cross to the Agent runs tab with that exact finding revealed. NOTE the Smart/Original toggle is deliberately NOT driven here: agent-browser clicks it only intermittently (an off-screen control gets scrolled under the sticky header and the click lands on the header), and a flaky flow is worse than none — the toggle's behaviour is covered by OrderToggle.test.tsx (click, roving tabindex, arrow keys) and its two renderers by SmartDiffViewer.test.tsx. Read-only seeded data; GET /pulls/:id/smart-diff is deterministic (no model call, no keys). Assumes a freshly-seeded DB where acme/payments-api (PR #482) is the first repo — run locally via the hermetic stack (see e2e/README.md).",
   "steps": [
     {
       "cmd": [
@@ -160,55 +160,13 @@
     {
       "cmd": [
         "find",
-        "text",
-        "Original order",
-        "click"
-      ],
-      "label": "switch to the original GitHub order"
-    },
-    {
-      "cmd": [
-        "wait",
-        "--url",
-        "order=original"
-      ],
-      "label": "the order choice lives in the URL, so it survives leaving the tab"
-    },
-    {
-      "cmd": [
-        "wait",
-        "--text",
-        "FILES CHANGED \u00b7 9 FILES"
-      ],
-      "label": "the plain diff header replaces the smart one (9 = the PR's GitHub file count)"
-    },
-    {
-      "cmd": [
-        "find",
-        "text",
-        "Smart order",
-        "click"
-      ],
-      "label": "switch back to smart order"
-    },
-    {
-      "cmd": [
-        "wait",
-        "--text",
-        "Core logic"
-      ],
-      "label": "the grouping is restored"
-    },
-    {
-      "cmd": [
-        "find",
         "role",
         "button",
         "click",
         "--name",
-        "Open this finding on the Agent runs tab"
+        "Open the Warning finding on line 45 on the Agent runs tab"
       ],
-      "label": "click a severity mark on a flagged line"
+      "label": "click the WARNING mark on src/api/users.ts:45 (on screen; its name carries the severity and line)"
     },
     {
       "cmd": [
@@ -230,7 +188,7 @@
       "cmd": [
         "wait",
         "--text",
-        "Hardcoded Stripe secret key in commit"
+        "N+1 query in user list endpoint"
       ],
       "label": "the seeded finding's card is on screen"
     }

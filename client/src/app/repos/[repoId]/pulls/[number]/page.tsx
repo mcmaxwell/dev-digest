@@ -15,7 +15,7 @@ import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
-import type { DiffOrder } from "./_components/OrderToggle/constants";
+import { DIFF_ORDERS, type DiffOrder } from "./_components/OrderToggle/constants";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
 import { usePullDetailByNumber } from "@/lib/hooks";
 import {
@@ -89,7 +89,12 @@ export default function PRDetailPage() {
   const focusFindingId = search.get("finding");
   // Also in the URL: the tab unmounts on every switch, so component state would
   // silently drop the reader back to Smart order each time they came back.
-  const diffOrder: DiffOrder = search.get("order") === "original" ? "original" : "smart";
+  const rawOrder = search.get("order");
+  // Validated against DIFF_ORDERS, not a hand-written literal: a third order
+  // would otherwise render as Smart while the toggle showed it selected.
+  const diffOrder: DiffOrder = DIFF_ORDERS.includes(rawOrder as DiffOrder)
+    ? (rawOrder as DiffOrder)
+    : "smart";
   const setParams = (entries: Record<string, string | null>, opts?: { scroll?: boolean }) => {
     const sp = new URLSearchParams(search.toString());
     for (const [key, val] of Object.entries(entries)) {

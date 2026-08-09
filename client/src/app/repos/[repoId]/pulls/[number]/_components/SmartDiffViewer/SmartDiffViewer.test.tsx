@@ -245,10 +245,13 @@ describe("SmartDiffViewer", () => {
     renderViewer({ onOpenFinding });
     const wiring = screen.getByRole("region", { name: "Wiring" });
     fireEvent.click(
-      within(wiring).getByRole("button", { name: /Open this finding/i }),
+      within(wiring).getByRole("button", { name: /Open the Critical finding on line 12/i }),
     );
     // The id of the CRITICAL on src/config.ts:12 — not the line, not the file.
     expect(onOpenFinding).toHaveBeenCalledWith("f1");
+    // The severity stays in the accessible name; an aria-label that replaced it
+    // would strip the only non-colour cue a screen reader gets for the line.
+    expect(within(wiring).getByText("Critical")).toBeInTheDocument();
   });
 
   it("leaves the mark inert when the finding cannot be resolved", () => {
@@ -256,7 +259,7 @@ describe("SmartDiffViewer", () => {
     // there is nothing to open — the mark must not look clickable.
     prReviews.mockReturnValue({ data: undefined });
     renderViewer({ onOpenFinding: vi.fn() });
-    expect(screen.queryByRole("button", { name: /Open this finding/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Open the .* finding/i })).not.toBeInTheDocument();
     expect(screen.getByText("Info")).toBeInTheDocument();
   });
 

@@ -35,7 +35,7 @@
     "noChangedFiles": "No changed files.",
     "findingCount": "{count, plural, one {# finding} other {# findings}}",
     "jumpToFinding": "Jump to the first of {count, plural, one {# finding} other {# findings}} in this file",
-    "openFinding": "Open this finding on the Agent runs tab",
+    "openFinding": "Open the {severity} finding on line {line} on the Agent runs tab",
     "commentPlaceholder": "Leave a comment… (⌘/Ctrl+Enter to post)",
     "post": "Comment",
     "posting": "Posting…",

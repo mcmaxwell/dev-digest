@@ -64,6 +64,16 @@ export const s = {
     color: "var(--text-primary)",
     paddingRight: 12,
   } satisfies CSSProperties,
+  /** Wraps the severity mark so it can open its finding; the badge draws itself. */
+  flagBtn: {
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    margin: 0,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+  } satisfies CSSProperties,
   /** The "N findings" control in a file header — a button, so it must not inherit one. */
   findingBtn: {
     display: "inline-flex",

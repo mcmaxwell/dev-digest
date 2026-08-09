@@ -31,7 +31,6 @@ export function CodeLine({
   const t = useTranslations("shell");
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
-  const openFindingLabel = t("diffViewer.openFinding");
 
   if (ln.kind === "hunk") {
     return (
@@ -84,9 +83,20 @@ export function CodeLine({
             <button
               type="button"
               onClick={() => onOpenFinding(flag.findingId!)}
-              title={openFindingLabel}
-              aria-label={openFindingLabel}
-              style={cs.flagBtn}
+              // The label COMPOSES the severity rather than replacing it: an
+              // aria-label overrides the badge's visible "Critical" text in the
+              // accessible-name computation, which would strip the very cue the
+              // icon+label pairing exists to provide — and leave every mark in
+              // the diff announcing an identical, undistinguishable name.
+              title={t("diffViewer.openFinding", {
+                severity: SEV[flag.severity].label,
+                line: ln.newNo ?? ln.oldNo ?? 0,
+              })}
+              aria-label={t("diffViewer.openFinding", {
+                severity: SEV[flag.severity].label,
+                line: ln.newNo ?? ln.oldNo ?? 0,
+              })}
+              style={s.flagBtn}
             >
               <SeverityBadge severity={flag.severity} />
             </button>
