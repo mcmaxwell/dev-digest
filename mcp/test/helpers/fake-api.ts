@@ -1,6 +1,7 @@
 import type { ApiClient } from '../../src/api/index.js';
 import * as s from '../../src/api/schemas.js';
 import agentsJson from '../fixtures/agents.json' with { type: 'json' };
+import blastJson from '../fixtures/blast-482.json' with { type: 'json' };
 import conventionsJson from '../fixtures/conventions.json' with { type: 'json' };
 import prJson from '../fixtures/pr-482.json' with { type: 'json' };
 import reposJson from '../fixtures/repos.json' with { type: 'json' };
@@ -25,6 +26,7 @@ import runsJson from '../fixtures/runs.json' with { type: 'json' };
 
 export const RAW_FIXTURES = {
   agents: agentsJson,
+  blast: blastJson,
   repos: reposJson,
   pull: prJson,
   reviews: reviewsJson,
@@ -39,6 +41,7 @@ export const fixtures = {
   reviews: s.ReviewList.parse(reviewsJson),
   runs: s.RunSummaryList.parse(runsJson),
   conventions: s.ConventionsPage.parse(conventionsJson),
+  blast: s.PrBlast.parse(blastJson),
 };
 
 export const REPO_FULL_NAME = 'acme/payments-api';
@@ -62,6 +65,8 @@ export function fakeApi(over: Partial<ApiClient> = {}): ApiClient {
     activeRuns: async () => [],
     reviewsForPull: async () => fixtures.reviews,
     conventions: async () => fixtures.conventions,
+    blastRadius: async () => fixtures.blast,
+    reviewDiff: async () => unexpected('reviewDiff'),
   };
   return { ...base, ...over };
 }

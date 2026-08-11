@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Container } from '../../platform/container.js';
 import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers, wrapUntrusted } from '@devdigest/reviewer-core';
+import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { skillToBlock, taskLine } from './helpers.js';
 import { loadDiff } from '../_shared/diff-loader.js';
 import {
   logPromptAssembly,
@@ -470,11 +470,7 @@ export class ReviewRunExecutor {
       `skills: ${enabled.length} enabled skill(s) attached` +
         (skippedDisabled > 0 ? ` (${skippedDisabled} disabled skipped)` : ''),
     );
-    return enabled.map(({ skill }) => {
-      const body =
-        skill.source === 'manual' ? skill.body : wrapUntrusted(`skill:${skill.name}`, skill.body);
-      return `### Skill: ${skill.name}\n${body}`;
-    });
+    return enabled.map(({ skill }) => skillToBlock(skill));
   }
 
   /**

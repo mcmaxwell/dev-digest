@@ -194,6 +194,109 @@ export const ConventionsPage = z.object({
 });
 export type ConventionsPage = z.infer<typeof ConventionsPage>;
 
+// --- Blast radius (GET /pulls/:id/blast) ------------------------------------
+
+/**
+ * `rank` and the `*_total` counters are read but never advertised in the tool's
+ * output schema: the totals go into the RESULT TEXT instead, because a schema is
+ * taxed on every session and a sentence in a result is not.
+ */
+export const BlastCaller = z.object({
+  name: z.string(),
+  file: z.string(),
+  line: z.number().int(),
+  rank: z.number().nullish(),
+});
+export type BlastCaller = z.infer<typeof BlastCaller>;
+
+export const BlastDownstream = z.object({
+  symbol: z.string(),
+  callers: z.array(BlastCaller).default([]),
+  caller_total: z.number().int().nullish(),
+  endpoints_affected: z.array(z.string()).default([]),
+  crons_affected: z.array(z.string()).default([]),
+});
+export type BlastDownstream = z.infer<typeof BlastDownstream>;
+
+export const BlastChangedSymbol = z.object({
+  name: z.string(),
+  file: z.string(),
+  kind: z.string().nullish(),
+});
+export type BlastChangedSymbol = z.infer<typeof BlastChangedSymbol>;
+
+/**
+ * `index.status` and `index.ranked` are the two fields the handler cannot work
+ * without: the first is the difference between "nothing calls this" and "we do
+ * not know", and the second decides whether `min_rank` means anything at all.
+ * Both are `.catch()`-guarded so an additive server change degrades one line of
+ * output rather than failing the call.
+ */
+export const BlastIndex = z.object({
+  status: z.enum(['ok', 'partial', 'degraded']).catch('partial'),
+  reason: z.string().nullish(),
+  ranked: z.boolean().catch(false),
+  facts: z.boolean().catch(false),
+  graph: z.boolean().catch(false),
+  last_indexed_sha: z.string().nullish(),
+});
+export type BlastIndex = z.infer<typeof BlastIndex>;
+
+export const PrBlast = z.object({
+  blast: z.object({
+    changed_symbols: z.array(BlastChangedSymbol).default([]),
+    downstream: z.array(BlastDownstream).default([]),
+    summary: z.string().nullish(),
+  }),
+  index: BlastIndex,
+  changed_files: z.number().int().nullish(),
+});
+export type PrBlast = z.infer<typeof PrBlast>;
+
+// --- PR-less diff review (POST /reviews/diff, the pre-push CLI) -------------
+
+/**
+ * What the CLI prints. Only the fields it renders are listed, so a server-side
+ * addition cannot leak into terminal output by accident - the same property the
+ * `system_prompt` canary relies on.
+ */
+export const DiffReviewFinding = z.object({
+  severity: Severity.catch('CRITICAL'),
+  category: z.string().nullish(),
+  title: z.string(),
+  file: z.string(),
+  start_line: z.number().int(),
+  end_line: z.number().int().nullish(),
+  rationale: z.string().nullish(),
+  suggestion: z.string().nullish(),
+});
+export type DiffReviewFinding = z.infer<typeof DiffReviewFinding>;
+
+export const DiffReview = z.object({
+  verdict: z.string(),
+  summary: z.string(),
+  score: z.number().int().nullish(),
+  findings: z.array(DiffReviewFinding).default([]),
+  blockers: z.number().int(),
+  grounding: z.string().nullish(),
+  dropped: z.array(z.object({ title: z.string(), reason: z.string() })).default([]),
+  agent: z.object({
+    id: z.string(),
+    slug: z.string().nullish(),
+    name: z.string(),
+    provider: z.string().nullish(),
+    model: z.string().nullish(),
+  }),
+  usage: z.object({
+    tokens_in: z.number().int(),
+    tokens_out: z.number().int(),
+    cost_usd: z.number().nullish(),
+    duration_ms: z.number().int(),
+  }),
+  files_reviewed: z.number().int(),
+});
+export type DiffReview = z.infer<typeof DiffReview>;
+
 export const RepoList = z.array(Repo);
 export const AgentList = z.array(Agent);
 export const RunSummaryList = z.array(RunSummary);

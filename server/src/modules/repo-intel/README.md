@@ -38,14 +38,29 @@ touch the pipeline internals:
 - `getRepoMap(repoId)` → the cached repo skeleton (fed into the **review prompt**).
 - `getFileRank(repoId, files)` → importance percentile per changed file.
 - `getCallerSignatures(repoId, files, limit)` → callers of changed symbols.
-- `getBlastRadius(repoId, files)` → impacted symbols / callers (used by L04).
+- `getBlastRadius(repoId, files)` → impacted symbols / callers. USED, by
+  `modules/blast` (L04): callers are capped per symbol in SQL
+  (`getResolvedCallersTopN`), which `LEFT JOIN`s `file_rank` so a rank-less
+  partial index still returns callers instead of silently returning none.
+- `getIndexHealth(repoId)` → the honest projection of `repo_index_state` PLUS
+  live counts of `file_rank` / `file_edges` / `file_facts`. Counted, not read
+  from `stats`: the incremental pipeline rebuilds rank and facts without
+  re-recording their counts, so a stats-derived `ranked` reads 0 after every
+  refresh. `modules/blast/status.ts` turns this into the user-facing status.
+- `getReverseImporters(repoId, files, depth)` → who imports the changed files,
+  up to `depth` hops (one indexed query per level, provenance preserved). Feeds
+  endpoint/cron attribution ONLY - an import edge is not proof of a call.
+- `getFileFactsFor(repoId, files)` → precomputed endpoints/crons per file.
 - `getUnresolvedReferences(repoId, …)` → phantom-symbol detection (used by L06).
 - `getConventionSamples(repoId)` → top-ranked files for convention extraction (L02).
 
-In the starter, only `getRepoMap` / `getFileRank` / `getCallerSignatures` are
-wired — into `modules/reviews/run-executor.ts`, which adds the repo map and a
-high-blast-radius note to the prompt. Toggled by `REPO_INTEL_ENABLED` (global)
-and a per-agent `repo_intel` flag.
+`getRepoMap` / `getFileRank` / `getCallerSignatures` are wired into
+`modules/reviews/run-executor.ts`, which adds the repo map and a
+high-blast-radius note to the prompt. The last four are wired into
+`modules/blast` (`GET /pulls/:id/blast`). Toggled by `REPO_INTEL_ENABLED`
+(global) and a per-agent `repo_intel` flag; with the flag off `getIndexHealth`
+reports `enabled: false` and the blast route returns an honest empty envelope
+rather than falling through to the clone-reading fallback.
 
 ## Routes
 

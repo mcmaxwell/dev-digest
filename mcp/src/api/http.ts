@@ -76,6 +76,12 @@ export interface RequestOptions {
   method?: 'GET' | 'POST';
   body?: unknown;
   timeoutMs: number;
+  /**
+   * Prefix for the one stderr line per call. Two binaries share this client and
+   * a user reading `devdigest: ...` should not be told a different program name
+   * than the one they typed.
+   */
+  label?: string;
 }
 
 /** `AbortSignal.timeout` rejects with a DOMException named TimeoutError; an
@@ -111,6 +117,7 @@ export async function request<T>(
   opts: RequestOptions,
 ): Promise<T> {
   const method = opts.method ?? 'GET';
+  const label = opts.label ?? 'devdigest-mcp';
   const started = Date.now();
   let res: Response;
   try {
@@ -122,11 +129,11 @@ export async function request<T>(
       signal: AbortSignal.timeout(opts.timeoutMs),
     });
   } catch (err) {
-    console.error(`devdigest-mcp: ${method} ${path} failed after ${Date.now() - started}ms`);
+    console.error(`${label}: ${method} ${path} failed after ${Date.now() - started}ms`);
     if (isTimeout(err)) throw new ApiTimeoutError(baseUrl, opts.timeoutMs, path);
     throw new ApiUnreachableError(baseUrl);
   }
-  console.error(`devdigest-mcp: ${method} ${path} -> ${res.status} in ${Date.now() - started}ms`);
+  console.error(`${label}: ${method} ${path} -> ${res.status} in ${Date.now() - started}ms`);
   if (!res.ok) throw await toApiError(res, path);
 
   let json: unknown;

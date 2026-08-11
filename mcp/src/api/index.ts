@@ -17,11 +17,22 @@ export interface ApiClient {
   activeRuns(prId: string): Promise<s.ActiveRun[]>;
   reviewsForPull(prId: string): Promise<s.Review[]>;
   conventions(repoId: string): Promise<s.ConventionsPage>;
+  blastRadius(prId: string): Promise<s.PrBlast>;
+  /** POST /reviews/diff - the pre-push CLI's review of a working-tree diff. */
+  reviewDiff(body: {
+    diff: string;
+    agent?: string;
+    severity_min?: s.Severity;
+    fail_on?: s.Severity;
+    source: 'cli';
+  }): Promise<s.DiffReview>;
 }
 
 export interface ApiClientConfig {
   apiUrl: string;
   timeoutMs: number;
+  /** Program name for the one-line-per-call stderr log. Defaults to the MCP server. */
+  label?: string;
 }
 
 /**
@@ -31,32 +42,54 @@ export interface ApiClientConfig {
  */
 const PR_DETAIL_TIMEOUT_MS = 30_000;
 
+/**
+ * A diff review is a real LLM call: 30 to 180 seconds is normal and a slow model
+ * can go further. The ordinary 15s read timeout would abandon a review the user
+ * has already been billed for, so this gets its own, generous ceiling.
+ */
+const REVIEW_DIFF_TIMEOUT_MS = 300_000;
+
 export function createApiClient(config: ApiClientConfig): ApiClient {
-  const { apiUrl, timeoutMs } = config;
+  const { apiUrl, timeoutMs, label } = config;
   return {
-    listRepos: () => request(apiUrl, '/repos', s.RepoList, { timeoutMs }),
-    listAgents: () => request(apiUrl, '/agents', s.AgentList, { timeoutMs }),
+    listRepos: () => request(apiUrl, '/repos', s.RepoList, { timeoutMs, label }),
+    listAgents: () => request(apiUrl, '/agents', s.AgentList, { timeoutMs, label }),
     pullByNumber: (repoId, prNumber) =>
       request(apiUrl, `/repos/${encodeURIComponent(repoId)}/pulls/${prNumber}`, s.PrDetail, {
         timeoutMs: PR_DETAIL_TIMEOUT_MS,
+        label,
       }),
     startReview: (prId, agentId) =>
       request(apiUrl, `/pulls/${encodeURIComponent(prId)}/review`, s.ReviewRunResponse, {
         method: 'POST',
         body: { agentId },
         timeoutMs,
+        label,
       }),
     listRuns: (prId) =>
-      request(apiUrl, `/pulls/${encodeURIComponent(prId)}/runs`, s.RunSummaryList, { timeoutMs }),
+      request(apiUrl, `/pulls/${encodeURIComponent(prId)}/runs`, s.RunSummaryList, { timeoutMs, label }),
     activeRuns: (prId) =>
       request(apiUrl, `/pulls/${encodeURIComponent(prId)}/runs/active`, s.ActiveRunList, {
         timeoutMs,
+        label,
       }),
     reviewsForPull: (prId) =>
-      request(apiUrl, `/pulls/${encodeURIComponent(prId)}/reviews`, s.ReviewList, { timeoutMs }),
+      request(apiUrl, `/pulls/${encodeURIComponent(prId)}/reviews`, s.ReviewList, { timeoutMs, label }),
     conventions: (repoId) =>
       request(apiUrl, `/repos/${encodeURIComponent(repoId)}/conventions`, s.ConventionsPage, {
         timeoutMs,
+        label,
+      }),
+    // A pure index read on the server - no model call, no clone - so the default
+    // timeout is right; it is nothing like the cold-import PR detail read above.
+    blastRadius: (prId) =>
+      request(apiUrl, `/pulls/${encodeURIComponent(prId)}/blast`, s.PrBlast, { timeoutMs, label }),
+    reviewDiff: (body) =>
+      request(apiUrl, '/reviews/diff', s.DiffReview, {
+        method: 'POST',
+        body,
+        timeoutMs: REVIEW_DIFF_TIMEOUT_MS,
+        label,
       }),
   };
 }
@@ -75,11 +108,18 @@ export {
 export type {
   ActiveRun,
   Agent,
+  BlastCaller,
+  BlastChangedSymbol,
+  BlastDownstream,
+  BlastIndex,
   ConventionCandidate,
   ConventionEvidence,
   ConventionScan,
   ConventionStatus,
   ConventionsPage,
+  DiffReview,
+  DiffReviewFinding,
+  PrBlast,
   PrDetail,
   Repo,
   Review,

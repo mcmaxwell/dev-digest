@@ -33,12 +33,15 @@ import type {
   BlastCallerRow,
   BlastChangedSymbol,
   BlastResult,
+  FileFactsRow,
   FileRankRow,
+  IndexHealth,
   IndexResult,
   IndexState,
   RefRow,
   RepoIntel,
   RepoMapResult,
+  ReverseLevel,
   SignatureRow,
   SymbolRow,
 } from './types.js';
@@ -50,6 +53,8 @@ import {
   MAX_CALLERS_PER_SYMBOL,
   REFRESH_JOB_KIND,
   RESYNC_JOB_KIND,
+  REVERSE_FANOUT_PER_LEVEL,
+  REVERSE_MAX_EDGES,
   SUPPORTED_EXT,
 } from './constants.js';
 import { runFullIndex, type IndexPayload } from './pipeline/full.js';
@@ -338,8 +343,13 @@ export class RepoIntelService implements RepoIntel {
       return { changedSymbols, callers: [], impactedEndpoints: [], degraded: false };
     }
 
-    // Resolved cross-file callers.
-    const callerRows = await this.repo.getResolvedCallers(repoId, changedFiles, [...nameSet]);
+    // Resolved cross-file callers, capped PER SYMBOL in SQL.
+    const callerRows = await this.repo.getResolvedCallersTopN(
+      repoId,
+      changedFiles,
+      [...nameSet],
+      MAX_CALLERS_PER_SYMBOL,
+    );
     const callerFiles = [...new Set(callerRows.map((c) => c.fromPath))];
 
     // Enclosing caller symbol from the callers' persistent symbol rows.
@@ -383,11 +393,130 @@ export class RepoIntelService implements RepoIntel {
 
     return {
       changedSymbols,
-      callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
+      // No slice: the cap is already applied per symbol by the query above. The
+      // old global `slice(0, 20)` here is what let one hot symbol starve the
+      // others, and it contradicted the constant's own name.
+      callers,
       impactedEndpoints: [...endpoints],
       factsByFile,
       degraded: false,
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // L04 — blast radius support reads. All three are pure Postgres: the blast
+  // route must never rebuild an index or touch a clone on the request path.
+  // -------------------------------------------------------------------------
+
+  /**
+   * The honest health of a repo's index. Never throws, never returns null: an
+   * unindexed repo is `{ present: false }`, which is a legitimate answer the
+   * caller renders as "not analyzed yet".
+   */
+  async getIndexHealth(repoId: string): Promise<IndexHealth> {
+    const enabled = this.container.config.repoIntelEnabled;
+    const row = enabled ? await this.repo.tryGetIndexStateRow(repoId) : null;
+    const counts = row
+      ? await this.repo.countIndexArtifacts(repoId)
+      : { ranked: 0, edges: 0, facts: 0 };
+    if (!row) {
+      return {
+        enabled,
+        present: false,
+        status: null,
+        indexerVersion: 0,
+        lastIndexedSha: '',
+        updatedAt: null,
+        softBudgetReached: false,
+        graphFailed: null,
+        parseDegradedCount: 0,
+        ranked: 0,
+        edgesWritten: 0,
+        factsWritten: 0,
+      };
+    }
+    const stats = row.stats;
+    return {
+      enabled,
+      present: true,
+      status: row.status,
+      indexerVersion: row.indexerVersion,
+      lastIndexedSha: row.lastIndexedSha,
+      updatedAt: row.updatedAt,
+      softBudgetReached: stats.softBudgetReached === true,
+      graphFailed: typeof stats.graphFailed === 'string' ? stats.graphFailed : null,
+      parseDegradedCount: Array.isArray(stats.parseDegraded) ? stats.parseDegraded.length : 0,
+      ranked: counts.ranked,
+      edgesWritten: counts.edges,
+      factsWritten: counts.facts,
+    };
+  }
+
+  /**
+   * Reverse import walk: who imports `files`, then who imports those, up to
+   * `depth` hops. One indexed query per level, never one per file.
+   *
+   * Provenance is carried through the walk (`{ file, target }`), so an endpoint
+   * found two hops from `repository.ts` is attributed to the symbols declared in
+   * `repository.ts` and not to every changed file in the PR.
+   *
+   * `visited` is seeded with the changed files themselves, which is what
+   * terminates a cycle (`a -> b -> a`) instead of oscillating between levels.
+   */
+  async getReverseImporters(
+    repoId: string,
+    files: string[],
+    depth: number,
+  ): Promise<ReverseLevel[]> {
+    if (!this.container.config.repoIntelEnabled) return [];
+    if (files.length === 0 || depth <= 0) return [];
+
+    const levels: ReverseLevel[] = [];
+    const visited = new Set(files);
+    // Which changed files each frontier file transitively reaches.
+    let frontier = new Map<string, Set<string>>(files.map((f) => [f, new Set([f])]));
+
+    for (let d = 1; d <= depth; d += 1) {
+      const frontierFiles = [...frontier.keys()];
+      if (frontierFiles.length === 0) break;
+      const edges = await this.repo.getImporters(repoId, frontierFiles, REVERSE_MAX_EDGES);
+      if (edges.length === 0) break;
+
+      const next = new Map<string, Set<string>>();
+      const importers: Array<{ file: string; target: string }> = [];
+      for (const e of edges) {
+        if (visited.has(e.fromFile)) continue;
+        const targets = frontier.get(e.toFile);
+        if (!targets) continue;
+        let acc = next.get(e.fromFile);
+        if (!acc) {
+          if (next.size >= REVERSE_FANOUT_PER_LEVEL) continue;
+          acc = new Set<string>();
+          next.set(e.fromFile, acc);
+        }
+        for (const target of targets) {
+          if (acc.has(target)) continue;
+          acc.add(target);
+          importers.push({ file: e.fromFile, target });
+        }
+      }
+      if (importers.length === 0) break;
+      // Mark visited only AFTER the whole level is built, so two importers of
+      // the same file at the same depth both keep their provenance.
+      for (const f of next.keys()) visited.add(f);
+      levels.push({ depth: d, importers });
+      frontier = next;
+    }
+
+    return levels;
+  }
+
+  /** Precomputed endpoints/crons for the given files. `[]` when unindexed. */
+  async getFileFactsFor(repoId: string, files: string[]): Promise<FileFactsRow[]> {
+    if (!this.container.config.repoIntelEnabled) return [];
+    if (files.length === 0) return [];
+    const rows = await this.repo.getFileFacts(repoId, files);
+    return rows.map((r) => ({ file: r.filePath, endpoints: r.endpoints, crons: r.crons }));
   }
 
   /**

@@ -67,6 +67,19 @@ export class AgentsRepository {
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.enabled, true)));
   }
 
+  /**
+   * Exact-name lookup, workspace-scoped. `(workspace_id, name)` has no unique
+   * constraint, so this returns the first match; the CLI-facing caller
+   * (`reviews/diff-review.ts`) accepts an id first for exactly that reason.
+   */
+  async getByName(workspaceId: string, name: string): Promise<AgentRow | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(t.agents)
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, name)));
+    return row;
+  }
+
   async getById(workspaceId: string, id: string): Promise<AgentRow | undefined> {
     const [row] = await this.db
       .select()

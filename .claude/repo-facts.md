@@ -44,7 +44,7 @@ so must an mcp test that needs a live API.
 
 ## Server modules
 
-`server/src/modules/`: _shared, agents, conventions, intent, polling, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
+`server/src/modules/`: _shared, agents, blast, conventions, intent, polling, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
 
 Registered statically in `server/src/modules/index.ts` (one import + one entry).
 Shared helpers live in `modules/_shared/`: context.ts, diff-loader.ts, logger.ts, schemas.ts, severity.ts
@@ -58,7 +58,7 @@ or add an allowlist entry to fix a violation - fix the placement.
 |---|---|
 | `server/.dependency-cruiser.cjs` | routes-are-transport-only, queries-live-in-repositories, no-cross-module-imports, modules-use-ports-not-clients, platform-independent-of-modules, db-independent-of-modules |
 | `reviewer-core/.dependency-cruiser.cjs` | core-has-no-io, core-has-no-db-or-server, vendor-sdks-confined-to-llm-adapters |
-| `mcp/.dependency-cruiser.cjs` | mcp-is-standalone, mcp-has-no-db-or-framework, tools-go-through-the-api-port, no-circular |
+| `mcp/.dependency-cruiser.cjs` | mcp-is-standalone, mcp-has-no-db-or-framework, tools-go-through-the-api-port, cli-goes-through-the-api-port, cli-does-not-import-the-mcp-server, no-circular |
 
 `no-cross-module-imports` exempts only another module's `service.ts`,
 `types.ts`, or `constants.ts`. Anything else shared between modules belongs in
@@ -70,7 +70,7 @@ or add an allowlist entry to fix a violation - fix the placement.
 client's own copy. A contract change lands in BOTH in the same step, or the two
 sides drift silently. There is no sync script.
 
-Files under `contracts/`: brief.ts, eval-ci.ts, findings.ts, intent.ts, knowledge.ts, observability.ts, platform.ts, productionize.ts, review-api.ts, trace.ts, why.ts
+Files under `contracts/`: blast.ts, brief.ts, eval-ci.ts, findings.ts, intent.ts, knowledge.ts, observability.ts, platform.ts, productionize.ts, review-api.ts, review-diff.ts, trace.ts, why.ts
 
 
 Already drifted, pre-existing, do not "fix" as a side quest: `adapters.ts` `contracts/eval-ci.ts` `contracts/knowledge.ts` `contracts/productionize.ts` 

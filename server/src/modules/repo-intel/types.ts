@@ -87,6 +87,58 @@ export interface BlastResult {
 }
 
 // ---------------------------------------------------------------------------
+// Index health (L04 blast). An HONEST projection of `repo_index_state` plus the
+// three tables whose emptiness silently changes what a read can answer.
+// ---------------------------------------------------------------------------
+
+/**
+ * What a consumer needs to decide how much of an index-backed answer to trust.
+ *
+ * `ranked` / `edgesWritten` / `factsWritten` are COUNTED from the tables, not
+ * read out of `repo_index_state.stats`: the incremental pipeline recomputes rank
+ * and facts but does not re-record their counts in `stats`, so a stats-derived
+ * `ranked` would report 0 after every "Re-analyze" on a perfectly ranked repo.
+ * Everything that IS taken from `stats` is coerced defensively - it is untyped
+ * jsonb written by two different pipelines.
+ */
+export interface IndexHealth {
+  /** False when repo-intel is switched off for this deployment. */
+  enabled: boolean;
+  /** False when the repo has no `repo_index_state` row at all. */
+  present: boolean;
+  status: IndexStatus | null;
+  indexerVersion: number;
+  lastIndexedSha: string;
+  updatedAt: Date | null;
+  /** The indexer ran out of its soft time budget and skipped rank/graph/facts. */
+  softBudgetReached: boolean;
+  /** The dependency-cruiser graph build failed; the message, or null. */
+  graphFailed: string | null;
+  parseDegradedCount: number;
+  /** Rows in `file_rank`. Zero means callers come back unranked, not absent. */
+  ranked: number;
+  /** Rows in `file_edges`. Zero means the reverse walk cannot run. */
+  edgesWritten: number;
+  /** Rows in `file_facts`. Zero means no endpoint or cron is answerable. */
+  factsWritten: number;
+}
+
+/** One hop of the reverse (who-imports-me) walk. */
+export interface ReverseLevel {
+  /** 1 = imports a changed file directly; 2 = imports one of those importers. */
+  depth: number;
+  /** `file` transitively imports the changed file `target`. */
+  importers: Array<{ file: string; target: string }>;
+}
+
+/** Precomputed per-file facts, as the facade exposes them. */
+export interface FileFactsRow {
+  file: string;
+  endpoints: string[];
+  crons: string[];
+}
+
+// ---------------------------------------------------------------------------
 // Read-model rows.
 // ---------------------------------------------------------------------------
 
@@ -145,6 +197,22 @@ export interface RepoIntel {
 
   // --- Reads --------------------------------------------------------------
   getBlastRadius(repoId: string, changedFiles: string[]): Promise<BlastResult>;
+  /**
+   * L04 — how trustworthy an index-backed read is right now. ALWAYS works: a
+   * repo that was never indexed returns `{ present: false }`, never a throw.
+   */
+  getIndexHealth(repoId: string): Promise<IndexHealth>;
+  /**
+   * L04 — who imports these files, up to `depth` hops out. Feeds endpoint/cron
+   * attribution only (an import edge does not prove a call).
+   */
+  getReverseImporters(
+    repoId: string,
+    files: string[],
+    depth: number,
+  ): Promise<ReverseLevel[]>;
+  /** L04 — precomputed endpoints/crons for the given files (no clone reads). */
+  getFileFactsFor(repoId: string, files: string[]): Promise<FileFactsRow[]>;
   getRepoMap(repoId: string, tokenBudget?: number): Promise<RepoMapResult>;
   getFileRank(repoId: string, paths: string[]): Promise<FileRankRow[]>;
   getSymbolsInFiles(repoId: string, paths: string[]): Promise<SymbolRow[]>;

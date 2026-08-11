@@ -1,16 +1,19 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { RunRequest } from '@devdigest/shared';
+import { ReviewDiffRequest, ReviewDiffResponse, RunRequest } from '@devdigest/shared';
 import type { RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
 import { ReviewService } from './service.js';
+import { reviewDiff } from './diff-review.js';
+import { DIFF_REVIEW_BODY_LIMIT_BYTES } from './constants.js';
 
 /**
  * reviews module.
  *   POST   /pulls/:id/review  {agentId} | {all:true}  → run review(s); returns runs
+ *   POST   /reviews/diff       {diff, agent?}            → review a PR-less diff (L04 CLI)
  *   GET    /runs/:id/events                            → SSE stream of RunEvent (replay-first)
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
@@ -52,6 +55,30 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     );
     return { pr_id: req.params.id, runs, reviews };
   });
+
+  // ---- Review a raw diff that belongs to no PR (L04, the pre-push CLI) -----
+  //
+  // The FOUR containment limits ship together with this route, because any one
+  // of them alone leaves a money hole reachable from a git hook that fires on
+  // every push:
+  //   bodyLimit 2 MB      stops the socket
+  //   400k chars (zod)    stops a body that fits but would cost a fortune
+  //   200 files (service) stops a change that is wide rather than long
+  //   4/min               stops repetition — deliberately tighter than the
+  //                       10/min on `POST /pulls/:id/review`, which is behind a
+  //                       button a human presses, not behind a hook.
+  app.post(
+    '/reviews/diff',
+    {
+      schema: { body: ReviewDiffRequest, response: { 200: ReviewDiffResponse } },
+      bodyLimit: DIFF_REVIEW_BODY_LIMIT_BYTES,
+      config: { rateLimit: { max: 4, timeWindow: '1 minute' } },
+    },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return reviewDiff(container, workspaceId, req.body, req.log);
+    },
+  );
 
   // ---- SSE: live run events (replay buffer first, then live; ends on done) -
   // No rate limit: SSE is one long-lived connection, not burst traffic.

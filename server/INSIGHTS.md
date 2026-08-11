@@ -78,7 +78,26 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   migration. Cheaper than the two-pass split noted below, and it works when the
   two-pass trick cannot (a rename is not an add-then-drop you can sequence).
 
+- [2026-08-10] When a read must NOT fall into a facade's expensive fallback
+  branch, gate it at the CALLER on a separate, honest health read - do not rely
+  on the branch not being reached. `RepoIntelService.getBlastRadius` degrades to
+  reading the clone and shelling out to ripgrep, which is fine as a fallback and
+  unacceptable on an HTTP request path, so `BlastService.load` reads
+  `getIndexHealth` first and returns an empty envelope before calling it
+  (`modules/blast/service.ts`). The guarantee is then structural, and
+  `blast.it.test.ts` proves it with a spy on `container.codeIndex` rather than
+  by asserting a shape.
+
 ## What Doesn't Work
+
+- [2026-08-10] `repo_index_state.stats` UNDER-REPORTS the T3 artifacts: the
+  incremental pipeline (`pipeline/incremental.ts`) rebuilds `file_rank` and
+  `file_facts` but only records `edgesWritten` in its stats blob, so anything
+  deriving "is this repo ranked?" from `stats.ranked` reads 0 after every
+  "Re-analyze" on a perfectly ranked repo. Count the rows instead
+  (`RepoIntelRepository.countIndexArtifacts` - three indexed counts over
+  ≤ MAX_INDEXED_FILES rows). Same trap applies to any future consumer of
+  `stats.factsWritten`.
 
 - [2026-08-07] An integration test that passes `llm: {}` (or omits a provider
   from `overrides.llm`) is NOT hermetic: `Container.buildLlm` falls back to
@@ -199,6 +218,16 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## Tool & Library Notes
 
+- [2026-08-10] For a window function, build the subquery with Drizzle's QUERY
+  BUILDER and `.as('alias')`, then select from it - do NOT drop to a
+  raw `sql` template. `getResolvedCallersTopN` needs
+  `row_number() OVER (PARTITION BY to_symbol …)` filtered by two text arrays;
+  the raw-SQL version would need `= ANY($n)` with a JS array bound through
+  postgres-js, whose array inference is the risky part. With the builder,
+  `inArray()` expands to `in ($1,$2,…)` exactly as everywhere else in this repo,
+  and only the `row_number()` expression is raw. The `.as()` subquery's columns
+  are then addressable (`ranked.rn`) for the outer `where`.
+
 - [2026-08-02] Drizzle `text('col', { enum: [...] })` is TypeScript-only — the DB
   has no CHECK constraint, so widening the enum (e.g. adding a `skills.source`
   value) needs contract + schema edits but NO migration; `pnpm db:generate`
@@ -266,5 +295,14 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
     Also `docker rm -f` any leftover `testcontainers-ryuk-*` container.
 
 ## Session Notes
+
+- [2026-08-10] L04 Blast Radius shipped server-side: `modules/blast`
+  (status.ts + build.ts are pure and carry the whole derivation table),
+  `pr_blast_summary` (migration 0016), four new repo-intel facade methods, and
+  `POST /reviews/diff` for the pre-push CLI. Two latent defects in the never-used
+  blast engine surfaced and were fixed at the source: the "per symbol" caller cap
+  was a global `slice(0, 20)`, and the caller query's `INNER JOIN file_rank`
+  returned ZERO callers on a rank-less partial index while still reporting
+  `degraded: false`.
 
 ## Open Questions

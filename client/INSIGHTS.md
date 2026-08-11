@@ -57,6 +57,16 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Codebase Patterns
 
+- [2026-08-10] Two vendored primitives silently render a `<button>` where a
+  caller may not want one, and `src/vendor/ui/**` is frozen, so the workaround
+  belongs in the FEATURE: `MonoLink` without an `href` is an inert button with
+  `cursor: pointer` (looks clickable, does nothing), and `Chip` is a `<button>`
+  even when it is only displaying a number. `CallerRow.tsx` renders a `<span>`
+  with a `title` when it has no link target, and `BlastRadiusCard/styles.ts`
+  defines its own stat pill instead of using `Chip`. The regression test is
+  `getAllByRole("button")` - assert the card's ONLY buttons are the ones that do
+  something.
+
 - [2026-08-07] A control that TWO sibling features under the same `_components/`
   both render must be promoted to their common ancestor's `_components/`, not
   imported across — `pnpm lint`'s `no-restricted-imports` rejects
@@ -115,6 +125,14 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Tool & Library Notes
 
+- [2026-08-10] When testing that untrusted text cannot inject into a generated
+  SOURCE FORMAT (a mermaid diagram here), `expect(out).not.toContain(payload)`
+  is the wrong property and will fail on correct code: an escaped payload
+  legitimately survives as inert text inside one quoted label. Assert the SHAPE
+  instead - line count, "no line starts with a token the data authored", edge
+  count (`toMermaid.test.tsx`). Pair it with synthetic node ids, which is what
+  actually makes the injection impossible.
+
 - [2026-07-31] Every route under `src/app` is a whole-page `"use client"`
   component reading `useSearchParams` directly (no per-hook Suspense
   boundaries), so Next 15 requires a Suspense boundary somewhere above all of
@@ -169,5 +187,12 @@ the root INSIGHTS.md. Format and quality gates:
   partial fix; both together close it for good.
 
 ## Session Notes
+
+- [2026-08-10] L04 Blast Radius card shipped under the Intent card on the PR
+  Overview tab: `_components/BlastRadiusCard/` (five states, tree + lazy mermaid
+  graph, optional impact summary) and `lib/hooks/blast.ts`. `messages/en/blast.json`
+  already existed and was dead - its `stat.*` / `view.*` / `graph.*` keys matched
+  the mock exactly, so grepping for a lesson's noun before building remains the
+  cheapest first step.
 
 ## Open Questions
