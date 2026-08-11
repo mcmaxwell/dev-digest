@@ -67,6 +67,14 @@ export type BlastDownstream = z.infer<typeof BlastDownstream>;
  */
 export const PrBlastRadius = BlastRadius.extend({
   downstream: z.array(BlastDownstream),
+  /**
+   * Changed symbols found BEFORE the display cap, so the card can say "60 of
+   * 200" instead of quietly presenting 60 as the whole set. A PR that touches a
+   * barrel file or a page full of interfaces blows past the cap easily, and a
+   * silently truncated count is the same defect as a silently truncated caller
+   * list.
+   */
+  symbols_total: z.number().int().min(0),
 });
 export type PrBlastRadius = z.infer<typeof PrBlastRadius>;
 

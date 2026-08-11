@@ -173,8 +173,16 @@ function BlastBody({
 
         {/* Both caveats are stated on every populated card. They are the two
             things that make this list honest, and hiding them behind a tooltip
-            would be hiding them. */}
+            would be hiding them. The display cap is stated the same way. */}
         <p style={s.caveat}>
+          {data.blast.symbols_total > data.blast.changed_symbols.length && (
+            <>
+              {t("symbolsTruncated", {
+                shown: data.blast.changed_symbols.length,
+                total: data.blast.symbols_total,
+              })}{" "}
+            </>
+          )}
           {t("symbolsCaveat")} {t("attribution")}
         </p>
       </Card>

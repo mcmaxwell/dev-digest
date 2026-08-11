@@ -139,14 +139,33 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   Keep the pure part in its own file (`classify.ts` — no I/O, no Container) so
   the rules are testable as a table without Postgres, and put every pattern and
   threshold in `constants.ts` so they can be read without reading the algorithm.
-- [2026-08-07] "The latest review of a PR" is NOT `reviewsForPull(prId)[0]`.
-  Group by `run_id` instead: take the newest `kind = 'review'` row, then keep
-  every review sharing its `run_id` (falling back to that single row when
-  `run_id` is null — the seeded review and any pre-run-tracking row). Taking
-  only the newest row silently drops all but one agent's findings the moment
-  multi-agent runs land (L07), and the bug is invisible until then. See
-  `modules/smart-diff/service.ts::latestReviewFindings`; complements the
-  2026-07-28 `kind`/`run_id` entry above.
+- [2026-07-28] AGGREGATING REVIEWS, RUNS AND FINDINGS — four rules with one root
+  cause: a PR has many reviews, they link to runs by id rather than by ordering,
+  and not every review row carries findings. Break any of them and the count
+  comes out silently LOW; none of them fails as an error.
+  [2026-08-11: consolidated from four separate entries, wording unchanged.]
+  - [2026-07-28] Runs link to reviews only via `reviews.run_id` (no FK), and
+    `reviews.kind` can be `'summary'` — any run↔findings aggregation must filter
+    `kind = 'review'` and `run_id IS NOT NULL`, else summary rows skew counts.
+    - [2026-07-31] The FK now EXISTS: `reviews.run_id` → `agent_runs.id`
+      `ON DELETE cascade` and `reviews.agent_id` → `agents.id` `ON DELETE set null`
+      (migration 0012). `deleteAgentRun` is therefore a single DELETE — do not
+      re-add the manual "delete reviews first" compensation. The `kind`/`run_id`
+      filtering above still applies to aggregations.
+  - [2026-08-07] "The latest review of a PR" is NOT `reviewsForPull(prId)[0]`.
+    Group by `run_id` instead: take the newest `kind = 'review'` row, then keep
+    every review sharing its `run_id` (falling back to that single row when
+    `run_id` is null — the seeded review and any pre-run-tracking row). Taking
+    only the newest row silently drops all but one agent's findings the moment
+    multi-agent runs land (L07), and the bug is invisible until then. See
+    `modules/smart-diff/service.ts::latestReviewFindings`.
+  - [2026-07-28] `rollupSeverities` is the canonical per-severity findings
+    rollup — reuse it instead of re-counting severities; its `SeverityCounts`
+    type lives in `@devdigest/shared` `contracts/findings.ts`, not beside it.
+    - [2026-07-31] MOVED from `src/modules/pulls/status.ts` to
+      `src/modules/_shared/severity.ts`. Two modules need it (pulls + reviews)
+      and `no-cross-module-imports` in `.dependency-cruiser.cjs` now rejects
+      reaching into another module's folder for it.
 - [2026-08-07] Prompt observability splits by DESTINATION, not by verbosity:
   logs get metadata (`platform/prompt-log.ts` — section, source, chars, tokens,
   `sha8`, model, correlation id), the DB gets content (`run_traces.trace`,
@@ -159,22 +178,6 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   byte-identical, so a behaviour change came from the model, not from assembly.
   `PROMPT_LOG=verbose` adds structural outline only (headings and
   `<untrusted source="…">` tags) and is refused when `NODE_ENV=production`.
-- [2026-07-28] `rollupSeverities` in `src/modules/pulls/status.ts` is the
-  canonical per-severity findings rollup — reuse it (the reviews module imports
-  it in `repository/run.repo.ts`) instead of re-counting severities; its
-  `SeverityCounts` type lives in `@devdigest/shared` `contracts/findings.ts`,
-  not in status.ts.
-  - [2026-07-31] MOVED to `src/modules/_shared/severity.ts`. Two modules need it
-    (pulls + reviews) and `no-cross-module-imports` in `.dependency-cruiser.cjs`
-    now rejects reaching into another module's folder for it.
-- [2026-07-28] Runs link to reviews only via `reviews.run_id` (no FK), and
-  `reviews.kind` can be `'summary'` — any run↔findings aggregation must filter
-  `kind = 'review'` and `run_id IS NOT NULL`, else summary rows skew counts.
-  - [2026-07-31] The FK now EXISTS: `reviews.run_id` → `agent_runs.id`
-    `ON DELETE cascade` and `reviews.agent_id` → `agents.id` `ON DELETE set null`
-    (migration 0012). `deleteAgentRun` is therefore a single DELETE — do not
-    re-add the manual "delete reviews first" compensation. The `kind`/`run_id`
-    filtering above still applies to aggregations.
 - [2026-07-31] Services are constructed as `new XService({ db } as unknown as
   Container)` in tests (`test/agents-versions.it.test.ts:167`), so a service
   MUST build its own repository from `container.db` rather than reading a
@@ -228,43 +231,49 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   and only the `row_number()` expression is raw. The `.as()` subquery's columns
   are then addressable (`ranked.rn`) for the outer `where`.
 
-- [2026-08-02] Drizzle `text('col', { enum: [...] })` is TypeScript-only — the DB
-  has no CHECK constraint, so widening the enum (e.g. adding a `skills.source`
-  value) needs contract + schema edits but NO migration; `pnpm db:generate`
-  confirms with "No schema changes".
+- [2026-07-28] DRIZZLE AND DRIZZLE-KIT — three quirks that each cost a debugging
+  session. [2026-08-11: consolidated from three separate entries, wording
+  unchanged.]
+  - [2026-08-02] `text('col', { enum: [...] })` is TypeScript-only — the DB has
+    no CHECK constraint, so widening the enum (e.g. adding a `skills.source`
+    value) needs contract + schema edits but NO migration; `pnpm db:generate`
+    confirms with "No schema changes".
+  - [2026-07-28] `sum()` returns a STRING (SQL numeric), not a number — wrap in
+    `Number(...)` before putting it in a JSON response, or Zod `z.number()`
+    contracts reject it (see the `total_cost_usd` aggregate in
+    `src/modules/pulls/routes.ts`).
+  - [2026-08-02] `drizzle-kit generate` turns INTERACTIVE ("is X created or
+    renamed from another column?") whenever one table both gains and drops
+    columns in the same diff, and it hangs forever with a piped stdin
+    (`yes '' | pnpm db:generate` never returns). Split the schema edit into two
+    passes — keep the doomed columns while adding the new ones (`generate` →
+    additions only, non-interactive), then delete them (`generate` → deletions
+    only, non-interactive). Two migrations, no TTY needed, and it works in CI.
+    See `0013_yielding_johnny_blaze` + `0014_square_agent_zero`. The cheaper
+    escape when the change is a RENAME is in What Works (2026-08-07): rename the
+    drizzle PROPERTY and leave the SQL column name alone.
 - [2026-08-02] `@fastify/multipart` can be registered INSIDE one module's routes
   plugin (`modules/skills/routes.ts`) — encapsulation keeps every other module
   JSON-only, and the global plugins (helmet/cors/…) registered before modules
   still apply. No need to touch `app.ts` for a single upload route.
-- [2026-07-28] Drizzle's `sum()` returns a STRING (SQL numeric), not a number —
-  wrap in `Number(...)` before putting it in a JSON response, or Zod
-  `z.number()` contracts reject it (see the `total_cost_usd` aggregate in
-  `src/modules/pulls/routes.ts`).
-
-- [2026-07-31] `pnpm arch:check` (dependency-cruiser) crashes with a missing
-  `styleText` export under old Node — it needs Node ≥ 22. If it fails right
-  after a shell start, check `node -v` before suspecting the config.
-
-- [2026-07-31] dependency-cruiser supports `$1` back-references from a capture
-  group in `from.path` inside `to.pathNot` — that is what makes the
-  "module A must not import module B" rule expressible in one rule
-  (`no-cross-module-imports`). Unknown keys on a rule fail with an unhelpful
-  "must NOT have additional properties"; `dependencyTypesNot: ['type-only']`
-  IS valid and is how cross-module `import type` stays allowed.
+- [2026-07-31] DEPENDENCY-CRUISER — the runtime requirement and the one rule
+  feature that is not obvious. [2026-08-11: consolidated from two separate
+  entries, wording unchanged.]
+  - [2026-07-31] `pnpm arch:check` crashes with a missing `styleText` export
+    under old Node — it needs Node ≥ 22. If it fails right after a shell start,
+    check `node -v` before suspecting the config.
+  - [2026-07-31] It supports `$1` back-references from a capture group in
+    `from.path` inside `to.pathNot` — that is what makes the "module A must not
+    import module B" rule expressible in one rule (`no-cross-module-imports`).
+    Unknown keys on a rule fail with an unhelpful "must NOT have additional
+    properties"; `dependencyTypesNot: ['type-only']` IS valid and is how
+    cross-module `import type` stays allowed.
 
 - [2026-07-31] reviewer-core is an **npm** package (`package-lock.json`, CI runs
   `npm ci`) while server/client use pnpm. Running `pnpm install` there creates a
   stray `pnpm-lock.yaml` and a pnpm-shaped `node_modules` that break `npm ci` —
   always use `npm` in `reviewer-core/`.
 
-- [2026-08-02] `drizzle-kit generate` turns INTERACTIVE ("is X created or renamed
-  from another column?") whenever one table both gains and drops columns in the
-  same diff, and it hangs forever with a piped stdin (`yes '' | pnpm db:generate`
-  never returns). Split the schema edit into two passes — keep the doomed columns
-  while adding the new ones (`generate` → additions only, non-interactive), then
-  delete them (`generate` → deletions only, non-interactive). Two migrations, no
-  TTY needed, and it works in CI. See `0013_yielding_johnny_blaze` +
-  `0014_square_agent_zero`.
 - [2026-08-02] `MockGitClient.readFile` resolves a MISSING path to `''` instead of
   rejecting (`src/adapters/mocks.ts`), so any "read these optional files" sampler
   must treat blank content as absent or it fills its budget with empty slices.

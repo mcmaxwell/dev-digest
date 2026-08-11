@@ -58,9 +58,12 @@ export const s = {
     fontVariantNumeric: "tabular-nums",
   } satisfies CSSProperties,
 
+  /** Indented and rule-marked: the view is called "tree", so the callers have
+   *  to read as children of the symbol above them, not as siblings. */
   callerList: {
     margin: "8px 0 0",
-    padding: 0,
+    padding: "0 0 0 12px",
+    borderLeft: "1px solid var(--border)",
     listStyle: "none",
     display: "flex",
     flexDirection: "column",
@@ -108,6 +111,14 @@ export const s = {
     fontSize: 13,
     color: "var(--text-muted)",
     fontStyle: "italic",
+  } satisfies CSSProperties,
+
+  /** The collapsed "N symbols have no known callers" block, when sections
+   *  precede it: separated by the same rule the sections use so it reads as the
+   *  last row of the list rather than as a footnote about the card. */
+  quietBlock: {
+    padding: "12px 0 0",
+    borderTop: "1px solid var(--border)",
   } satisfies CSSProperties,
 
   /** The partial-index banner: present but quiet - a caveat, not an error. */

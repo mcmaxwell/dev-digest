@@ -27,7 +27,9 @@ export function BlastStats({ blast }: { blast: PrBlastRadius }) {
   }
 
   const stats = [
-    ["symbols", blast.changed_symbols.length],
+    // The PRE-CAP total: `changed_symbols` has already been trimmed for display,
+    // and a chip reporting the trimmed length would present the cap as the fact.
+    ["symbols", blast.symbols_total],
     ["callers", callers],
     ["endpoints", endpoints.size],
     ["crons", crons.size],

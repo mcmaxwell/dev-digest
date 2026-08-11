@@ -56,6 +56,7 @@ const RESPONSE: PrBlastResponse = {
       },
     ],
     summary: "",
+    symbols_total: 2,
   },
   summary: null,
   index: {
@@ -114,7 +115,7 @@ describe("BlastRadiusCard states", () => {
     useResyncRepoIntel.mockReturnValue({ mutate, isPending: false, isSuccess: false });
     usePrBlast.mockReturnValue({
       data: response({
-        blast: { changed_symbols: [], downstream: [], summary: "" },
+        blast: { changed_symbols: [], downstream: [], summary: "", symbols_total: 0 },
         index: { ...RESPONSE.index, status: "degraded", reason: "not_indexed", ranked: false, facts: false, graph: false, last_indexed_sha: "" },
       }),
       isLoading: false,
@@ -132,7 +133,7 @@ describe("BlastRadiusCard states", () => {
 
   it("explains an empty result and always states the default-branch caveat", () => {
     usePrBlast.mockReturnValue({
-      data: response({ blast: { changed_symbols: [], downstream: [], summary: "" } }),
+      data: response({ blast: { changed_symbols: [], downstream: [], summary: "", symbols_total: 0 } }),
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
@@ -148,9 +149,88 @@ describe("BlastRadiusCard states", () => {
     expect(screen.getByText("src/server.ts:30")).toBeTruthy();
     expect(screen.getByText("GET /users")).toBeTruthy();
     expect(screen.getByText("nightly-purge")).toBeTruthy();
-    // A symbol nothing calls keeps its section: "no known callers" is a result.
-    expect(screen.getByText("Lonely")).toBeTruthy();
-    expect(screen.getByText(blast.noCallers)).toBeTruthy();
+  });
+
+  it("collapses symbols with no downstream into ONE counted line", () => {
+    renderCard();
+    // `Lonely` has no callers, endpoints or jobs. Giving it a section would put
+    // a repetition of "No known callers." between the reader and the symbol
+    // that matters - and a PR touching a page of interfaces produces dozens.
+    expect(screen.queryByText("Lonely")).toBeNull();
+    expect(screen.getByText(/1 more changed symbol has no downstream callers/)).toBeTruthy();
+    // Still counted in the chip, so the collapse hides noise, not information.
+    expect(screen.getByText("2")).toBeTruthy();
+  });
+
+  it("shows a collapsed symbol's endpoints once, not once per symbol", () => {
+    // Endpoints and jobs are FILE-level. Forty interfaces declared in one
+    // service file all inherit that file's cron, so keying the collapse on them
+    // would give each of them a section showing the identical badge. They are
+    // unioned onto the collapsed line instead - shown, but once.
+    const sameFile = (name: string) => ({
+      symbol: name,
+      callers: [],
+      caller_total: 0,
+      endpoints_affected: ["POST /pay"],
+      endpoints_total: 1,
+      crons_affected: ["0 */4 * * *"],
+      crons_total: 1,
+    });
+    usePrBlast.mockReturnValue({
+      data: response({
+        blast: {
+          changed_symbols: [
+            { name: "Draft", file: "src/pay.ts", kind: "interface" },
+            { name: "Receipt", file: "src/pay.ts", kind: "interface" },
+            { name: "Total", file: "src/pay.ts", kind: "interface" },
+          ],
+          downstream: [sameFile("Draft"), sameFile("Receipt"), sameFile("Total")],
+          summary: "",
+          symbols_total: 3,
+        },
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderCard();
+
+    expect(screen.getByText(/3 more changed symbols have no downstream callers/)).toBeTruthy();
+    // Exactly one badge each, not three.
+    expect(screen.getAllByText("POST /pay")).toHaveLength(1);
+    expect(screen.getAllByText("0 */4 * * *")).toHaveLength(1);
+  });
+
+  it("reports the symbol display cap instead of passing 2 of 90 off as all", () => {
+    usePrBlast.mockReturnValue({
+      data: response({ blast: { ...RESPONSE.blast, symbols_total: 90 } }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderCard();
+    expect(screen.getByText(/Showing 2 of 90 changed symbols/)).toBeTruthy();
+    // The chip shows the real total, not the truncated list length.
+    expect(screen.getByText("90")).toBeTruthy();
+  });
+
+  it("pluralizes the caller count", () => {
+    renderCard();
+    expect(screen.getByText("3 callers")).toBeTruthy();
+    usePrBlast.mockReturnValue({
+      data: response({
+        blast: {
+          ...RESPONSE.blast,
+          downstream: [{ ...RESPONSE.blast.downstream[0]!, caller_total: 1 }],
+        },
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    cleanup();
+    renderCard();
+    expect(screen.getByText("1 caller")).toBeTruthy();
   });
 
   it("states truncation rather than passing 1 of 3 callers off as all of them", () => {

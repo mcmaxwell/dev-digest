@@ -18,32 +18,76 @@ interface BlastTreeProps {
 }
 
 /**
- * One section per changed symbol: what it is, who calls it, and what sits behind
- * those callers.
+ * One section per changed symbol that HAS downstream, and a single counted line
+ * for the ones that do not.
  *
- * A symbol with no callers keeps its section and says so. Collapsing it away
- * would make "the index knows nothing calls this" indistinguishable from "this
- * symbol was never indexed", and those need different reactions from a reviewer.
+ * The collapse is the point. A PR that touches a page full of interfaces
+ * declares dozens of symbols with no call sites, and giving each of them a
+ * section turns the card into forty repetitions of "No known callers." with the
+ * one symbol that matters buried at the top. The count still says how many there
+ * were, so "the index knows nothing calls these" stays distinguishable from
+ * "these were never indexed" - it is just said once instead of forty times.
+ *
+ * THE SPLIT IS ON CALLERS, which is what the copy has always said ("no
+ * downstream callers"). It cannot also key on endpoints and jobs: those are
+ * attributed per FILE, so every one of the forty interfaces declared in a
+ * service file inherits that file's cron and would earn a section showing the
+ * identical badge. Endpoints and jobs are not lost - the collapsed symbols'
+ * facts are unioned and shown ONCE on the collapsed line, which is the honest
+ * rendering of a file-level fact anyway.
  */
 export function BlastTree({ blast, repoFullName, indexedSha, headSha }: BlastTreeProps) {
+  const t = useTranslations("blast");
   const bySymbol = new Map<string, BlastDownstream>(
     blast.downstream.map((d) => [d.symbol, d]),
   );
 
+  const withCallers: { symbol: ChangedSymbol; down: BlastDownstream }[] = [];
+  const quiet: BlastDownstream[] = [];
+  for (const symbol of blast.changed_symbols) {
+    const down = bySymbol.get(symbol.name);
+    if (!down) continue;
+    if (down.callers.length > 0) withCallers.push({ symbol, down });
+    else quiet.push(down);
+  }
+
+  // Unioned across the collapsed symbols, so a file-level fact appears once
+  // rather than once per symbol that happens to live in that file - and minus
+  // whatever the sections above already show, so the reader never sees the same
+  // cron badge twice on one card.
+  const shown = new Set(
+    withCallers.flatMap(({ down }) => [...down.endpoints_affected, ...down.crons_affected]),
+  );
+  const quietEndpoints = unique(quiet.flatMap((d) => d.endpoints_affected)).filter(
+    (e) => !shown.has(e),
+  );
+  const quietCrons = unique(quiet.flatMap((d) => d.crons_affected)).filter((c) => !shown.has(c));
+
   return (
     <div>
-      {blast.changed_symbols.map((symbol, i) => (
+      {withCallers.map(({ symbol, down }, i) => (
         <SymbolSection
           key={`${symbol.file}:${symbol.name}:${i}`}
           symbol={symbol}
-          down={bySymbol.get(symbol.name)}
+          down={down}
           repoFullName={repoFullName}
           indexedSha={indexedSha}
           headSha={headSha}
         />
       ))}
+      {quiet.length > 0 && (
+        <div style={withCallers.length > 0 ? s.quietBlock : undefined}>
+          <p style={s.quiet}>{t("noDownstream", { count: quiet.length })}</p>
+          <FactRow label={t("endpointsLabel")} values={quietEndpoints} />
+          <FactRow label={t("cronsLabel")} values={quietCrons} />
+        </div>
+      )}
     </div>
   );
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)].sort();
 }
 
 function SymbolSection({
@@ -54,14 +98,14 @@ function SymbolSection({
   headSha,
 }: {
   symbol: ChangedSymbol;
-  down: BlastDownstream | undefined;
+  down: BlastDownstream;
   repoFullName: string | null;
   indexedSha: string;
   headSha: string;
 }) {
   const t = useTranslations("blast");
-  const callers = down?.callers ?? [];
-  const total = down?.caller_total ?? 0;
+  const callers = down.callers;
+  const total = down.caller_total;
 
   return (
     <section style={s.symbolBlock}>
@@ -105,9 +149,8 @@ function SymbolSection({
         </p>
       )}
 
-      <FactRow label={t("endpointsLabel")} values={down?.endpoints_affected ?? []} />
-      <FactRow label={t("cronsLabel")} values={down?.crons_affected ?? []} />
-
+      <FactRow label={t("endpointsLabel")} values={down.endpoints_affected} />
+      <FactRow label={t("cronsLabel")} values={down.crons_affected} />
     </section>
   );
 }

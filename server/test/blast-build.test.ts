@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildBlast } from '../src/modules/blast/build.js';
-import { MAX_CALLERS_PER_SYMBOL } from '../src/modules/blast/constants.js';
+import { MAX_CALLERS_PER_SYMBOL, MAX_CHANGED_SYMBOLS } from '../src/modules/blast/constants.js';
 import type { BlastCallerRow, BlastResult } from '../src/modules/repo-intel/types.js';
 
 function caller(over: Partial<BlastCallerRow> & { viaSymbol: string }): BlastCallerRow {
@@ -59,6 +59,22 @@ describe('buildBlast — per-symbol caps', () => {
     // A global cap of 20 would have left B with nothing.
     expect(byName.get('B')!.callers).toHaveLength(5);
     expect(byName.get('B')!.caller_total).toBe(5);
+  });
+
+  it('reports the PRE-CAP symbol count, so the display cap is never silent', () => {
+    const many = Array.from({ length: MAX_CHANGED_SYMBOLS + 12 }, (_, i) => ({
+      name: `sym${String(i).padStart(3, '0')}`,
+      file: 'src/barrel.ts',
+      kind: 'function',
+    }));
+    const blast = buildBlast({
+      result: result({ changedSymbols: many }),
+      reverse: [],
+      facts: [],
+      summary: '',
+    });
+    expect(blast.changed_symbols).toHaveLength(MAX_CHANGED_SYMBOLS);
+    expect(blast.symbols_total).toBe(MAX_CHANGED_SYMBOLS + 12);
   });
 
   it('keeps a symbol with zero callers — "nothing calls this" is a result', () => {

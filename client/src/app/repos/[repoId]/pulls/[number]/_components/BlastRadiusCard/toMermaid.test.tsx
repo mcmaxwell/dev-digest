@@ -26,6 +26,7 @@ function blast(over: Partial<PrBlastRadius> = {}): PrBlastRadius {
       },
     ],
     summary: "",
+    symbols_total: 1,
     ...over,
   };
 }

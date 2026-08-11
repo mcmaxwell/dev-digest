@@ -132,6 +132,9 @@ export function buildBlast(input: BuildBlastInput): PrBlastRadius {
   return {
     changed_symbols: ranked.map((r) => r.sym),
     downstream: ranked.map((r) => r.down),
+    // Counted BEFORE the cap above, so the card can report the truncation
+    // instead of presenting the first MAX_CHANGED_SYMBOLS as the whole set.
+    symbols_total: result.changedSymbols.length,
     summary,
   };
 }

@@ -236,7 +236,7 @@ export class BlastService {
 
 /** The honest empty answer: no symbols, no downstream, whatever summary exists. */
 function empty(summary: string): PrBlastRadius {
-  return { changed_symbols: [], downstream: [], summary };
+  return { changed_symbols: [], downstream: [], symbols_total: 0, summary };
 }
 
 /**

@@ -10,8 +10,8 @@
     "graph": "graph",
     "label": "Blast radius view"
   },
-  "callerCount": "{count} callers",
-  "noDownstream": "{count} changed symbol(s), no downstream callers found.",
+  "callerCount": "{count, plural, one {# caller} other {# callers}}",
+  "noDownstream": "{count, plural, one {# more changed symbol has} other {# more changed symbols have}} no downstream callers in the index.",
   "graph": {
     "empty": "No downstream callers to graph.",
     "ariaLabel": "Blast radius graph"
@@ -28,6 +28,7 @@
   "symbolsCaveat": "The index is built from the default branch, so symbols this PR ADDS are not visible here, and symbols it DELETES may still show callers.",
   "attribution": "Endpoints and jobs are attributed per FILE, so symbols declared in the same changed file share them.",
   "truncated": "{shown} of {total} callers shown.",
+  "symbolsTruncated": "Showing {shown} of {total} changed symbols, most-called first.",
   "linkUnavailable": "No GitHub link: this repository has no full name, or the index has no commit.",
   "linkTitle": "Open {file} at line {line} on the indexed commit",
   "noCallers": "No known callers.",
