@@ -137,6 +137,30 @@ export const Skill = z.object({
 });
 export type Skill = z.infer<typeof Skill>;
 
+// One immutable body snapshot from `skill_versions` (recorded on create and on
+// every body-changing save). The current `skills.body` always equals the
+// newest snapshot; rollback restores an old body AS A NEW version.
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  body: z.string(),
+  created_at: z.string(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+// Usage statistics for one skill, derived transitively via the agents it is
+// attached to (runs record the rendered prompt, not skill ids, so per-run
+// attribution is by linkage): those agents' runs and review findings.
+export const SkillStats = z.object({
+  agents: z.array(z.object({ id: z.string(), name: z.string(), enabled: z.boolean() })),
+  runs_count: z.number().int(),
+  last_run_at: z.string().nullable(),
+  findings_count: z.number().int(),
+  accepted_count: z.number().int(),
+  dismissed_count: z.number().int(),
+});
+export type SkillStats = z.infer<typeof SkillStats>;
+
 // What the import endpoint extracts from an uploaded .md / .zip BEFORE anything
 // is persisted: the markdown core + optional frontmatter-derived fields, plus
 // which archive entries were skipped (non-markdown — never read, never executed).

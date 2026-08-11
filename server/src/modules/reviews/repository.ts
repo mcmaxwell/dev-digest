@@ -102,6 +102,11 @@ export class ReviewRepository {
     return runRepo.totalCostByPull(this.db, prIds);
   }
 
+  /** Aggregate run + finding stats for a set of agents (skill statistics). */
+  statsForAgents(agentIds: string[]): Promise<runRepo.AgentSetStats> {
+    return runRepo.statsForAgents(this.db, agentIds);
+  }
+
   /** In-flight runs for a PR (status='running') — the server-side source of
    *  truth for "which agents are running now". Joined with the agent name. */
   activeRunsForPull(

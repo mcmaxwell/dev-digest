@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, sum } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, max, sum } from 'drizzle-orm';
 import type { Db, DbOrTx } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace, SeverityCounts } from '@devdigest/shared';
@@ -140,6 +140,61 @@ export async function totalCostByPull(
   return rows.flatMap((r) =>
     r.prId != null && r.total != null ? [{ prId: r.prId, total: Number(r.total) }] : [],
   );
+}
+
+export interface AgentSetStats {
+  runsCount: number;
+  lastRunAt: Date | null;
+  findingsCount: number;
+  acceptedCount: number;
+  dismissedCount: number;
+}
+
+/**
+ * Aggregate run + review-finding stats over a set of agents (the skill-stats
+ * read: a skill's usage is attributed via the agents it is linked to).
+ * Finding counts follow the roll-up rule for run aggregates: `kind='review'`
+ * AND `run_id IS NOT NULL` only (see server/INSIGHTS.md).
+ */
+export async function statsForAgents(db: Db, agentIds: string[]): Promise<AgentSetStats> {
+  const empty: AgentSetStats = {
+    runsCount: 0,
+    lastRunAt: null,
+    findingsCount: 0,
+    acceptedCount: 0,
+    dismissedCount: 0,
+  };
+  if (agentIds.length === 0) return empty;
+
+  const [runs] = await db
+    .select({ n: count(), last: max(t.agentRuns.ranAt) })
+    .from(t.agentRuns)
+    .where(inArray(t.agentRuns.agentId, agentIds));
+
+  // count(column) counts non-null values — accepted/dismissed in one pass.
+  const [f] = await db
+    .select({
+      total: count(),
+      accepted: count(t.findings.acceptedAt),
+      dismissed: count(t.findings.dismissedAt),
+    })
+    .from(t.findings)
+    .innerJoin(t.reviews, eq(t.findings.reviewId, t.reviews.id))
+    .where(
+      and(
+        inArray(t.reviews.agentId, agentIds),
+        eq(t.reviews.kind, 'review'),
+        isNotNull(t.reviews.runId),
+      ),
+    );
+
+  return {
+    runsCount: Number(runs?.n ?? 0),
+    lastRunAt: runs?.last ?? null,
+    findingsCount: Number(f?.total ?? 0),
+    acceptedCount: Number(f?.accepted ?? 0),
+    dismissedCount: Number(f?.dismissed ?? 0),
+  };
 }
 
 /** Mark a still-running run as cancelled (no-op if it already finished). */

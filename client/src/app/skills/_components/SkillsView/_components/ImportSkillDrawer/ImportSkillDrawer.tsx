@@ -11,7 +11,7 @@ import type { SkillType } from "@devdigest/shared";
 import { useCreateSkill, useImportSkillPreview } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
 import { ApiError } from "@/lib/api";
-import { SKILL_TYPES } from "../../constants";
+import { SKILL_TYPES } from "../../../SkillFormFields";
 import { s } from "./styles";
 
 export function ImportSkillDrawer({ onClose }: { onClose: () => void }) {

@@ -17,6 +17,9 @@ import { SkillsService } from './service.js';
  *   PUT    /skills/:id        → update (body change bumps version)
  *   DELETE /skills/:id        → delete (agent links cascade)
  *   POST   /skills/import     → multipart .md/.zip → PREVIEW only (no persist)
+ *   GET    /skills/:id/versions → immutable body history (newest first)
+ *   POST   /skills/:id/rollback → restore an old body AS A NEW version
+ *   GET    /skills/:id/stats  → usage stats via the agents the skill is linked to
  */
 
 const CreateSkillBody = z.object({
@@ -26,6 +29,10 @@ const CreateSkillBody = z.object({
   body: z.string().min(1),
   source: SkillSource.optional(),
   enabled: z.boolean().optional(),
+});
+
+const RollbackBody = z.object({
+  version: z.number().int().min(1),
 });
 
 const UpdateSkillBody = z.object({
@@ -89,6 +96,29 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
     const ok = await service.delete(workspaceId, req.params.id);
     if (!ok) throw new NotFoundError('Skill not found');
     return { ok: true };
+  });
+
+  app.get('/skills/:id/versions', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    const versions = await service.listVersions(workspaceId, req.params.id);
+    if (!versions) throw new NotFoundError('Skill not found');
+    return versions;
+  });
+
+  app.post(
+    '/skills/:id/rollback',
+    { schema: { params: IdParams, body: RollbackBody } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      return service.rollback(workspaceId, req.params.id, req.body.version);
+    },
+  );
+
+  app.get('/skills/:id/stats', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    const stats = await service.stats(workspaceId, req.params.id);
+    if (!stats) throw new NotFoundError('Skill not found');
+    return stats;
   });
 
   app.post('/skills/import', async (req) => {

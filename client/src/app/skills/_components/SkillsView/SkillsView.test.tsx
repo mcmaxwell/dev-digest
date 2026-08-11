@@ -31,6 +31,10 @@ const SKILLS: Skill[] = [
 ];
 
 vi.mock("@/lib/shell-crumb", () => ({ useSetCrumb: () => {} }));
+// the preview drawer's "Open editor" button navigates to /skills/:id
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
 vi.mock("@/lib/hooks/skills", () => ({
   useSkills: () => ({ data: SKILLS, isLoading: false, isError: false, refetch: vi.fn() }),
   useUpdateSkill: () => ({ mutate: mutateToggle, isPending: false }),

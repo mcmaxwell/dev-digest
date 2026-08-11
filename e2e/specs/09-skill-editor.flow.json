@@ -1,0 +1,25 @@
+{
+  "name": "Skill editor page: config, statistics and version history tabs",
+  "description": "Loads /skills, opens the seeded 'secret-leakage-gate' preview drawer, jumps to the full editor page via 'Open editor' and walks all three tabs: Configuration (the editable form), Statistics (usage derived via attached agents — Security Reviewer is seeded as linked), and Version history (the immutable v1 snapshot marked current; the current version has no Restore button, so nothing can be written). Read-only seeded data — the flow is re-runnable against a stack it does not own.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/skills"], "label": "load the skills page" },
+    { "cmd": ["wait", "--url", "/skills"], "label": "skills route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "skills fetch settles" },
+    { "cmd": ["wait", "--text", "secret-leakage-gate"], "label": "seeded skill card is visible" },
+    { "cmd": ["find", "text", "secret-leakage-gate", "click"], "label": "open the preview drawer" },
+    { "cmd": ["wait", "--text", "Open editor"], "label": "drawer shows the editor link" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Open editor", "--exact"], "label": "jump to the full editor page" },
+    { "cmd": ["wait", "--url", "/skills/"], "label": "editor route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "skill fetch settles" },
+    { "cmd": ["wait", "--text", "Configuration"], "label": "editor tabs render" },
+    { "cmd": ["wait", "--text", "Skill body (Markdown)"], "label": "config form shows the body field" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Statistics"], "label": "switch to the Statistics tab" },
+    { "cmd": ["wait", "--url", "tab=stats"], "label": "stats tab is active in the URL" },
+    { "cmd": ["wait", "--text", "Attached agents"], "label": "stats show the attached-agents section" },
+    { "cmd": ["wait", "--text", "Security Reviewer"], "label": "seeded linked agent is listed" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Version history"], "label": "switch to the Version history tab" },
+    { "cmd": ["wait", "--url", "tab=history"], "label": "history tab is active in the URL" },
+    { "cmd": ["wait", "--text", "current"], "label": "the seeded v1 snapshot is marked current" },
+    { "cmd": ["wait", "--text", "Every body-changing save creates an immutable snapshot."], "label": "history explains the immutability rule" }
+  ]
+}

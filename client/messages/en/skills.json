@@ -26,11 +26,41 @@
   "detail": {
     "crumbSkill": "Skill",
     "back": "← All skills",
+    "openEditor": "Open editor",
     "loadError": "Could not load this skill.",
     "notFound": {
       "title": "Skill not found",
       "body": "It may have been deleted."
+    },
+    "tabs": {
+      "config": "Configuration",
+      "stats": "Statistics",
+      "history": "Version history"
     }
+  },
+  "stats": {
+    "loadError": "Could not load statistics.",
+    "runs": "Runs",
+    "findings": "Findings",
+    "accepted": "Accepted",
+    "dismissed": "Dismissed",
+    "lastRun": "Last run",
+    "never": "never",
+    "agentsTitle": "Attached agents",
+    "agentsEmptyTitle": "Not attached to any agent",
+    "agentsEmpty": "Attach this skill from an agent's Skills tab — it becomes a block in that agent's prompt.",
+    "openAgent": "Open agent",
+    "note": "Statistics are attributed via the agents this skill is attached to: their runs and review findings. Individual runs don't record which skills were injected."
+  },
+  "history": {
+    "loadError": "Could not load version history.",
+    "empty": "No versions yet.",
+    "current": "current",
+    "restore": "Restore",
+    "restoring": "Restoring…",
+    "restoreConfirm": "Restore the body of v{version}? It will be saved as a new version — history is never rewritten.",
+    "restored": "Restored v{version} as v{newVersion}.",
+    "note": "Every body-changing save creates an immutable snapshot. Restoring an old version saves its body as a new version on top."
   },
   "create": {
     "title": "Create skill",

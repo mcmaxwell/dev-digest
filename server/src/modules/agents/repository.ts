@@ -213,6 +213,18 @@ export class AgentsRepository {
     return links.map((l) => l.skill.id);
   }
 
+  /** Agents a skill is linked to (the reverse read: skill → its agents). */
+  async agentsForSkill(
+    skillId: string,
+  ): Promise<{ id: string; name: string; enabled: boolean }[]> {
+    return this.db
+      .select({ id: t.agents.id, name: t.agents.name, enabled: t.agents.enabled })
+      .from(t.agentSkills)
+      .innerJoin(t.agents, eq(t.agentSkills.agentId, t.agents.id))
+      .where(eq(t.agentSkills.skillId, skillId))
+      .orderBy(asc(t.agents.name));
+  }
+
   /** Linked-skill counts per agent for a workspace (Agent cards' "N skills"). */
   async skillCountsByAgent(workspaceId: string): Promise<Map<string, number>> {
     const rows = await this.db
