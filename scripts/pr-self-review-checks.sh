@@ -160,19 +160,27 @@ run_checks() {
     fi
   done <<<"$files"
 
-  # 7. Onion layering (dependency-cruiser) when server sources changed
-  if grep -qE '^server/src/' <<<"$files"; then
+  # 7. Boundaries (dependency-cruiser) for every package that declares them.
+  # A package whose sources did not change is skipped: the rules are about the
+  # package's own imports, so an untouched package cannot newly violate them.
+  local pkg src_prefix why
+  for pkg in server mcp; do
+    case "$pkg" in
+      server) src_prefix='^server/src/'; why='onion layering violated' ;;
+      mcp)    src_prefix='^mcp/src/';    why='the MCP server reached outside its package, or a tool bypassed the ApiClient port' ;;
+    esac
+    grep -qE "$src_prefix" <<<"$files" || continue
     ensure_node
-    if ! command -v pnpm >/dev/null 2>&1 || [[ ! -d server/node_modules ]]; then
-      emit MAJOR "server" "arch:check skipped (pnpm or server/node_modules missing) — run 'cd server && pnpm arch:check' manually"
-    else
-      local arch_out
-      arch_out=$(cd server && pnpm -s arch:check 2>&1) || {
-        emit CRITICAL "server" "dependency-cruiser arch:check failed — onion layering violated; see 'cd server && pnpm arch:check'"
-        printf '%s\n' "$arch_out" | tail -20 >&2
-      }
+    if ! command -v pnpm >/dev/null 2>&1 || [[ ! -d "$pkg/node_modules" ]]; then
+      emit MAJOR "$pkg" "arch:check skipped (pnpm or $pkg/node_modules missing) — run 'cd $pkg && pnpm arch:check' manually"
+      continue
     fi
-  fi
+    local arch_out
+    arch_out=$(cd "$pkg" && pnpm -s arch:check 2>&1) || {
+      emit CRITICAL "$pkg" "dependency-cruiser arch:check failed — $why; see 'cd $pkg && pnpm arch:check'"
+      printf '%s\n' "$arch_out" | tail -20 >&2
+    }
+  done
 
   if [[ "$CRITICALS" -gt 0 ]]; then
     echo "deterministic layer: $CRITICALS critical finding(s)" >&2
