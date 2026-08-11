@@ -20,18 +20,19 @@ export function OverviewTab({ prId, prBody, repoId, repoFullName, headSha }: Ove
   const t = useTranslations("brief");
   return (
     <>
-      {/* Intent sits ABOVE the description: it is derived FROM the description,
-          and the reader should verify the machine's reading first. */}
-      <IntentCard prId={prId} />
-      {/* Blast radius comes after intent: intent says what the PR MEANT to do,
-          this says what it can REACH, and the second is only worth reading once
-          the first has been checked. */}
-      <BlastRadiusCard
-        prId={prId}
-        repoId={repoId}
-        repoFullName={repoFullName}
-        headSha={headSha}
-      />
+      {/* Intent and Blast Radius sit SIDE BY SIDE: they answer the two halves of
+          the same question - what this PR meant to do, and what it can reach -
+          and reading them together is the point. `auto-fit` + `minmax` collapses
+          them to one column when narrow, with no media query and no measurement. */}
+      <div style={s.briefGrid}>
+        <IntentCard prId={prId} />
+        <BlastRadiusCard
+          prId={prId}
+          repoId={repoId}
+          repoFullName={repoFullName}
+          headSha={headSha}
+        />
+      </div>
       {prBody && (
         <section>
           <SectionLabel icon="MessageSquare">{t("description")}</SectionLabel>

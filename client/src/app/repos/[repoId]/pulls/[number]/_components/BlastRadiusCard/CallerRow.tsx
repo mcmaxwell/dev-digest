@@ -14,7 +14,7 @@ interface CallerRowProps {
    * The commit the INDEX was built from - NOT the PR head.
    *
    * Caller lines come out of the index, which is built from the repository's
-   * default branch, so `src/server.ts:30` is a fact about that commit. Linking
+   * default branch, so `src/server.ts:88` is a fact about that commit. Linking
    * to the PR head would point at a line number that may not exist there, and
    * these files are not in the PR, so there is no internal diff view to send the
    * reader to instead. A GitHub blob at the indexed commit is the only correct
@@ -24,13 +24,19 @@ interface CallerRowProps {
 }
 
 /**
- * One `file:line in symbol` row, and the single place the link decision is made.
+ * One `↳ file:line` branch of the tree, and the single place the link decision
+ * is made.
+ *
+ * The enclosing caller symbol is deliberately NOT shown. It is a best-effort
+ * guess (the nearest preceding top-level declaration, which is wrong inside a
+ * nested closure), and printing a wrong function name next to a correct
+ * `file:line` spends the row's width on the least reliable half of it. The
+ * location is the part a reader acts on.
  *
  * `MonoLink` WITHOUT an `href` renders an inert `<button>` with
  * `cursor: pointer` - something that looks clickable and does nothing - and
- * `src/vendor/ui/**` is do-not-touch, so the fix belongs here: when there is no
- * repo full name or no indexed commit, this renders a `<span>` with a title, and
- * never a button.
+ * `src/vendor/ui/**` is do-not-touch, so the fix belongs here: with no repo full
+ * name or no indexed commit this renders a `<span>` with a title, never a button.
  */
 export function CallerRow({ caller, repoFullName, indexedSha }: CallerRowProps) {
   const t = useTranslations("blast");
@@ -39,6 +45,9 @@ export function CallerRow({ caller, repoFullName, indexedSha }: CallerRowProps) 
 
   return (
     <li style={s.callerRow}>
+      <span aria-hidden style={s.branch}>
+        ↳
+      </span>
       {canLink ? (
         <MonoLink href={githubBlobUrl(repoFullName!, indexedSha, caller.file, caller.line)}>
           {label}
@@ -48,7 +57,6 @@ export function CallerRow({ caller, repoFullName, indexedSha }: CallerRowProps) 
           {label}
         </span>
       )}
-      <span style={s.callerSymbol}>{caller.name}</span>
     </li>
   );
 }

@@ -26,9 +26,8 @@ interface BlastRadiusCardProps {
 /**
  * L04 - what else this PR can reach.
  *
- * Sits UNDER the Intent card on Overview: intent is derived from the PR's own
- * description and should be verified first; this is derived from the index and
- * answers a different question.
+ * Sits BESIDE the Intent card on Overview: intent is what the PR meant to do,
+ * this is what it can reach, and the two are read together.
  *
  * Five states, split by early return rather than stacked ternaries, because they
  * are five different screens: loading, error, not-analyzed, nothing-indexed, and
@@ -148,10 +147,16 @@ function BlastBody({
   const tBrief = useTranslations("brief");
 
   return (
+    // The switch lives in the HEADING row rather than beside the counts. The
+    // design puts the two together, but that card is ~700px wide and this one is
+    // a column of a two-up grid at ~420px: side by side they wrap, leaving the
+    // switch stranded on a line of its own. The heading row never wraps.
     <Section title={tBrief("block.blast")} right={<ViewToggle value={view} onChange={onView} />}>
       <Card>
         <IndexNotice index={data.index} />
-        <BlastStats blast={data.blast} />
+        <div style={s.headerRow}>
+          <BlastStats blast={data.blast} />
+        </div>
 
         {view === "tree" ? (
           <BlastTree

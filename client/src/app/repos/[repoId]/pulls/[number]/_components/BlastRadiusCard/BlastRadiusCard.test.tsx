@@ -6,7 +6,7 @@
  * `file:line` must never look clickable when it cannot be clicked.
  */
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { PrBlastResponse } from "@devdigest/shared";
 import blast from "../../../../../../../../messages/en/blast.json";
@@ -145,10 +145,48 @@ describe("BlastRadiusCard states", () => {
 
   it("renders the populated card: stats, callers, endpoints and jobs", () => {
     renderCard();
-    expect(screen.getByText("rateLimit")).toBeTruthy();
+    // A function reads as a call; the first symbol is expanded by default.
+    expect(screen.getByText("rateLimit()")).toBeTruthy();
     expect(screen.getByText("src/server.ts:30")).toBeTruthy();
     expect(screen.getByText("GET /users")).toBeTruthy();
     expect(screen.getByText("nightly-purge")).toBeTruthy();
+  });
+
+  it("is an accordion: the top symbol opens, the rest stay shut", () => {
+    usePrBlast.mockReturnValue({
+      data: response({
+        blast: {
+          ...RESPONSE.blast,
+          changed_symbols: [
+            { name: "rateLimit", file: "src/middleware/ratelimit.ts", kind: "function" },
+            { name: "bucketKey", file: "src/middleware/ratelimit.ts", kind: "function" },
+          ],
+          downstream: [
+            RESPONSE.blast.downstream[0]!,
+            {
+              symbol: "bucketKey",
+              callers: [{ name: "rateLimit", file: "src/middleware/ratelimit.ts", line: 9, rank: 0.2 }],
+              caller_total: 2,
+              endpoints_affected: [],
+              endpoints_total: 0,
+              crons_affected: [],
+              crons_total: 0,
+            },
+          ],
+        },
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderCard();
+
+    const rows = screen.getAllByRole("button", { expanded: false });
+    expect(rows.map((r) => r.textContent)).toContain("bucketKey()2 callers");
+    // The second symbol's caller is hidden until its row is opened.
+    expect(screen.queryByText("src/middleware/ratelimit.ts:9")).toBeNull();
+    fireEvent.click(rows.find((r) => r.textContent?.startsWith("bucketKey"))!);
+    expect(screen.getByText("src/middleware/ratelimit.ts:9")).toBeTruthy();
   });
 
   it("collapses symbols with no downstream into ONE counted line", () => {

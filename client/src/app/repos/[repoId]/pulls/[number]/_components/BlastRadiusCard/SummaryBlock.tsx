@@ -11,8 +11,8 @@ import { s } from "./styles";
  *
  * The GET never spends a token, so this is the ONLY place in the card that can
  * cost money, and it takes an explicit click every time. The summary the model
- * writes sits next to the machine-computed lists it was derived from, which is
- * what lets a reader check every claim in it.
+ * writes sits directly under the machine-computed lists it was derived from,
+ * which is what lets a reader check every claim in it.
  */
 export function SummaryBlock({
   summary,
@@ -28,9 +28,9 @@ export function SummaryBlock({
   const t = useTranslations("blast");
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div style={s.headerRow}>
-        <span style={s.factLabel}>{t("summary.title")}</span>
+    <div style={s.summaryBlock}>
+      <div style={s.summaryHead}>
+        <span style={s.sectionCaption}>{t("summary.title")}</span>
         {/* Staleness is derived on read against BOTH the PR head and the indexed
             commit, so a summary can go stale without the PR moving at all. */}
         {summary?.stale && (
@@ -39,13 +39,7 @@ export function SummaryBlock({
           </Badge>
         )}
         <div style={{ marginLeft: "auto" }}>
-          <Button
-            kind="ghost"
-            size="sm"
-            icon="Sparkles"
-            loading={pending}
-            onClick={onGenerate}
-          >
+          <Button kind="ghost" size="sm" icon="Sparkles" loading={pending} onClick={onGenerate}>
             {pending
               ? t("summary.generating")
               : summary

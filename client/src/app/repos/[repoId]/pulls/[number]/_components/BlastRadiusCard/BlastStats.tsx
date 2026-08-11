@@ -8,11 +8,13 @@ import { STAT_ICONS } from "./constants";
 import { s } from "./styles";
 
 /**
- * The four counts, in the order the mock puts them.
+ * The four counts, as INLINE text on the card's first row next to the view
+ * toggle - not as bordered chips. Four boxes would read as four controls, and
+ * none of them is clickable.
  *
  * Endpoints and jobs are counted as SETS across the whole PR, not summed per
- * symbol: two changed symbols in one file share the endpoints behind them, and
- * adding those up would report an impact twice the size of the real one.
+ * symbol: they are attributed per file, so two changed symbols in one file share
+ * them and adding them up would report an impact twice its real size.
  */
 export function BlastStats({ blast }: { blast: PrBlastRadius }) {
   const t = useTranslations("blast");
@@ -28,7 +30,7 @@ export function BlastStats({ blast }: { blast: PrBlastRadius }) {
 
   const stats = [
     // The PRE-CAP total: `changed_symbols` has already been trimmed for display,
-    // and a chip reporting the trimmed length would present the cap as the fact.
+    // and a count reporting the trimmed length would present the cap as the fact.
     ["symbols", blast.symbols_total],
     ["callers", callers],
     ["endpoints", endpoints.size],
@@ -40,11 +42,11 @@ export function BlastStats({ blast }: { blast: PrBlastRadius }) {
       {stats.map(([key, value]) => {
         const StatIcon = Icon[STAT_ICONS[key]];
         return (
-          <div key={key} style={s.stat}>
-            <StatIcon size={13} />
+          <span key={key} style={s.stat}>
+            <StatIcon size={13} style={{ color: "var(--text-muted)" }} />
             <span style={s.statValue}>{value}</span>
             <span>{t(`stat.${key}`)}</span>
-          </div>
+          </span>
         );
       })}
     </div>
