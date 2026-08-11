@@ -71,7 +71,10 @@ export const RunSummary = z.object({
   agent_id: z.string().nullish(),
   agent_name: z.string().nullish(),
   model: z.string().nullish(),
-  status: RunStatus.nullish(),
+  // An ADDITIVE server change to any of these enums must degrade one field,
+  // not fail the whole parse: run_agent_on_pr parses this AFTER the LLM run
+  // was billed, so a throw here costs real money and returns nothing.
+  status: RunStatus.nullish().catch(null),
   error: z.string().nullish(),
   duration_ms: z.number().nullish(),
   cost_usd: z.number().nullish(),
@@ -93,7 +96,9 @@ export type ActiveRun = z.infer<typeof ActiveRun>;
 /** A finding as GET /pulls/:id/reviews returns it. `id` is dropped on purpose:
  *  none of the five tools consumes a finding id and a uuid costs ~36 chars each. */
 export const ReviewFinding = z.object({
-  severity: Severity,
+  // Caught UP, not down: an unknown severity must never be silently
+  // downgraded into something `severity_min` filters away.
+  severity: Severity.catch('CRITICAL'),
   category: z.string().nullish(),
   title: z.string(),
   file: z.string(),
@@ -163,14 +168,14 @@ export const ConventionCandidate = z.object({
   support: z.number().int().nullish(),
   violations: z.number().int().nullish(),
   origin: z.string().nullish(),
-  status: ConventionStatus,
+  status: ConventionStatus.catch('pending'),
   edited: z.boolean().nullish(),
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
 
 export const ConventionScan = z.object({
   id: z.string(),
-  status: z.enum(['running', 'done', 'error']),
+  status: z.enum(['running', 'done', 'error']).catch('done'),
   sha: z.string().nullish(),
   model: z.string().nullish(),
   sample_count: z.number().int().nullish(),

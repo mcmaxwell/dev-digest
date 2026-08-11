@@ -65,7 +65,12 @@ export function renderAgents(
 // ---------------------------------------------------------------------------
 
 export function renderFinding(f: ReviewFinding, withBody: boolean): string {
-  const head = `[${f.severity}] ${f.file}:${f.start_line} - ${f.title}`;
+  // `file` and `title` are LLM output derived from a diff somebody else wrote,
+  // and the contract puts no length or newline bound on either. Rendered raw
+  // into this newline-delimited result they could forge extra lines - a fake
+  // verdict, a fake finding - in the reading agent's context. clip() collapses
+  // whitespace, which removes the line-forging primitive.
+  const head = `[${f.severity}] ${clip(f.file, 200)}:${f.start_line} - ${clip(f.title, 200)}`;
   if (!withBody) return head;
   const body: string[] = [];
   if (f.rationale) body.push(`    why: ${clip(f.rationale)}`);

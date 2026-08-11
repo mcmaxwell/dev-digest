@@ -69,6 +69,16 @@ export function describeApiError(err: unknown): string {
           `DevDigest UI (or POST /repos/:id/refresh) so it gets cloned, then retry.`
         );
       default:
+        // A 5xx body is NOT safe to relay. Outside production the API's error
+        // handler sends the raw `e.message` for any non-AppError, and its own
+        // comment admits that can be a DB error, a filesystem path or adapter
+        // output. Those would leave the machine with the next completion.
+        if (err.status >= 500) {
+          return (
+            `The DevDigest API returned HTTP ${err.status}. Retry once; if it persists, ` +
+            `read the API log in the terminal running ./scripts/dev.sh.`
+          );
+        }
         return (
           `The DevDigest API returned HTTP ${err.status} (${err.code}): ${err.message}. Retry ` +
           `once; if it persists, read the API log in the terminal running ./scripts/dev.sh.`

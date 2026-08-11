@@ -77,9 +77,14 @@ const CASES: { name: string; err: unknown; contains: string[] }[] = [
     contains: ['no clone on disk', 'POST /repos/:id/refresh', 'then retry'],
   },
   {
-    name: 'unmapped API error',
+    name: 'unmapped 4xx API error',
+    err: new ApiError(409, 'some_new_code', 'the branch moved under you'),
+    contains: ['HTTP 409 (some_new_code): the branch moved under you', './scripts/dev.sh'],
+  },
+  {
+    name: 'unmapped 5xx API error',
     err: new ApiError(500, 'internal_error', 'boom'),
-    contains: ['HTTP 500 (internal_error): boom', './scripts/dev.sh'],
+    contains: ['HTTP 500', './scripts/dev.sh'],
   },
   {
     name: 'unreadable response shape',
@@ -131,5 +136,27 @@ describe('a dead API through the real tool surface', () => {
     // model sees a message it can act on.
     expect(isError).toBe(true);
     expect(text).toContain('./scripts/dev.sh');
+  });
+});
+
+/**
+ * A 5xx body is not safe to relay: outside production the API's error handler
+ * sends the raw `e.message` for any non-AppError, which its own comment says
+ * can be a DB error, a filesystem path or adapter output. Relaying that hands
+ * the machine's paths to the model, and they leave with the next completion.
+ */
+describe('5xx bodies are not relayed', () => {
+  it('drops the server message but keeps the status and the next action', () => {
+    const leak = '/Users/someone/projects/dev-digest/server/clones/acme/secret.ts ENOENT';
+    const message = describeApiError(new ApiError(503, 'internal_error', leak));
+    expect(message).not.toContain(leak);
+    expect(message).not.toContain('/Users/');
+    expect(message).toContain('HTTP 503');
+    expect(message).toContain('./scripts/dev.sh');
+  });
+
+  it('still relays a 4xx message, which is the API telling the caller what to fix', () => {
+    const message = describeApiError(new ApiError(400, 'invalid_run_request', 'pick an agent'));
+    expect(message).toContain('pick an agent');
   });
 });
