@@ -1,0 +1,97 @@
+{
+  "scan": {
+    "id": "c3000000-6666-4d00-9000-000000000001",
+    "repo_id": "1b7e5f40-1111-4c22-8d31-9a0b1c2d3e40",
+    "status": "done",
+    "sha": "3f9a1c4e8b2d7a05c6e1f0b9d8a7c6b5a4930211",
+    "provider": "openrouter",
+    "model": "deepseek/deepseek-v4-flash",
+    "sample_count": 120,
+    "candidate_count": 5,
+    "error": null,
+    "started_at": "2026-08-06T08:00:00.000Z",
+    "finished_at": "2026-08-06T08:04:12.000Z"
+  },
+  "candidates": [
+    {
+      "id": "d4000000-7777-4e00-9000-000000000001",
+      "category": "error-handling",
+      "rule": "Route handlers never catch; errors bubble to the shared error plugin.",
+      "rationale": "Every handler under src/routes returns or throws, and the envelope is built in one place.",
+      "evidence": [
+        { "path": "src/routes/charges.ts", "line": 44, "snippet": "return service.create(req.body);", "verified": "exact", "sha": "3f9a1c4" }
+      ],
+      "confidence": 0.92,
+      "adherence": 0.96,
+      "support": 48,
+      "violations": 2,
+      "origin": "llm",
+      "status": "accepted",
+      "edited": false
+    },
+    {
+      "id": "d4000000-7777-4e00-9000-000000000002",
+      "category": "naming",
+      "rule": "Repository methods are named <verb><Entity>, never get<Entity>By<Field>.",
+      "rationale": null,
+      "evidence": [
+        { "path": "src/db/charges.repo.ts", "line": 12, "snippet": "export function insertCharge(", "verified": "exact", "sha": "3f9a1c4" }
+      ],
+      "confidence": 0.81,
+      "adherence": 0.88,
+      "support": 22,
+      "violations": 3,
+      "origin": "llm",
+      "status": "accepted",
+      "edited": true
+    },
+    {
+      "id": "d4000000-7777-4e00-9000-000000000003",
+      "category": "imports",
+      "rule": "Relative imports carry an explicit .js extension.",
+      "rationale": "The package is ESM with NodeNext resolution.",
+      "evidence": [
+        { "path": "src/charges/create.ts", "line": 1, "snippet": "import { idempotencyKey } from './idempotency.js';", "verified": "exact", "sha": "3f9a1c4" }
+      ],
+      "confidence": 1,
+      "adherence": null,
+      "support": null,
+      "violations": null,
+      "origin": "config",
+      "status": "accepted",
+      "edited": false
+    },
+    {
+      "id": "d4000000-7777-4e00-9000-000000000004",
+      "category": "testing",
+      "rule": "One assertion per behaviour; no snapshot tests.",
+      "rationale": "Reviewed by nobody yet.",
+      "evidence": [
+        { "path": "test/charges.test.ts", "line": 9, "snippet": "expect(res.status).toBe(201);", "verified": "relocated", "sha": "3f9a1c4" }
+      ],
+      "confidence": 0.55,
+      "adherence": 0.61,
+      "support": 11,
+      "violations": 7,
+      "origin": "llm",
+      "status": "pending",
+      "edited": false
+    },
+    {
+      "id": "d4000000-7777-4e00-9000-000000000005",
+      "category": "logging",
+      "rule": "REJECTED-CANARY every function logs its own entry and exit.",
+      "rationale": "A human said no to this one.",
+      "evidence": [
+        { "path": "src/charges/create.ts", "line": 3, "snippet": "log.debug('create');", "verified": "exact", "sha": "3f9a1c4" }
+      ],
+      "confidence": 0.4,
+      "adherence": 0.12,
+      "support": 2,
+      "violations": 60,
+      "origin": "llm",
+      "status": "rejected",
+      "edited": false
+    }
+  ]
+}

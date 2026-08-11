@@ -1,0 +1,47 @@
+[
+  {
+    "id": "6f1c2b3a-0000-4a1e-9f2b-1a2b3c4d5e01",
+    "name": "Security Reviewer",
+    "description": "Auth, secrets, injection and data-exfiltration problems.",
+    "provider": "openai",
+    "model": "gpt-4.1",
+    "system_prompt": "LEAK-CANARY-SYSTEM-PROMPT You are a senior application security reviewer. Report only defects you can defend with a diff citation.",
+    "output_schema": null,
+    "enabled": true,
+    "version": 3,
+    "strategy": "single-pass",
+    "ci_fail_on": "critical",
+    "repo_intel": true,
+    "skill_count": 2
+  },
+  {
+    "id": "6f1c2b3a-0000-4a1e-9f2b-1a2b3c4d5e02",
+    "name": "Test Quality",
+    "description": "Missing, weak or tautological tests.",
+    "provider": "openrouter",
+    "model": "deepseek/deepseek-v4-flash",
+    "system_prompt": "LEAK-CANARY-SYSTEM-PROMPT You review the tests that ship with a change.",
+    "output_schema": { "type": "object", "properties": { "leak": { "type": "string" } } },
+    "enabled": true,
+    "version": 1,
+    "strategy": "single-pass",
+    "ci_fail_on": "warning",
+    "repo_intel": true,
+    "skill_count": 1
+  },
+  {
+    "id": "6f1c2b3a-0000-4a1e-9f2b-1a2b3c4d5e03",
+    "name": "API Contract Agent",
+    "description": "Breaking changes to public request/response shapes.",
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "system_prompt": "LEAK-CANARY-SYSTEM-PROMPT You guard the API contract.",
+    "output_schema": null,
+    "enabled": false,
+    "version": 2,
+    "strategy": "auto",
+    "ci_fail_on": "critical",
+    "repo_intel": false,
+    "skill_count": 0
+  }
+]

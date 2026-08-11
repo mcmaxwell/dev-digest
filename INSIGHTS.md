@@ -39,6 +39,20 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   all four packages (`ls -la CLAUDE.md` → `CLAUDE.md -> AGENTS.md`). Any
   instruction to "update both files" is wrong, and writing `CLAUDE.md` as a new
   file would replace the link. There is one file per scope; edit `AGENTS.md`.
+  - [2026-08-10] L04 added a fifth package, `mcp/`, so "all four packages" in
+    that entry (and in the generated `.claude/repo-facts.md`) now reads as a
+    count that has to be maintained. The root `CLAUDE.md -> AGENTS.md` symlink
+    is unchanged; a plan that lists `CLAUDE.md` and `AGENTS.md` as two separate
+    rows to edit (this one did) means ONE edit, not two.
+- [2026-08-10] Adding a package means editing `scripts/repo-facts.sh` in five
+  places, not one: the prose count in the HEADER heredoc, the
+  `for p in server client reviewer-core mcp e2e` loop, the test-lane table and
+  the package-manager sentence in the LANES heredoc, the per-config
+  `rules_of ...dependency-cruiser.cjs` printf block, and the CLAUDE.md-symlink
+  sentence in the FOOTER heredoc. Everything else in that script is derived from
+  disk, so a missed spot fails silently: the generated card just omits the
+  package and every agent that reads it first believes the repo is smaller than
+  it is.
 - [2026-08-07] Only `client/` has a `lint` script. `server/` has
   `typecheck test arch:check db:*` and `reviewer-core/` has
   `typecheck build arch:check test` — the mechanical boundary check on the

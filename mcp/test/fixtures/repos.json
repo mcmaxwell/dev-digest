@@ -1,0 +1,24 @@
+[
+  {
+    "id": "1b7e5f40-1111-4c22-8d31-9a0b1c2d3e40",
+    "workspace_id": "00000000-0000-4000-8000-000000000001",
+    "owner": "acme",
+    "name": "payments-api",
+    "full_name": "acme/payments-api",
+    "default_branch": "main",
+    "clone_path": "/Users/leak-canary/dev-digest/server/clones/acme-payments-api",
+    "last_polled_at": "2026-08-09T09:14:00.000Z",
+    "created_by": null
+  },
+  {
+    "id": "1b7e5f40-1111-4c22-8d31-9a0b1c2d3e41",
+    "workspace_id": "00000000-0000-4000-8000-000000000001",
+    "owner": "acme",
+    "name": "web-console",
+    "full_name": "acme/web-console",
+    "default_branch": "main",
+    "clone_path": "/Users/leak-canary/dev-digest/server/clones/acme-web-console",
+    "last_polled_at": null,
+    "created_by": null
+  }
+]

@@ -1,0 +1,63 @@
+# mcp suite - the local MCP server (devdigest-mcp).
+# Five stdio tools over the DevDigest HTTP API. Hermetic: no network, no
+# Postgres, no LLM key, no spawned process - every handler gets a fake
+# ApiClient. Uses pnpm (pnpm-lock.yaml).
+#
+# The path filter is deliberately mcp/** only. This package aliases nothing:
+# it talks to the API over HTTP and pins zod 4 while every other package is on
+# zod 3, so a server/** or reviewer-core/** change cannot break it.
+#
+# The `*.it.test.ts` lane (pnpm test:it) needs a live stack and is NOT run here
+# - see TESTING.md.
+name: mcp
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mcp/**'
+      - '.github/workflows/mcp.yml'
+  pull_request:
+    paths:
+      - 'mcp/**'
+      - '.github/workflows/mcp.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: mcp/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      # Package isolation: no imports from server/client/reviewer-core/e2e, no
+      # drizzle/postgres/fastify/octokit, tools reach HTTP only through the
+      # ApiClient port (see .dependency-cruiser.cjs).
+      - run: pnpm arch:check
+
+      # Includes the tools/list structural gate: token budget, flat schemas,
+      # description length limits.
+      - run: pnpm test

@@ -12,6 +12,14 @@ Adding a new skill = one row here.
 | 5 | `server/src/db/**` (excl. `migrations/`) | `drizzle-orm-patterns`; schema files additionally `postgresql-table-design` | DB |
 | 6 | `**/vendor/shared/**`, files defining `z.object` schemas | `zod` | Contracts |
 | 7 | Any route with input handling, auth, file upload, secrets usage, `child_process`/`exec` (UI **and** backend) | `security` | Security |
+| 8 | `mcp/src/**`, `mcp/scripts/**`, `mcp/bin/**`, `scripts/mcp.sh` | `security`, `zod`; rules from `mcp/AGENTS.md` | MCP server |
+
+Group 8 exists because rows 1-7 miss this package almost entirely: it is not
+`client/`, not `server/src/`, not `reviewer-core/`. Rows 6 and 7 would catch
+some of it by content, but only by accident, and neither knows the invariants
+that actually matter here. `mcp/AGENTS.md` is the rule source for that group
+the way a skill is for the others: stdout is the JSON-RPC channel, flat schemas
+only, no bare throws to the model, no `system_prompt` in any result.
 
 Not routed (not review skills): `engineering-insights`, `mermaid-diagram`,
 `typescript-expert`.
@@ -44,6 +52,14 @@ most `major`.
 12. Client component fetching/mutating server data outside the established
     hook layer (`src/lib/hooks/*`) in a way that breaks the app's data flow
     (per `frontend-ui-architecture`).
+13. An MCP tool result renders text that originated in a reviewed repository
+    without flattening it. Finding titles, file paths, review summaries and
+    scan/run errors are LLM output derived from somebody else's diff, and no
+    contract bounds their length or newlines: rendered raw into a
+    newline-delimited result they forge lines - a fake CRITICAL, a fake
+    verdict - in the reading agent's context. Pass them through `clip()`.
+    (Also: a 5xx body is never relayed to the model; outside production the
+    API sends the raw `e.message`, which can carry a filesystem path.)
 
 ## PR-hygiene checklist (orchestrator, no subagent)
 
@@ -52,6 +68,10 @@ most `major`.
 - Both `vendor/shared` copies updated together when contracts changed.
 - No stray files: editor configs, `.DS_Store`, debug scripts, large binaries.
 - Lockfile changed → was a dependency actually added/updated on purpose?
+- An `mcp/` tool description or input schema changed → `cd mcp && pnpm budget`
+  re-run and still under budget? Those strings are loaded into the system
+  prompt of every session, so growing one is a deliberate decision, never a
+  side effect of a refactor.
 
 ## Subagent prompt template
 
@@ -75,6 +95,6 @@ useful; an empty list is a valid, good result.
 
 ## Quick mode (41–150 files)
 
-Subagents receive only the critical criteria (8–12) and check nothing else;
+Subagents receive only the critical criteria (8–13) and check nothing else;
 PR-hygiene checklist still runs; report must state that major/minor depth was
 skipped.

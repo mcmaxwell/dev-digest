@@ -4,7 +4,7 @@ Local-first AI PR review: import a GitHub PR, run an LLM agent review, get
 grounded findings. Course starter — lessons L01–L08 add features on top
 (lesson list in README.md).
 
-4 standalone packages — **no monorepo workspace**: each folder has its own
+5 standalone packages — **no monorepo workspace**: each folder has its own
 package.json + lockfile; cross-package code is shared only via tsconfig path
 aliases, never published modules.
 
@@ -33,6 +33,8 @@ server/         @devdigest/api  — Fastify API; modules/{repos,pulls,agents,rev
 client/         @devdigest/web  — app/{repos,agents,settings,onboarding}; hooks in
                 src/lib/hooks/*; feature logic in colocated _components/
 reviewer-core/  engine: diff + repo map → prompt → LLM → grounded findings
+mcp/            local MCP server (stdio) for editor agents: 5 tools, reaching
+                the API over HTTP only; own process, zod 4, no shared aliases
 e2e/            deterministic agent-browser flows (JSON specs, no LLM, no keys)
 docs/           agent-prompts/ (built-in reviewer prompts) · specs/ (lesson specs)
 ```
@@ -71,6 +73,9 @@ docs/           agent-prompts/ (built-in reviewer prompts) · specs/ (lesson spe
 - …adding/changing API routes, DB schema, or adapters → `server/README.md`
 - …touching indexing, the repo map, or the Indexed badge → `server/src/modules/repo-intel/README.md`
 - …working on UI routes, hooks, or components → `client/README.md`
+- …changing the MCP tools, their descriptions, or the token budget →
+  `mcp/README.md`, then `mcp/AGENTS.md` (tool descriptions are taxed in every
+  session, so their wording is a deliberate decision, not a refactor)
 - …writing or fixing tests (any package) → `TESTING.md`; browser flows → `e2e/README.md`
 - …editing built-in reviewer agent prompts → `docs/agent-prompts/README.md`
 - …implementing a lesson feature → its spec in `docs/specs/`
