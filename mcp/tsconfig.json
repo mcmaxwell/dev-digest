@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": false,
+    "declaration": false,
+    "sourceMap": true,
+    "composite": false,
+    "noEmit": true,
+    "types": ["node"],
+    // DOM is here ONLY for the global `fetch`/`Response`/`AbortSignal` types.
+    // This package renders text; it never touches a document.
+    "lib": ["ES2022", "DOM"]
+    //
+    // NO `paths` BLOCK - ON PURPOSE. Every other package in this repo aliases
+    // `@devdigest/shared` to `server/src/vendor/shared`. This one must not:
+    // those contracts are written against zod 3 and the MCP SDK v2 pins zod 4,
+    // so an alias here buys a wall of type errors inside vendored files nobody
+    // in this package owns. `src/api/schemas.ts` keeps its own narrow parsers
+    // of the few fields we read instead. See AGENTS.md, "Why no @devdigest/shared".
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
+}

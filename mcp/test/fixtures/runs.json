@@ -1,0 +1,40 @@
+[
+  {
+    "run_id": "a2000000-4444-4b00-9000-000000000003",
+    "agent_id": "6f1c2b3a-0000-4a1e-9f2b-1a2b3c4d5e02",
+    "agent_name": "Test Quality",
+    "provider": "openrouter",
+    "model": "deepseek/deepseek-v4-flash",
+    "status": "done",
+    "error": null,
+    "duration_ms": 8400,
+    "tokens_in": 18422,
+    "tokens_out": 903,
+    "cost_usd": 0.0009,
+    "findings_count": 2,
+    "severity_counts": { "critical": 0, "warning": 1, "suggestion": 1 },
+    "grounding": "3/3",
+    "ran_at": "2026-08-08T17:02:00.000Z",
+    "score": 71,
+    "blockers": 0
+  },
+  {
+    "run_id": "a2000000-4444-4b00-9000-000000000002",
+    "agent_id": "6f1c2b3a-0000-4a1e-9f2b-1a2b3c4d5e01",
+    "agent_name": "Security Reviewer",
+    "provider": "openai",
+    "model": "gpt-4.1",
+    "status": "done",
+    "error": null,
+    "duration_ms": 12400,
+    "tokens_in": 24110,
+    "tokens_out": 1502,
+    "cost_usd": 0.0031,
+    "findings_count": 2,
+    "severity_counts": { "critical": 1, "warning": 0, "suggestion": 1 },
+    "grounding": "2/2",
+    "ran_at": "2026-08-08T16:58:00.000Z",
+    "score": 42,
+    "blockers": 1
+  }
+]

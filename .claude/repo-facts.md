@@ -9,19 +9,23 @@ It does NOT replace `INSIGHTS.md` (module lessons) or a package's `AGENTS.md`
 
 ## Packages
 
-Four standalone packages, no workspace. Each has its own `package.json` and
+Five standalone packages, no workspace. Each has its own `package.json` and
 lockfile; cross-package code is shared only through tsconfig path aliases.
 
 | Package | Name | Scripts |
 |---|---|---|
-| `server/` | `@devdigest/api` | `dev` · `build` · `start` · `typecheck` · `test` · `arch:check` · `db:generate` · `db:migrate` · `db:seed` |
+| `server/` | `@devdigest/api` | `dev` · `build` · `start` · `typecheck` · `test` · `verify:l03` · `arch:check` · `db:generate` · `db:migrate` · `db:seed` |
 | `client/` | `@devdigest/web` | `dev` · `build` · `start` · `typecheck` · `lint` · `test` |
 | `reviewer-core/` | `@devdigest/reviewer-core` | `typecheck` · `build` · `arch:check` · `test` |
+| `mcp/` | `@devdigest/mcp` | `dev` · `typecheck` · `arch:check` · `budget` · `test` · `test:it` · `inspect` |
 | `e2e/` | `@devdigest/e2e` | `test` · `e2e:hermetic` · `typecheck` |
 
-**`reviewer-core` and `e2e` use `npm`, not `pnpm`.** `server/` and
-`reviewer-core/` have NO `lint` script; their mechanical boundary check is
-`arch:check`.
+**`reviewer-core` and `e2e` use `npm`, not `pnpm`**; `server/`, `client/` and
+`mcp/` use `pnpm`. `server/`, `reviewer-core/` and `mcp/` have NO `lint`
+script; their mechanical boundary check is `arch:check`.
+
+`mcp/` is also the only package on `zod` 4 - everything else is on `zod` 3,
+which is why it aliases no shared contracts and has no `paths` block.
 
 ## Test lanes
 
@@ -31,9 +35,12 @@ lockfile; cross-package code is shared only through tsconfig path aliases.
 | server integration (Docker) | `cd server && pnpm exec vitest run .it.test --no-file-parallelism` |
 | reviewer-core | `cd reviewer-core && npm test` |
 | client | `cd client && pnpm test` |
+| mcp (hermetic) | `cd mcp && pnpm test` |
+| mcp live stack (opt-in, not in CI) | `cd mcp && pnpm test:it` (needs `./scripts/dev.sh --no-client`) |
 | browser e2e | `./scripts/e2e.sh` |
 
-A server test importing `test/helpers/pg.ts` MUST be named `*.it.test.ts`.
+A server test importing `test/helpers/pg.ts` MUST be named `*.it.test.ts`, and
+so must an mcp test that needs a live API.
 
 ## Server modules
 
@@ -51,6 +58,7 @@ or add an allowlist entry to fix a violation - fix the placement.
 |---|---|
 | `server/.dependency-cruiser.cjs` | routes-are-transport-only, queries-live-in-repositories, no-cross-module-imports, modules-use-ports-not-clients, platform-independent-of-modules, db-independent-of-modules |
 | `reviewer-core/.dependency-cruiser.cjs` | core-has-no-io, core-has-no-db-or-server, vendor-sdks-confined-to-llm-adapters |
+| `mcp/.dependency-cruiser.cjs` | mcp-is-standalone, mcp-has-no-db-or-framework, tools-go-through-the-api-port, no-circular |
 
 `no-cross-module-imports` exempts only another module's `service.ts`,
 `types.ts`, or `constants.ts`. Anything else shared between modules belongs in
@@ -79,8 +87,9 @@ whole-tree comparison - that is always red because of the drift above.
 - `CHANGELOG.md` and anything marked auto-generated
 - never `docker compose down -v` (destroys the dev database volume)
 
-`CLAUDE.md` is a SYMLINK to `AGENTS.md` at the root and in all four packages.
-There is one file per scope; edit `AGENTS.md`.
+`CLAUDE.md` is a SYMLINK to `AGENTS.md` at the root and in `server/`,
+`client/`, `reviewer-core/` and `e2e/`. There is one file per scope; edit
+`AGENTS.md`.
 
 ## Environment traps
 

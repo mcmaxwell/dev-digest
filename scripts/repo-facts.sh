@@ -35,22 +35,25 @@ It does NOT replace `INSIGHTS.md` (module lessons) or a package's `AGENTS.md`
 
 ## Packages
 
-Four standalone packages, no workspace. Each has its own `package.json` and
+Five standalone packages, no workspace. Each has its own `package.json` and
 lockfile; cross-package code is shared only through tsconfig path aliases.
 
 HEADER
 
   printf '| Package | Name | Scripts |\n|---|---|---|\n'
-  for p in server client reviewer-core e2e; do
+  for p in server client reviewer-core mcp e2e; do
     name=$(python3 -c "import json;print(json.load(open('$p/package.json'))['name'])")
     printf '| `%s/` | `%s` | %s |\n' "$p" "$name" "$(scripts_of $p)"
   done
 
   cat <<'LANES'
 
-**`reviewer-core` and `e2e` use `npm`, not `pnpm`.** `server/` and
-`reviewer-core/` have NO `lint` script; their mechanical boundary check is
-`arch:check`.
+**`reviewer-core` and `e2e` use `npm`, not `pnpm`**; `server/`, `client/` and
+`mcp/` use `pnpm`. `server/`, `reviewer-core/` and `mcp/` have NO `lint`
+script; their mechanical boundary check is `arch:check`.
+
+`mcp/` is also the only package on `zod` 4 - everything else is on `zod` 3,
+which is why it aliases no shared contracts and has no `paths` block.
 
 ## Test lanes
 
@@ -60,9 +63,12 @@ HEADER
 | server integration (Docker) | `cd server && pnpm exec vitest run .it.test --no-file-parallelism` |
 | reviewer-core | `cd reviewer-core && npm test` |
 | client | `cd client && pnpm test` |
+| mcp (hermetic) | `cd mcp && pnpm test` |
+| mcp live stack (opt-in, not in CI) | `cd mcp && pnpm test:it` (needs `./scripts/dev.sh --no-client`) |
 | browser e2e | `./scripts/e2e.sh` |
 
-A server test importing `test/helpers/pg.ts` MUST be named `*.it.test.ts`.
+A server test importing `test/helpers/pg.ts` MUST be named `*.it.test.ts`, and
+so must an mcp test that needs a live API.
 
 ## Server modules
 LANES
@@ -85,6 +91,7 @@ BOUNDARIES
   printf '| Config | Rules |\n|---|---|\n'
   printf '| `server/.dependency-cruiser.cjs` | %s |\n' "$(rules_of server/.dependency-cruiser.cjs)"
   printf '| `reviewer-core/.dependency-cruiser.cjs` | %s |\n' "$(rules_of reviewer-core/.dependency-cruiser.cjs)"
+  printf '| `mcp/.dependency-cruiser.cjs` | %s |\n' "$(rules_of mcp/.dependency-cruiser.cjs)"
 
   cat <<'CONTRACTS'
 
@@ -122,8 +129,9 @@ CONTRACTS
 - `CHANGELOG.md` and anything marked auto-generated
 - never `docker compose down -v` (destroys the dev database volume)
 
-`CLAUDE.md` is a SYMLINK to `AGENTS.md` at the root and in all four packages.
-There is one file per scope; edit `AGENTS.md`.
+`CLAUDE.md` is a SYMLINK to `AGENTS.md` at the root and in `server/`,
+`client/`, `reviewer-core/` and `e2e/`. There is one file per scope; edit
+`AGENTS.md`.
 
 ## Environment traps
 

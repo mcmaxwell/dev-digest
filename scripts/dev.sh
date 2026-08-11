@@ -75,6 +75,9 @@ install_if_needed() {
 }
 install_if_needed server
 [ "$DB_ONLY" -eq 0 ] && [ "$RUN_CLIENT" -eq 1 ] && install_if_needed client
+# mcp/ is deliberately NOT installed here. The MCP server is an optional,
+# separately-enabled tool: this script owns the app (Postgres + API + web) and
+# nothing else. Set it up on demand with `./scripts/mcp.sh setup`.
 # reviewer-core's RAW source is imported by the API at runtime (tsconfig alias);
 # without its deps the API crashes at boot with ERR_MODULE_NOT_FOUND. It uses npm.
 [ -d reviewer-core/node_modules ] || { log "installing deps in reviewer-core"; (cd reviewer-core && npm ci); }

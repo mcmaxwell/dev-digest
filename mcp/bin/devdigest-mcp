@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Launcher for the devdigest MCP server (stdio transport).
+#
+# stdout is the JSON-RPC channel, so this script must print NOTHING there -
+# every diagnostic below goes to stderr, which the host shows as server logs.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ ! -x "$here/node_modules/.bin/tsx" ]; then
+  echo "devdigest-mcp: dependencies are not installed." >&2
+  echo "  Run: cd $here && pnpm install" >&2
+  echo "  (or run ./scripts/dev.sh from the repo root, which installs them)" >&2
+  exit 1
+fi
+
+exec "$here/node_modules/.bin/tsx" "$here/src/index.ts" "$@"
