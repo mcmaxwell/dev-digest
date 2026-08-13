@@ -74,8 +74,33 @@ fact.
 | Above `EXCERPT_CUTOFF_INDEXED_FILES` | `repo_too_large` | Zero excerpts; every other budget unchanged |
 | `listIssues` throws (incl. no `GITHUB_TOKEN`) | `issues_unavailable` | First tasks come from `TODO`/`FIXME` markers alone |
 | Model call fails, times out, or cannot be repaired | `model_failed` | The deterministic skeleton is persisted; the page offers Retry |
+| The clone cannot be read AT JOB TIME (resync, deletion) | `clone_unavailable` | No model call is made at all; the empty skeleton is persisted with this reason and the page offers Retry |
 
 A degraded tour is persisted and readable. It is never rendered as an error.
+
+`clone_unavailable` is separate from `model_failed` on purpose. `requestGeneration`
+checks the clone, but the generation runs LATER on the queue, so the clone can be
+mid-resync or gone by the time `collectFacts` reads it. Reporting that as a model
+failure would blame the model for a disk, and letting the job simply throw would
+persist nothing at all — the page would then keep rendering the PREVIOUS tour and
+look like nothing had happened.
+
+## The two halves of the import graph
+
+`usedGraph` is a PAIR, not a boolean, because the two graph-dependent sections
+lose the graph separately:
+
+- **Reading path** needs a *ranking*. `computeFileRank` gives an edge-less
+  repository PageRank's uniform floor rather than nothing, so "there are ranked
+  files" is not "there is a ranking" — the rank percentiles are read and a
+  single shared value counts as no ranking. A rank the port could not report at
+  all is UNMEASURED, not flat, and does not downgrade the section.
+- **Critical paths** need *edges*. `getCriticalPaths` returns `[]` as soon as
+  there are none, so its own emptiness is the signal.
+
+A repository with a real ranking and no usable chains therefore marks Critical
+paths `no_graph` while the reading path stays `ok`. Reporting the first as
+`empty` would read as "we looked and found nothing" (AC-57, AC-58).
 
 ## The trust boundary
 
@@ -101,6 +126,9 @@ enqueues the job and returns the page with `generation.status = 'running'`; the
 client polls `GET /repos/:id/onboarding` for the phase.
 The slot is claimed at REQUEST time, not inside the handler, so a second request
 arriving while the first is still queued is refused rather than queued behind it.
+It is claimed BEFORE the repository read and the clone probe, so the check and
+the claim stay an unbroken pair no matter what those reads do, and every early
+exit (unknown repository, no clone, a queue that refused the job) releases it.
 It is per process — two API processes would each allow a generation — which is
 the price of not having a `running` row that would need a boot reaper.
 
@@ -109,9 +137,15 @@ the price of not having a `running` row that would need a boot reaper.
 - `MockGitClient.readFile` resolves a MISSING path to `''`. Every "file absent"
   branch treats blank as absent, not only a throw.
 - A first task can only be found in the top `MAX_RANKED_FILES` files: the marker
-  grep is filtered to the candidate set, which is how the junk-path filter is
-  applied without importing `isJunkPath` (module-local to `repo-intel`, and not
-  an exempt cross-module import). Raising the constant is free.
+  grep is filtered to the candidate set, which is what keeps a `TODO` inside a
+  vendored dependency out of the tour. Raising the constant is free.
+- `HEURISTIC_EXCLUDE_PATTERNS` extends `repo-intel`'s `JUNK_PATH_PATTERNS`
+  rather than re-typing it. The ranked path is filtered twice (index-time
+  `EXCLUDED_DIRS`, read-time junk filter) and the no-graph path only here, so a
+  local copy silently became the narrower of the two and let `*.test.ts`,
+  `tsconfig.json` and `.d.ts` into an unindexed repository's tour. Import the
+  constants; never `isJunkPath` itself — `repo-intel/service.ts` is not an
+  exempt cross-module import and `arch:check` rejects it.
 - `guardDiagram` is a STRUCTURAL check, not a real mermaid parse. The client's
   `MermaidDiagram` is the authoritative gate and renders `null` on failure.
 - `repo_too_large` marks an otherwise perfect tour `degraded`. The spec's enum

@@ -149,14 +149,29 @@ describe('L06 candidates — the no-graph heuristic (AC-57)', () => {
   });
 
   it('prefers the prominent directory over a sparse one, at equal depth', () => {
-    // Compared at the same depth on purpose: the spec fixes "directory
-    // prominence and entry-point heuristics" as the two signals and says
-    // nothing about how a path's depth weighs against them.
     const out = heuristicCandidates(
       ['src/a/one.ts', 'src/a/two.ts', 'src/a/three.ts', 'tools/z/legacy.ts'],
       10,
     );
     expect(out.indexOf('src/a/one.ts')).toBeLessThan(out.indexOf('tools/z/legacy.ts'));
+  });
+
+  it('prefers the prominent directory over a sparse one ACROSS depths', () => {
+    // AC-57 fixes exactly two signals — directory prominence and entry-point
+    // naming — and says nothing about depth, so a shallower file under a
+    // sparse directory must not overtake a deeper one under the busiest.
+    const out = heuristicCandidates(
+      ['src/routes/one.ts', 'src/routes/two.ts', 'src/routes/three.ts', 'scripts/one-off.sh'],
+      10,
+    );
+    expect(out.indexOf('src/routes/one.ts')).toBeLessThan(out.indexOf('scripts/one-off.sh'));
+  });
+
+  it('breaks a prominence tie by the shallower path', () => {
+    // Depth still ORDERS, it just no longer overturns: with the same
+    // prominence and no entry point, the file nearer the root reads first.
+    const out = heuristicCandidates(['src/a/deep.ts', 'src/shallow.ts'], 10);
+    expect(out).toEqual(['src/shallow.ts', 'src/a/deep.ts']);
   });
 
   it('excludes vendored and generated paths, which a newcomer must never be sent to', () => {
@@ -170,6 +185,37 @@ describe('L06 candidates — the no-graph heuristic (AC-57)', () => {
     ]) {
       expect(out).not.toContain(junk);
     }
+  });
+
+  it('excludes everything the ranked path excludes: tests, configs, generated files, lockfiles', () => {
+    // The graph-having path is filtered twice (index-time and read-time); this
+    // one is filtered only here, so anything repo-intel's junk filter drops
+    // must be dropped here too — otherwise an UNINDEXED repository is the one
+    // that shows a newcomer `tsconfig.json` as a file that matters.
+    const listing = [
+      'src/server.ts',
+      'src/server.test.ts',
+      'src/routes/public.spec.ts',
+      '__tests__/smoke.ts',
+      'tsconfig.json',
+      'jest.config.js',
+      'vitest.config.ts',
+      '.eslintrc.js',
+      'src/types/generated.d.ts',
+      'db/migrations/0001_init.sql',
+      'pnpm-lock.yaml',
+      'package-lock.json',
+      'yarn.lock',
+    ];
+    const out = heuristicCandidates(listing, 20);
+
+    expect(out).toEqual(['src/server.ts']);
+  });
+
+  it('excludes junk whatever its case', () => {
+    expect(heuristicCandidates(['src/Server.ts', 'src/Server.Test.ts'], 10)).toEqual([
+      'src/Server.ts',
+    ]);
   });
 
   it('respects the limit it is given', () => {

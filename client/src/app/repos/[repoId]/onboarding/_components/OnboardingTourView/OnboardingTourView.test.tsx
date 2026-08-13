@@ -317,6 +317,24 @@ describe("L06 OnboardingTourView — cost and degradation (AC-53, AC-54, AC-58, 
     expect(screen.getByText(/GitHub issues could not be read/)).toBeInTheDocument();
   });
 
+  it("states a clone that could not be read as its own reason, in words (AC-59, AC-63)", () => {
+    // A reason the header has no sentence for renders as its raw key, which is
+    // the only way this degradation reaches a user as jargon rather than as an
+    // explanation. It is also the one reason that means "no facts at all", so
+    // it must not be mistaken for the model failing.
+    page.tour = {
+      ...TOUR,
+      status: "degraded",
+      degraded_reasons: ["clone_unavailable"],
+    };
+    renderView();
+
+    expect(screen.getByText(/The repository's clone could not be read/)).toBeInTheDocument();
+    expect(screen.queryByText(/clone_unavailable/)).not.toBeInTheDocument();
+    // AC-60: the control on a degraded tour is Retry, whatever degraded it.
+    expect(screen.getByRole("button", { name: /Retry/ })).toBeInTheDocument();
+  });
+
   it("marks a section computed without the import graph, in words", () => {
     page.tour = {
       ...TOUR,

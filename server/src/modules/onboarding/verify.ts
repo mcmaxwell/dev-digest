@@ -17,7 +17,7 @@ import {
   MAX_RUN_STEPS,
 } from './constants.js';
 import type { OnboardingDraft } from './schemas.js';
-import type { MarkerRow } from './types.js';
+import type { GraphSignals, MarkerRow } from './types.js';
 
 /**
  * L06 — grounding the model's output. PURE over an injected `exists(path)`, so
@@ -28,8 +28,15 @@ import type { MarkerRow } from './types.js';
  * place a model-authored path can become a link.
  */
 
-/** The two sections that cannot be built without the import graph. */
-const GRAPH_DEPENDENT = new Set<OnboardingSectionKind>(['critical_paths', 'reading_path']);
+/**
+ * The two sections that cannot be built without the import graph, each mapped
+ * to the half of it that it actually needs: the reading path needs a RANKING,
+ * critical paths need EDGES. Every other kind is graph-independent.
+ */
+const GRAPH_DEPENDENT: Partial<Record<OnboardingSectionKind, keyof GraphSignals>> = {
+  reading_path: 'reading',
+  critical_paths: 'critical',
+};
 
 export interface VerifyContext {
   /** Does this repo-relative path exist in the clone at `headSha`? */
@@ -46,7 +53,7 @@ export interface VerifyContext {
   markers: MarkerRow[];
   /** Issue numbers the label query actually returned. */
   issueNumbers: Set<number>;
-  usedGraph: boolean;
+  usedGraph: GraphSignals;
 }
 
 export interface VerifiedDraft {
@@ -65,13 +72,18 @@ export interface VerifiedDraft {
  * that is true whether or not the heuristic then found anything. The page still
  * renders an empty line when a section has no content, because it derives that
  * from the content rather than from this status.
+ *
+ * The signal is taken PER SECTION: a repository can have a usable ranking and
+ * no usable chains at the same time, and reporting `empty` for the chains would
+ * read as "we looked and found nothing" rather than "there is no import graph".
  */
 export function sectionStatus(
   kind: OnboardingSectionKind,
   hasContent: boolean,
-  usedGraph: boolean,
+  usedGraph: GraphSignals,
 ): OnboardingSectionStatus {
-  if (GRAPH_DEPENDENT.has(kind) && !usedGraph) return 'no_graph';
+  const half = GRAPH_DEPENDENT[kind];
+  if (half && !usedGraph[half]) return 'no_graph';
   return hasContent ? 'ok' : 'empty';
 }
 
@@ -168,24 +180,40 @@ function linkOutsideFences(text: string, ctx: VerifyContext): string {
  * synchronous `exists`. That split is what keeps the whole verification pass
  * pure and testable without a repository, while still checking every claim
  * against the real thing.
+ *
+ * ORDER IS LOAD-BEARING. The probe budget (`MAX_PATH_PROBES`) is a prefix of
+ * this list, so whatever comes first is what gets checked. Rows, sources and
+ * links are capped by the draft schema; a `body` is not, so a chatty
+ * architecture section full of inline-code file mentions could exhaust the
+ * budget before a single `run_locally` source was probed — and those real,
+ * checkable citations would then fail `exists` and be dropped as if they had
+ * been invented (AC-24, AC-25). The bounded citations therefore go first,
+ * across ALL five sections, and prose fills whatever is left.
  */
 export function collectDraftPaths(draft: OnboardingDraft): string[] {
-  const out = new Set<string>();
-  const add = (p: string | null | undefined) => {
-    if (typeof p === 'string' && looksLikePath(p)) out.add(p);
+  const cited = new Set<string>();
+  const prose = new Set<string>();
+  const add = (into: Set<string>, p: string | null | undefined) => {
+    if (typeof p === 'string' && looksLikePath(p)) into.add(p);
   };
 
-  for (const section of Object.values(draft) as Record<string, unknown>[]) {
-    for (const link of (section.links as { path?: string }[] | undefined) ?? []) add(link.path);
-    if (typeof section.body === 'string') {
-      for (const path of prosePaths(section.body)) add(path);
+  const sections = Object.values(draft) as Record<string, unknown>[];
+  for (const section of sections) {
+    for (const link of (section.links as { path?: string }[] | undefined) ?? []) {
+      add(cited, link.path);
     }
     for (const item of (section.items as Record<string, unknown>[] | undefined) ?? []) {
-      add(item.path as string | undefined);
-      add(item.source as string | undefined);
+      add(cited, item.path as string | undefined);
+      add(cited, item.source as string | undefined);
     }
   }
-  return [...out];
+  for (const section of sections) {
+    if (typeof section.body === 'string') {
+      for (const path of prosePaths(section.body)) add(prose, path);
+    }
+  }
+
+  return [...cited, ...[...prose].filter((p) => !cited.has(p))];
 }
 
 /** Path-shaped inline-code spans in a body, outside fenced code blocks. */

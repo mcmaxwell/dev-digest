@@ -35,7 +35,7 @@ const NO_CANDIDATES: CandidateSets = {
   critical: [],
   markers: [],
   issues: [],
-  usedGraph: true,
+  usedGraph: { reading: true, critical: true },
 };
 
 const FIVE_IN_ORDER = [
@@ -193,7 +193,7 @@ describe('L06 skeleton — no import graph (AC-57, AC-58)', () => {
   const sections = build(
     {},
     {
-      usedGraph: false,
+      usedGraph: { reading: false, critical: false },
       reading: ['src/index.ts', 'src/routes/public.ts'],
       critical: ['src/index.ts'],
     },
@@ -248,7 +248,7 @@ describe('L06 skeleton — merging the model onto the deterministic base (AC-18,
     const merged = mergeSections(
       base,
       [modelSection({ kind: 'architecture', title: 'What this is', body: 'A payments API.' })],
-      true,
+      { reading: true, critical: true },
     );
 
     expect(merged.map((s) => s.kind)).toEqual(FIVE_IN_ORDER);
@@ -259,7 +259,7 @@ describe('L06 skeleton — merging the model onto the deterministic base (AC-18,
     const merged = mergeSections(
       base,
       [modelSection({ kind: 'run_locally', title: 'How to run locally', body: '', items: [] })],
-      true,
+      { reading: true, critical: true },
     );
 
     const run = merged.find((s) => s.kind === 'run_locally')!;
@@ -274,7 +274,7 @@ describe('L06 skeleton — merging the model onto the deterministic base (AC-18,
     const merged = mergeSections(
       bare,
       [modelSection({ kind: 'first_tasks', title: '', body: '', items: [] })],
-      true,
+      { reading: true, critical: true },
     );
 
     const tasks = merged.find((s) => s.kind === 'first_tasks')!;
@@ -284,7 +284,10 @@ describe('L06 skeleton — merging the model onto the deterministic base (AC-18,
   });
 
   it('keeps the no-graph marker after a merge', () => {
-    const noGraph = build({}, { usedGraph: false, reading: ['src/index.ts'] });
+    const noGraph = build(
+      {},
+      { usedGraph: { reading: false, critical: false }, reading: ['src/index.ts'] },
+    );
     const merged = mergeSections(
       noGraph,
       [
@@ -295,7 +298,7 @@ describe('L06 skeleton — merging the model onto the deterministic base (AC-18,
           items: [{ order: 1, path: 'src/index.ts', reason: 'The entry point.' }],
         }),
       ],
-      false,
+      { reading: false, critical: false },
     );
 
     expect(merged.find((s) => s.kind === 'reading_path')!.status).toBe('no_graph');

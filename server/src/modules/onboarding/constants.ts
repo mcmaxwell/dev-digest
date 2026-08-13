@@ -1,4 +1,7 @@
 import type { OnboardingSectionKind } from '@devdigest/shared';
+// Cross-module constant import, which `no-cross-module-imports` permits: the
+// junk-path knowledge has ONE owner (repo-intel) and two consumers.
+import { JUNK_PATH_PATTERNS } from '../repo-intel/constants.js';
 
 /**
  * L06 — every budget, cap and fixed list the onboarding tour depends on, in one
@@ -66,9 +69,9 @@ export const MAX_ISSUES = 20;
 
 /**
  * How deep into the file ranking a first task may be found. The marker grep is
- * filtered to this candidate set, which is what applies the junk-path filter
- * without importing `isJunkPath` — and the price is that a genuine `TODO` in a
- * file ranked below this is invisible. Raising it is free.
+ * filtered to this candidate set, which is what keeps a `TODO` inside a
+ * vendored dependency out of the tour — and the price is that a genuine `TODO`
+ * in a file ranked below this is invisible. Raising it is free.
  */
 export const MAX_RANKED_FILES = 200;
 
@@ -155,22 +158,37 @@ export const STACK_BY_MANIFEST: Record<string, string> = {
 export const MAX_README_LINES = 120;
 
 /**
- * Paths the no-graph heuristic drops. `git ls-files` already excludes ignored
- * output, but a vendored dependency can be TRACKED — and putting a
- * `node_modules` file in front of a newcomer is exactly the failure the
- * ranking's junk filter exists to prevent.
+ * Paths the no-graph heuristic drops.
+ *
+ * The graph-having path is filtered TWICE — at index time by `EXCLUDED_DIRS`
+ * and at read time by repo-intel's junk filter — while this path has neither,
+ * so a re-typed, narrower list is how a `*.test.ts`, a `tsconfig.json` or a
+ * `.d.ts` ends up in front of a newcomer as a "critical path". The shared
+ * knowledge is therefore IMPORTED from `repo-intel/constants.ts` (a module's
+ * constants are an exempt cross-module import; its `service.ts`, where
+ * `isJunkPath` lives, is not) and only the genuinely onboarding-specific
+ * additions stay local.
+ *
+ * Local additions: `git ls-files` already excludes ignored output, but a
+ * vendored dependency can be TRACKED, and lockfiles sit at root depth where the
+ * heuristic's own signals cannot push them down. `.lock` alone misses the two
+ * commonest ones, so both are named.
+ *
+ * Matched case-insensitively, so every entry is lowercase.
  */
 export const HEURISTIC_EXCLUDE_PATTERNS: readonly string[] = [
+  ...JUNK_PATH_PATTERNS,
   'node_modules/',
   'vendor/',
   'third_party/',
   'dist/',
   'build/',
-  '.min.',
-  '.lock',
   'fixtures/',
   '__snapshots__/',
-] as const;
+  '.lock',
+  'pnpm-lock.yaml',
+  'package-lock.json',
+];
 
 /** Basenames that read as a program's front door. */
 export const ENTRY_POINT_NAMES: readonly string[] = [

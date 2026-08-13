@@ -113,9 +113,12 @@ function markerTitle(m: MarkerRow): string {
  * can list a clone's files.
  */
 export function heuristicCandidates(files: string[], limit: number): string[] {
-  const kept = files.filter(
-    (p) => p.length > 0 && !HEURISTIC_EXCLUDE_PATTERNS.some((pat) => p.includes(pat)),
-  );
+  // Lowercased before matching, the way repo-intel's own junk filter matches —
+  // otherwise `Src/Foo.Test.ts` slips past a filter that stopped `foo.test.ts`.
+  const kept = files.filter((p) => {
+    const lower = p.toLowerCase();
+    return p.length > 0 && !HEURISTIC_EXCLUDE_PATTERNS.some((pat) => lower.includes(pat));
+  });
 
   // Directory prominence: how much of the repository lives under each
   // top-level directory. A newcomer should be pointed at the busy one.
@@ -125,17 +128,21 @@ export function heuristicCandidates(files: string[], limit: number): string[] {
     perDir.set(dir, (perDir.get(dir) ?? 0) + 1);
   }
 
-  const scored = kept.map((path, i) => ({
+  const scored = kept.map((path) => ({
     path,
-    i,
-    score:
-      (perDir.get(topLevelDir(path)) ?? 0) +
-      (isEntryPoint(path) ? 500 : 0) -
-      depthOf(path) * 5,
+    depth: depthOf(path),
+    score: (perDir.get(topLevelDir(path)) ?? 0) + (isEntryPoint(path) ? 500 : 0),
   }));
 
+  // AC-57 names exactly two signals — directory prominence and entry-point
+  // naming — so depth is a TIE-BREAK, not a third term. As a term it inverted
+  // the two it was meant to refine: one shallow file under a sparse directory
+  // outscored five under the busiest one.
   return scored
-    .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.path.localeCompare(b.path)))
+    .sort(
+      (a, b) =>
+        b.score - a.score || a.depth - b.depth || a.path.localeCompare(b.path),
+    )
     .slice(0, limit)
     .map((r) => r.path);
 }

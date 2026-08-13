@@ -47,7 +47,9 @@ import type {
 } from './types.js';
 import {
   BFS_DEPTH,
+  CONFIG_PATH_PATTERNS,
   DEFAULT_REPO_MAP_TOKEN_BUDGET,
+  GENERATED_PATH_PATTERNS,
   INDEX_JOB_KIND,
   INDEXER_VERSION,
   MAX_CALLERS_PER_SYMBOL,
@@ -56,6 +58,7 @@ import {
   REVERSE_FANOUT_PER_LEVEL,
   REVERSE_MAX_EDGES,
   SUPPORTED_EXT,
+  TEST_PATH_PATTERNS,
 } from './constants.js';
 import { SCAN_JOB_KIND } from '../project-context/constants.js';
 import { runFullIndex, type IndexPayload } from './pipeline/full.js';
@@ -888,35 +891,10 @@ export class RepoIntelService implements RepoIntel {
 const CRITICAL_PATH_ROOTS = 5;
 
 /**
- * Path kinds excluded from rank-driven file samples (conventions/onboarding).
- *
- * Split into three predicates rather than one `isJunkPath` blob because the
- * conventions sampler needs to ASK FOR tests (a stratum of its own) while still
- * excluding configs and generated output. `isJunkPath` = the union, and is what
- * `getTopFilesByRank` (onboarding, conventions samples) keeps using.
+ * The three lists live in `constants.ts` — onboarding's no-graph heuristic
+ * needs the same knowledge and may import a module's constants, but not its
+ * service. The predicates stay here, where they are used.
  */
-const TEST_PATH_PATTERNS = [
-  '.test.',
-  '.spec.',
-  '__tests__/',
-  '__mocks__/',
-  '/test/',
-  '/tests/',
-  '/__fixtures__/',
-  '/e2e/',
-] as const;
-
-const CONFIG_PATH_PATTERNS = [
-  '.config.',
-  'vitest.',
-  'jest.',
-  'eslint',
-  'prettier',
-  'tsconfig',
-] as const;
-
-const GENERATED_PATH_PATTERNS = ['.d.ts', '/migrations/', '/dist/', '/build/', '.min.'] as const;
-
 function matchesAny(path: string, patterns: readonly string[]): boolean {
   const lower = path.toLowerCase();
   return patterns.some((p) => lower.includes(p));

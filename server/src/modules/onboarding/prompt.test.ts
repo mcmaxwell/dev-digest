@@ -36,7 +36,7 @@ const EMPTY_CANDIDATES: CandidateSets = {
   critical: [],
   markers: [],
   issues: [],
-  usedGraph: true,
+  usedGraph: { reading: true, critical: true },
 };
 
 function input(over: Partial<PromptInput> = {}): PromptInput {
@@ -160,7 +160,7 @@ describe('L06 prompt — the trust boundary (AC-64, AC-65)', () => {
     critical: ['src/middleware/auth.ts'],
     markers: [{ path: 'src/lib/redis.ts', line: 7, text: 'TODO: backoff' }],
     issues: [{ number: 311, title: 'Document the rate-limit headers' }],
-    usedGraph: true,
+    usedGraph: { reading: true, critical: true },
   };
 
   const assembled = assemblePrompt(

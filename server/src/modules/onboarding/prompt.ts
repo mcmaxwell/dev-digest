@@ -76,7 +76,10 @@ function buildSections(input: PromptInput, excerpts: Excerpt[]): PromptSection[]
       `Repository: ${input.repoFullName}`,
       `Commit: ${input.headSha}`,
       `Indexed files: ${input.filesIndexed} (skipped ${input.filesSkipped})`,
-      `Import graph available: ${candidates.usedGraph ? 'yes' : 'no'}`,
+      // Stated per section, because the two halves are lost separately: a
+      // repository can have a usable file ranking and no usable chains.
+      `File ranking available: ${candidates.usedGraph.reading ? 'yes' : 'no'}`,
+      `Dependency chains available: ${candidates.usedGraph.critical ? 'yes' : 'no'}`,
     ].join('\n'),
   });
 

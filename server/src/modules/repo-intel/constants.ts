@@ -25,6 +25,60 @@ export const EXCLUDED_DIRS = [
   '.git',
 ] as const;
 
+// --- Junk paths -------------------------------------------------------------
+/**
+ * Path kinds excluded from rank-driven file samples (conventions, onboarding).
+ *
+ * Split into three lists rather than one blob because the conventions sampler
+ * needs to ASK FOR tests (a stratum of its own) while still excluding configs
+ * and generated output; `JUNK_PATH_PATTERNS` is the union, and is what
+ * `getTopFilesByRank` applies.
+ *
+ * They live in `constants.ts` rather than beside their predicates in
+ * `service.ts` because a second module needs the same knowledge: onboarding's
+ * no-graph heuristic has no ranked input to inherit the filter from, and
+ * `no-cross-module-imports` exempts only another module's `service.ts`,
+ * `types.ts` or `constants.ts` — of which this is the one that may hold data.
+ * A re-typed copy there was materially narrower and let test files and configs
+ * in front of a newcomer.
+ *
+ * Every pattern is lowercase; matching lowercases the path first.
+ */
+export const TEST_PATH_PATTERNS = [
+  '.test.',
+  '.spec.',
+  '__tests__/',
+  '__mocks__/',
+  '/test/',
+  '/tests/',
+  '/__fixtures__/',
+  '/e2e/',
+] as const;
+
+export const CONFIG_PATH_PATTERNS = [
+  '.config.',
+  'vitest.',
+  'jest.',
+  'eslint',
+  'prettier',
+  'tsconfig',
+] as const;
+
+export const GENERATED_PATH_PATTERNS = [
+  '.d.ts',
+  '/migrations/',
+  '/dist/',
+  '/build/',
+  '.min.',
+] as const;
+
+/** The union: nothing matching this may be shown as a file that matters. */
+export const JUNK_PATH_PATTERNS: readonly string[] = [
+  ...TEST_PATH_PATTERNS,
+  ...CONFIG_PATH_PATTERNS,
+  ...GENERATED_PATH_PATTERNS,
+];
+
 // --- Read-time limits -------------------------------------------------------
 /**
  * [T1] Caller fan-out cap PER CHANGED SYMBOL.

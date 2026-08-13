@@ -60,12 +60,22 @@ export type OnboardingSectionKind = z.infer<typeof OnboardingSectionKind>;
 export const OnboardingSectionStatus = z.enum(['ok', 'empty', 'no_graph']);
 export type OnboardingSectionStatus = z.infer<typeof OnboardingSectionStatus>;
 
+/**
+ * Why a stored tour is less than a full one.
+ *
+ * `clone_unavailable` is deliberately NOT folded into `model_failed`: the
+ * generation runs on a queue, so the clone the request checked can be mid-resync
+ * or gone by the time the job reads it, and reporting that as a model failure
+ * would blame the model for a disk. It is the only reason that means "no facts
+ * were collected at all".
+ */
 export const OnboardingDegradedReason = z.enum([
   'no_index',
   'partial_index',
   'repo_too_large',
   'model_failed',
   'issues_unavailable',
+  'clone_unavailable',
 ]);
 export type OnboardingDegradedReason = z.infer<typeof OnboardingDegradedReason>;
 

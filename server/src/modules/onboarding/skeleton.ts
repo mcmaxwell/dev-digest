@@ -8,7 +8,7 @@ import {
 } from './constants.js';
 import { firstTaskCandidates } from './candidates.js';
 import { sectionStatus } from './verify.js';
-import type { CandidateSets, DeterministicFacts } from './types.js';
+import type { CandidateSets, DeterministicFacts, GraphSignals } from './types.js';
 
 /**
  * L06 — the deterministic tour. PURE.
@@ -65,7 +65,7 @@ export function deterministicSections(input: SkeletonInput): OnboardingSection[]
 
   const criticalItems = candidates.critical.slice(0, MAX_CRITICAL_PATHS).map((path) => ({
     path,
-    reason: candidates.usedGraph
+    reason: candidates.usedGraph.critical
       ? 'On a dependency chain from the repository’s highest-ranked files.'
       : 'Prominent by directory size and entry-point naming (no import graph available).',
     rank_percentile: rankPercentile(path),
@@ -96,7 +96,7 @@ export function deterministicSections(input: SkeletonInput): OnboardingSection[]
   const readingItems = candidates.reading.slice(0, MAX_READING_ENTRIES).map((path, i) => ({
     order: i + 1,
     path,
-    reason: candidates.usedGraph
+    reason: candidates.usedGraph.reading
       ? 'Ranked highly by the repository’s PageRank-derived file rank.'
       : 'Prominent by directory size and entry-point naming (no import graph available).',
   }));
@@ -161,7 +161,7 @@ function buildArchitectureBody(facts: DeterministicFacts): string {
 export function mergeSections(
   base: OnboardingSection[],
   verified: OnboardingSection[],
-  usedGraph: boolean,
+  usedGraph: GraphSignals,
 ): OnboardingSection[] {
   const byKind = new Map(verified.map((s) => [s.kind, s]));
   return base.map((fallback) => {
@@ -174,7 +174,7 @@ export function mergeSections(
 function mergeOne(
   fallback: OnboardingSection,
   model: OnboardingSection,
-  usedGraph: boolean,
+  usedGraph: GraphSignals,
 ): OnboardingSection {
   const body = model.body.trim().length > 0 ? model.body : fallback.body;
   const title = model.title.trim().length > 0 ? model.title : fallback.title;

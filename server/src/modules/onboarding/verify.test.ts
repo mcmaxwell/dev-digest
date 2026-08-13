@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { guardDiagram, linkProsePaths, sectionStatus, verifyDraft, type VerifyContext } from './verify.js';
+import { MAX_PATH_PROBES } from './constants.js';
+import {
+  collectDraftPaths,
+  guardDiagram,
+  linkProsePaths,
+  sectionStatus,
+  verifyDraft,
+  type VerifyContext,
+} from './verify.js';
 import type { OnboardingDraft } from './schemas.js';
 import type { MarkerRow } from './types.js';
 
@@ -52,7 +60,7 @@ function ctx(over: Partial<VerifyContext> = {}): VerifyContext {
     rankPercentile: (p) => (p === 'src/middleware/auth.ts' ? 0.97 : null),
     markers: MARKERS,
     issueNumbers: new Set([311]),
-    usedGraph: true,
+    usedGraph: { reading: true, critical: true },
     ...over,
   };
 }
@@ -217,6 +225,105 @@ describe('L06 verify — run steps (AC-24, AC-25)', () => {
     const result = verifyDraft(draft({ run_locally: { title: '', body: '', links: [], items } }), ctx());
 
     expect(section(result.sections, 'run_locally').items).toHaveLength(12);
+  });
+});
+
+describe('L06 verify — what gets probed against the clone (AC-24, AC-25, AC-32)', () => {
+  /**
+   * The service probes the FIRST `MAX_PATH_PROBES` of this list and treats
+   * everything it did not probe as non-existent. AC-24 and AC-25 require a run
+   * step to survive on its cited source existing — so a verbose body, which the
+   * draft schema does not cap, must never be able to starve that citation.
+   */
+  it('probes a run step’s cited source even when prose named more paths than the budget', () => {
+    const chatty = Array.from({ length: MAX_PATH_PROBES + 50 }, (_, i) => `src/prose${i}.ts`)
+      .map((p) => `\`${p}\``)
+      .join(' and ');
+
+    const collected = collectDraftPaths(
+      draft({
+        architecture: { title: '', body: chatty, links: [], diagram: null },
+        run_locally: {
+          title: '',
+          body: '',
+          links: [],
+          // A path-shaped source: `looksLikePath` needs a slash or a suffix, so
+          // an extension-less `Makefile` is never a probe candidate at all — it
+          // survives on being a fact file the collector already read.
+          items: [{ command: 'npm run dev', source: 'package.json' }],
+        },
+        first_tasks: {
+          title: '',
+          body: '',
+          links: [],
+          items: [
+            {
+              title: 'Rotate the signing key',
+              origin: 'todo',
+              path: 'src/middleware/auth.ts',
+              line: 42,
+              issue_number: null,
+            },
+          ],
+        },
+      }),
+    );
+
+    const probed = collected.slice(0, MAX_PATH_PROBES);
+    expect(probed).toContain('package.json');
+    expect(probed).toContain('src/middleware/auth.ts');
+    // …and the prose was not dropped, only queued behind them.
+    expect(collected).toContain('src/prose0.ts');
+    expect(collected.length).toBeGreaterThan(MAX_PATH_PROBES);
+  });
+
+  it('puts every section’s links and rows ahead of every section’s prose', () => {
+    const collected = collectDraftPaths(
+      draft({
+        architecture: {
+          title: '',
+          body: 'The queue lives in `src/prose-only.ts`.',
+          links: [{ label: 'Entry point', path: 'src/server.ts' }],
+          diagram: null,
+        },
+        // Last section in schema order: its cited path still outranks the
+        // prose of the first.
+        first_tasks: {
+          title: '',
+          body: '',
+          links: [],
+          items: [
+            {
+              title: 'Rotate the signing key',
+              origin: 'todo',
+              path: 'src/middleware/auth.ts',
+              line: 42,
+              issue_number: null,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(collected.indexOf('src/middleware/auth.ts')).toBeLessThan(
+      collected.indexOf('src/prose-only.ts'),
+    );
+    expect(collected.indexOf('src/server.ts')).toBeLessThan(collected.indexOf('src/prose-only.ts'));
+  });
+
+  it('lists a path named in both a row and the prose exactly once', () => {
+    const collected = collectDraftPaths(
+      draft({
+        run_locally: {
+          title: '',
+          body: 'Read `package.json` first.',
+          links: [],
+          items: [{ command: 'npm run dev', source: 'package.json' }],
+        },
+      }),
+    );
+
+    expect(collected.filter((p) => p === 'package.json')).toHaveLength(1);
   });
 });
 
@@ -452,7 +559,7 @@ describe('L06 verify — the diagram (AC-20, AC-21)', () => {
 
 describe('L06 verify — section status (AC-19, AC-58)', () => {
   it('marks the two graph-dependent sections when there was no import graph', () => {
-    const result = verifyDraft(draft(), ctx({ usedGraph: false }));
+    const result = verifyDraft(draft(), ctx({ usedGraph: { reading: false, critical: false } }));
     const byKind = Object.fromEntries(result.sections.map((s) => [s.kind, s.status]));
 
     expect(byKind.critical_paths).toBe('no_graph');
@@ -475,9 +582,34 @@ describe('L06 verify — section status (AC-19, AC-58)', () => {
   });
 
   it('is `ok` only when the section actually carries something', () => {
-    expect(sectionStatus('run_locally', true, true)).toBe('ok');
-    expect(sectionStatus('run_locally', false, true)).toBe('empty');
-    expect(sectionStatus('reading_path', true, false)).toBe('no_graph');
+    const graph = { reading: true, critical: true };
+    expect(sectionStatus('run_locally', true, graph)).toBe('ok');
+    expect(sectionStatus('run_locally', false, graph)).toBe('empty');
+    expect(sectionStatus('reading_path', true, { reading: false, critical: false })).toBe('no_graph');
+  });
+
+  /**
+   * AC-57 names the import graph as the thing the fallback replaces, and AC-58
+   * asks for the marker on the sections BUILT WITHOUT IT. The two sections lose
+   * it separately — the reading path needs a ranking, critical paths need
+   * dependency chains — so the marker is per section, not per generation.
+   */
+  it('marks critical paths without the graph while the reading path keeps its ranking', () => {
+    const result = verifyDraft(
+      draft({
+        reading_path: {
+          title: '',
+          body: '',
+          links: [],
+          items: [{ path: 'src/server.ts', reason: 'Where a request enters.' }],
+        },
+      }),
+      ctx({ usedGraph: { reading: true, critical: false } }),
+    );
+    const byKind = Object.fromEntries(result.sections.map((s) => [s.kind, s.status]));
+
+    expect(byKind.critical_paths).toBe('no_graph');
+    expect(byKind.reading_path).toBe('ok');
   });
 });
 

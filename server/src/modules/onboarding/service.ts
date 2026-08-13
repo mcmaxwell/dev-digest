@@ -55,8 +55,10 @@ import type {
   AssembledPrompt,
   CandidateSets,
   CollectedFacts,
+  DeterministicFacts,
   Excerpt,
   FactFile,
+  GraphSignals,
   InFlight,
   IssueRow,
   MarkerRow,
@@ -169,17 +171,17 @@ export class OnboardingService {
    * arriving while the first is still QUEUED is refused too, instead of being
    * queued behind it. It is released when the job settles, whatever way it
    * settles.
+   *
+   * The claim is the FIRST thing this method does, before any `await`. Fastify
+   * interleaves concurrent requests on the event loop, so a check placed after
+   * the repository read and the clone probe is a TOCTOU race: two requests
+   * arriving close together — a double click, two open tabs — would both finish
+   * their reads, both see an empty slot, and both enqueue a paid generation.
+   * `has` + `set` with nothing awaited between them is the only atomic pair
+   * available in a single-threaded runtime, so every other check moves INSIDE
+   * the claim and every early exit releases it (AC-16).
    */
   async requestGeneration(workspaceId: string, repoId: string): Promise<OnboardingPage> {
-    const repo = await this.requireRepo(workspaceId, repoId);
-    const ref: RepoRef = { owner: repo.owner, name: repo.name };
-    if (!repo.clonePath || !(await this.currentHeadOrNull(ref))) {
-      throw new AppError(
-        'clone_missing',
-        'The repository has no clone on disk yet — a tour cannot be generated',
-        409,
-      );
-    }
     if (this.inFlight.has(repoId)) {
       throw new AppError(
         'generation_in_progress',
@@ -196,6 +198,16 @@ export class OnboardingService {
     this.inFlight.set(repoId, slot);
 
     try {
+      const repo = await this.requireRepo(workspaceId, repoId);
+      const ref: RepoRef = { owner: repo.owner, name: repo.name };
+      if (!repo.clonePath || !(await this.currentHeadOrNull(ref))) {
+        throw new AppError(
+          'clone_missing',
+          'The repository has no clone on disk yet — a tour cannot be generated',
+          409,
+        );
+      }
+
       const job = await this.container.jobs.enqueue(workspaceId, GENERATE_JOB_KIND, {
         workspaceId,
         repoId,
@@ -203,7 +215,9 @@ export class OnboardingService {
       slot.promise = job.done.catch(() => undefined);
       void slot.promise.finally(() => this.inFlight.delete(repoId));
     } catch (err) {
-      // Nothing will ever run, so nothing must ever be blocked by it.
+      // Nothing will ever run — an unknown repository, a clone that is not
+      // there, a queue that refused the job — so nothing must ever be blocked
+      // by it.
       this.inFlight.delete(repoId);
       throw err;
     }
@@ -217,6 +231,12 @@ export class OnboardingService {
    * Generate, verify and persist one tour. Never throws for a modelling
    * failure: a failed call persists the deterministic skeleton as `degraded`,
    * which is what the page renders and what a Retry replaces.
+   *
+   * A failure of the DETERMINISTIC pass resolves the same way. `requestGeneration`
+   * checks the clone, but the job runs LATER on a queue, and by then the clone can
+   * be mid-resync or gone — so `collectFacts` throwing must still leave a
+   * persisted, readable, honestly-labelled tour behind rather than a failed job
+   * and no row at all (AC-60, AC-61, AC-63).
    */
   async generate(workspaceId: string, repoId: string): Promise<void> {
     const started = Date.now();
@@ -224,7 +244,17 @@ export class OnboardingService {
     const repo = await this.requireRepo(workspaceId, repoId);
     const ref: RepoRef = { owner: repo.owner, name: repo.name };
 
-    const collected = await this.collectFacts(repoId, ref);
+    let collected: CollectedFacts;
+    let factsFailure: string | null = null;
+    try {
+      collected = await this.collectFacts(repoId, ref);
+    } catch (err) {
+      // `clone_unavailable`, not `model_failed`: no call was made, and blaming
+      // the model for a clone that went away is a lie the reader cannot check.
+      factsFailure = scrubSecrets(err instanceof Error ? err.message : String(err));
+      collected = this.noFacts();
+    }
+
     const base = deterministicSections({
       facts: collected.facts,
       candidates: collected.candidates,
@@ -242,85 +272,94 @@ export class OnboardingService {
     let droppedRows = 0;
     let droppedSteps = 0;
     let assembled: AssembledPrompt | null = null;
-    let failure: string | null = null;
+    let failure: string | null = factsFailure;
 
-    try {
-      this.setPhase(repoId, 'model');
-      assembled = await this.assembleWithinBudget(repoId, collected, repo.fullName);
+    // The model is asked NOTHING when the deterministic pass collected nothing:
+    // there would be no repository to ground its answer against, and every path
+    // it named would be dropped by verification anyway. `usage` then stays null,
+    // which the page renders as "no usage was recorded" rather than a zero call.
+    if (factsFailure === null) {
+      try {
+        this.setPhase(repoId, 'model');
+        assembled = await this.assembleWithinBudget(repoId, collected, repo.fullName);
 
-      const system = await this.renderSystemPrompt();
-      // Metadata-only, emitted BEFORE the call so it survives a provider
-      // failure. `logPromptAssembly` takes text and returns only measurements,
-      // so no file content and no model output can reach a log by construction.
-      logPromptAssembly(
-        this.logger,
-        this.container.config.promptLog,
-        { correlationId, call: 'onboarding', provider, model },
-        [{ section: 'system', source: 'prompts/onboarding.system.md', text: system }, ...assembled.sections],
-        (text) => this.container.tokenizer.count(text),
-      );
-
-      const llm = await this.container.llm(provider as Provider);
-      // EXACTLY ONE call. Deliberately NOT wrapped in `withRetry`: that would
-      // re-issue the whole call and break the one-call property this feature
-      // exists to demonstrate. The provider's own repair loop runs
-      // `maxRetries + 1` attempts, which bounds `attempts` at 3.
-      const res = await withTimeout(
-        llm.completeStructured({
-          model,
-          schema: OnboardingDraft,
-          schemaName: ONBOARDING_SCHEMA_NAME,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: assembled.user },
+        const system = await this.renderSystemPrompt();
+        // Metadata-only, emitted BEFORE the call so it survives a provider
+        // failure. `logPromptAssembly` takes text and returns only measurements,
+        // so no file content and no model output can reach a log by construction.
+        logPromptAssembly(
+          this.logger,
+          this.container.config.promptLog,
+          { correlationId, call: 'onboarding', provider, model },
+          [
+            { section: 'system', source: 'prompts/onboarding.system.md', text: system },
+            ...assembled.sections,
           ],
-          maxRetries: MAX_SCHEMA_REPAIRS,
-        }),
-        MODEL_TIMEOUT_MS,
-      );
+          (text) => this.container.tokenizer.count(text),
+        );
 
-      this.setPhase(repoId, 'verifying');
-      const known = await this.probePaths(ref, collected, res.data);
-      const verified = verifyDraft(res.data, {
-        exists: (p) => known.has(p),
-        repoFullName: repo.fullName,
-        headSha: collected.headSha,
-        readingCandidates: new Set(collected.candidates.reading),
-        criticalCandidates: new Set(collected.candidates.critical),
-        rankPercentile: (p) => collected.rankPercentile.get(p) ?? null,
-        markers: collected.candidates.markers,
-        issueNumbers: new Set(collected.candidates.issues.map((i) => i.number)),
-        usedGraph: collected.candidates.usedGraph,
-      });
+        const llm = await this.container.llm(provider as Provider);
+        // EXACTLY ONE call. Deliberately NOT wrapped in `withRetry`: that would
+        // re-issue the whole call and break the one-call property this feature
+        // exists to demonstrate. The provider's own repair loop runs
+        // `maxRetries + 1` attempts, which bounds `attempts` at 3.
+        const res = await withTimeout(
+          llm.completeStructured({
+            model,
+            schema: OnboardingDraft,
+            schemaName: ONBOARDING_SCHEMA_NAME,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: assembled.user },
+            ],
+            maxRetries: MAX_SCHEMA_REPAIRS,
+          }),
+          MODEL_TIMEOUT_MS,
+        );
 
-      sections = mergeSections(base, verified.sections, collected.candidates.usedGraph);
-      droppedRows = verified.droppedRows;
-      droppedSteps = verified.droppedSteps;
-      usage = {
-        calls: 1,
-        provider,
-        model: res.model,
-        tokens_in: res.tokensIn,
-        tokens_out: res.tokensOut,
-        cost_usd: res.costUsd,
-        attempts: res.attempts,
-        duration_ms: Date.now() - started,
-      };
-    } catch (err) {
-      // A failure, a timeout, or output that could not be repaired: the
-      // deterministic skeleton IS the tour, and the page offers Retry.
-      failure = scrubSecrets(err instanceof Error ? err.message : String(err));
-      reasons.push('model_failed');
-      usage = {
-        calls: 1,
-        provider,
-        model,
-        tokens_in: null,
-        tokens_out: null,
-        cost_usd: null,
-        attempts: 1,
-        duration_ms: Date.now() - started,
-      };
+        this.setPhase(repoId, 'verifying');
+        const known = await this.probePaths(ref, collected, res.data);
+        const verified = verifyDraft(res.data, {
+          exists: (p) => known.has(p),
+          repoFullName: repo.fullName,
+          headSha: collected.headSha,
+          readingCandidates: new Set(collected.candidates.reading),
+          criticalCandidates: new Set(collected.candidates.critical),
+          rankPercentile: (p) => collected.rankPercentile.get(p) ?? null,
+          markers: collected.candidates.markers,
+          issueNumbers: new Set(collected.candidates.issues.map((i) => i.number)),
+          usedGraph: collected.candidates.usedGraph,
+        });
+
+        sections = mergeSections(base, verified.sections, collected.candidates.usedGraph);
+        droppedRows = verified.droppedRows;
+        droppedSteps = verified.droppedSteps;
+        usage = {
+          calls: 1,
+          provider,
+          model: res.model,
+          tokens_in: res.tokensIn,
+          tokens_out: res.tokensOut,
+          cost_usd: res.costUsd,
+          attempts: res.attempts,
+          duration_ms: Date.now() - started,
+        };
+      } catch (err) {
+        // A failure, a timeout, or output that could not be repaired: the
+        // deterministic skeleton IS the tour, and the page offers Retry.
+        failure = scrubSecrets(err instanceof Error ? err.message : String(err));
+        reasons.push('model_failed');
+        usage = {
+          calls: 1,
+          provider,
+          model,
+          tokens_in: null,
+          tokens_out: null,
+          cost_usd: null,
+          attempts: 1,
+          duration_ms: Date.now() - started,
+        };
+      }
     }
 
     const deduped = [...new Set(reasons)];
@@ -378,9 +417,15 @@ export class OnboardingService {
   /**
    * The deterministic pass, in the order the phases are reported.
    *
-   * Nothing here can fail a generation. A file that will not read drops that
+   * Nothing PARTIAL can fail a generation. A file that will not read drops that
    * one fact; an unavailable index drops to the heuristic; unavailable issues
    * record a reason and continue.
+   *
+   * The one read that may throw is the head below, and it is left unguarded on
+   * purpose: without a commit there is nothing to pin a link to, so the tour
+   * would be ungrounded rather than merely thin. `generate` catches it and
+   * persists a `clone_unavailable` skeleton, so a throw here is still a stored,
+   * readable tour — never a failed job with no row behind it.
    */
   private async collectFacts(repoId: string, ref: RepoRef): Promise<CollectedFacts> {
     const reasons: OnboardingDegradedReason[] = [];
@@ -415,37 +460,59 @@ export class OnboardingService {
       this.container.repoIntel.getCriticalPaths(repoId).catch(() => []),
     ]);
 
-    // The import graph is what `getTopFilesByRank` needs; an empty result is
-    // exactly the unindexed condition the heuristic exists for.
-    const usedGraph = topFiles.length > 0;
-    const listing = usedGraph
-      ? []
-      : await this.container.git
+    // Without this read, `rank_percentile` would persist null forever — and it
+    // is also how the ranking is MEASURED rather than assumed below.
+    const rankRows =
+      topFiles.length > 0
+        ? await this.container.repoIntel.getFileRank(repoId, topFiles).catch(() => [])
+        : [];
+
+    // The graph is lost in two independent ways, so it is read as two signals.
+    //
+    // "There are ranked files" is NOT "there is a ranking": `computeFileRank`
+    // hands an edge-less repository PageRank's uniform floor rather than
+    // returning nothing, so every file comes back with the same percentile and
+    // "ranked highly by the repository's file rank" would be untrue of every
+    // row. A rank the port could not report at all is UNMEASURED, not flat —
+    // an infra hiccup must not downgrade a section that has a real ranking.
+    const rankIsFlat =
+      rankRows.length > 1 && new Set(rankRows.map((r) => r.percentile)).size === 1;
+    const usedGraph: GraphSignals = {
+      reading: topFiles.length > 0 && !rankIsFlat,
+      // `getCriticalPaths` returns nothing at all when there are no edges, so
+      // its own emptiness is the edge signal.
+      critical: chains.length > 0,
+    };
+
+    // The heuristic listing is fetched only for the half (or halves) that lost
+    // the graph; it is the same fallback pool for both.
+    const needHeuristic = !usedGraph.reading || !usedGraph.critical;
+    const listing = needHeuristic
+      ? await this.container.git
           .listFiles(ref, { limit: MAX_HEURISTIC_FILES })
-          .catch(() => [] as string[]);
-    const pool = usedGraph ? topFiles : heuristicCandidates(listing, MAX_RANKED_FILES);
+          .catch(() => [] as string[])
+      : [];
+    const fallbackPool = needHeuristic ? heuristicCandidates(listing, MAX_RANKED_FILES) : [];
 
-    const reading = usedGraph
-      ? readingCandidates(topFiles)
-      : readingCandidates(pool);
-    const critical = usedGraph
+    // Markers and excerpts are drawn from whichever pool the reading path used:
+    // that is the one this generation treats as "the files that matter".
+    const pool = usedGraph.reading ? topFiles : fallbackPool;
+
+    const reading = readingCandidates(pool);
+    const critical = usedGraph.critical
       ? criticalCandidates(chains, topFiles)
-      : criticalCandidates([pool], pool);
+      : criticalCandidates([fallbackPool], fallbackPool);
 
-    // Without this read, `rank_percentile` would persist null forever.
     const rankPercentile = new Map<string, number>();
-    const rankPaths = [...new Set([...reading, ...critical])];
-    if (usedGraph && rankPaths.length > 0) {
-      const rows = await this.container.repoIntel
-        .getFileRank(repoId, rankPaths)
-        .catch(() => []);
-      for (const row of rows) rankPercentile.set(row.path, row.percentile);
+    if (!rankIsFlat) {
+      for (const row of rankRows) rankPercentile.set(row.path, row.percentile);
     }
 
-    // --- markers: filtered to the candidate file set, which is what applies
-    // the junk-path filter without importing `isJunkPath` (it is module-local
-    // to repo-intel and not an exempt cross-module import). The price is that a
-    // `TODO` below the ranking cut is invisible.
+    // --- markers: filtered to the candidate file set, which is what keeps a
+    // `TODO` inside a vendored dependency out of the tour — both pools have
+    // already had the shared junk-path filter applied (the ranked one by
+    // `getTopFilesByRank`, the heuristic one by `HEURISTIC_EXCLUDE_PATTERNS`).
+    // The price is that a `TODO` below the ranking cut is invisible.
     this.setPhase(repoId, 'markers');
     const inPool = new Set(pool);
     const markers: MarkerRow[] = (
@@ -479,6 +546,9 @@ export class OnboardingService {
     const knownPaths = new Set<string>([
       ...facts.present,
       ...pool,
+      // The heuristic pool is a `git ls-files` listing of the clone, so its
+      // entries are known to exist even when only ONE section fell back to it.
+      ...fallbackPool,
       ...markers.map((m) => m.path),
       ...excerpts.map((e) => e.path),
     ]);
@@ -633,18 +703,33 @@ export class OnboardingService {
 
   private emptySections(): OnboardingSection[] {
     return deterministicSections({
-      facts: {
-        present: [],
-        envKeys: [],
-        scripts: [],
-        services: [],
-        stack: [],
-        readme: null,
-        contributing: null,
-      },
-      candidates: { reading: [], critical: [], markers: [], issues: [], usedGraph: true },
+      facts: blankFacts(),
+      candidates: blankCandidates(),
       rankPercentile: () => null,
     });
+  }
+
+  /**
+   * What a generation holds when the deterministic pass could not read the
+   * clone AT ALL — the job-time counterpart of the prerequisite state.
+   *
+   * Every count is zero and every set is empty, because nothing was measured;
+   * `clone_unavailable` is the single reason, so the page states what happened
+   * instead of showing a tour that looks merely thin.
+   */
+  private noFacts(): CollectedFacts {
+    return {
+      headSha: '',
+      facts: blankFacts(),
+      candidates: blankCandidates(),
+      excerpts: [],
+      knownPaths: new Set<string>(),
+      rankPercentile: new Map<string, number>(),
+      filesIndexed: 0,
+      filesSkipped: 0,
+      indexSha: null,
+      reasons: ['clone_unavailable'],
+    };
   }
 
   private generationState(repoId: string): OnboardingGeneration {
@@ -662,4 +747,33 @@ export class OnboardingService {
   private renderSystemPrompt(): Promise<string> {
     return renderPrompt('onboarding.system.md', { language: 'English' });
   }
+}
+
+/** A fact set with nothing in it. */
+function blankFacts(): DeterministicFacts {
+  return {
+    present: [],
+    envKeys: [],
+    scripts: [],
+    services: [],
+    stack: [],
+    readme: null,
+    contributing: null,
+  };
+}
+
+/**
+ * Candidate sets with nothing in them. `usedGraph` reads TRUE on both halves on
+ * purpose: nothing was looked up, so nothing may claim the import graph was
+ * missing — a `no_graph` marker here would be a second untruth on top of the
+ * reason that is already stated.
+ */
+function blankCandidates(): CandidateSets {
+  return {
+    reading: [],
+    critical: [],
+    markers: [],
+    issues: [],
+    usedGraph: { reading: true, critical: true },
+  };
 }

@@ -122,7 +122,48 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   is a per-test duration of ~90,000 ms in the vitest output; read those
   durations, they are the only symptom.
 
+- [2026-08-13] To decide whether a repo-intel FILE RANKING is usable, measure
+  its variance instead of its size: `pipeline/rank.ts::computeFileRank` gives an
+  edge-less repository PageRank's uniform floor rather than returning nothing,
+  so `getTopFilesByRank(...).length > 0` is true for a repository with no import
+  graph at all. Read the percentiles (`getFileRank`) and treat "one distinct
+  value across >1 file" as no ranking; treat a rank the port could NOT return as
+  unmeasured, not flat, so an infra hiccup never downgrades a good section.
+  `getCriticalPaths` is the other half and needs no such care — it returns `[]`
+  the moment `edges.length === 0`, so its emptiness IS the edge signal. The two
+  halves are lost independently, which is why
+  `modules/onboarding/types.ts::GraphSignals` is a pair rather than one boolean
+  (`{reading, critical}`): a repository with a real ranking and no chains must
+  mark critical paths `no_graph` while the reading path stays `ok`.
+
+- [2026-08-13] When a budget is applied as a PREFIX of a collected list
+  (`collectDraftPaths(...).slice(0, MAX_PATH_PROBES)`), collection order is a
+  correctness property, not a style choice: gather the schema-CAPPED citations
+  (row paths, run-step sources, links) from every section first and the
+  unbounded ones (prose, whose `body` has no length cap) last. Walking the draft
+  section-by-section put one chatty Markdown body's inline-code spans ahead of
+  every later section's real citations, which then failed `exists()` by default
+  and were counted as dropped — indistinguishable from hallucinations, and
+  non-deterministic in the size of the model's prose
+  (`modules/onboarding/verify.ts::collectDraftPaths`).
+
 ## What Doesn't Work
+
+- [2026-08-13] A check/claim pair with NO `await` between them
+  (`if (map.has(id)) throw; map.set(id, slot)`) is ALREADY mutually exclusive on
+  Node's event loop, no matter how much awaited I/O precedes it — a second
+  request cannot slip between the `has` and the `set`, because nothing yields
+  there. So "the reads before the check make this a TOCTOU race" is a false
+  positive, and a regression test for it passes against the unfixed code (proved
+  by reverting the fix in `modules/onboarding/service.ts::requestGeneration` and
+  re-running the whole `onboarding.it.test.ts`: still 24 green). Claiming the
+  slot FIRST is still worth doing — it refuses the second click before spending
+  a DB read and a git call, it keeps the invariant if someone later inserts an
+  `await` between the check and the claim, and it makes the doc comment true —
+  but do not claim a race in the commit message, and do not expect a test to
+  demonstrate one. The window that IS real is much narrower: a request whose
+  pre-claim I/O outlasts the ENTIRE first generation would see the slot already
+  released.
 
 - [2026-08-13] Do NOT trust `server/CLAUDE.md`'s claim that "the DB schema
   already contains EVERY table for all course lessons" as a reason to skip
@@ -202,6 +243,33 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   not just the red.
 
 ## Codebase Patterns
+
+- [2026-08-13] Path-classification knowledge that TWO modules need
+  (test/config/generated denylists) belongs in the owning module's
+  `constants.ts`, never beside its predicates in `service.ts`:
+  `no-cross-module-imports` exempts only another module's `service.ts`,
+  `types.ts` or `constants.ts`, and a service exports FUNCTIONS a consumer would
+  have to re-type. Onboarding's hand-rolled copy had drifted materially narrower
+  than `isJunkPath` (no test files, no `tsconfig`/`jest`/`vitest` configs, no
+  `.d.ts`, no `/migrations/`, and `.lock` misses both `pnpm-lock.yaml` and
+  `package-lock.json`), and it applied to the ONLY path that is not filtered
+  twice — the unindexed one. Fixed by exporting `JUNK_PATH_PATTERNS` from
+  `modules/repo-intel/constants.ts` and spreading it into
+  `HEURISTIC_EXCLUDE_PATTERNS`. Match lowercased on both sides, or the two
+  filters disagree on `Foo.Test.ts`.
+
+- [2026-08-13] A background job must catch the failure of its own DETERMINISTIC
+  pass, not only of its model call. `requestGeneration` checks the clone, but
+  the job runs later on the queue, so an unguarded
+  `git.currentHead` in `collectFacts` turned a mid-resync clone into a failed job
+  that persisted NOTHING — and the read path then kept rendering the previous
+  tour, so the page looked untouched and the failure was invisible. Give that
+  failure its own degraded reason (`clone_unavailable`, added to
+  `OnboardingDegradedReason` in BOTH `vendor/shared` copies) instead of folding
+  it into `model_failed`, and skip the model call entirely when it fires: there
+  is nothing to ground an answer against, so the call would only spend money.
+  The tell in a test is `expected 'ready' to be 'degraded'` — a stale row read
+  back, not a missing one.
 
 - [2026-08-13] `JobRunner.enqueue` wraps EVERY handler in
   `withRetry(..., { retries: this.retries })` and `container.ts` constructs the

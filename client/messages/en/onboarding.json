@@ -65,7 +65,8 @@
       "partial_index": "The repository's index is incomplete, so parts of the tour were built from deterministic facts.",
       "repo_too_large": "The repository is above the excerpt cutoff, so no file excerpts reached the model.",
       "model_failed": "The model call failed, so the tour below is the deterministic skeleton. Retry to try again.",
-      "issues_unavailable": "GitHub issues could not be read, so first tasks come from TODO and FIXME markers alone."
+      "issues_unavailable": "GitHub issues could not be read, so first tasks come from TODO and FIXME markers alone.",
+      "clone_unavailable": "The repository's clone could not be read when the tour was generated, so no facts were collected. Retry once the clone is back on disk."
     }
   },
   "status": {

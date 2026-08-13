@@ -82,6 +82,17 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Recurring Errors & Fixes
 
+- [2026-08-13] `specs/11-project-context.flow.json` failed one run at step 4
+  with `✗ repo-scoped context route reached — Command failed: agent-browser wait
+  --url /context`, and passed on an immediate re-run of the same tree (11/12
+  then 12/12, no code change in between). The preceding step is
+  `find text "Project Context" click`, which exits 0 even when the click lands
+  on nothing (see the above-the-fold entry), so the failure surfaces one step
+  later on the URL wait. `specs/12-onboarding-tour.flow.json` clicks the SAME
+  sidebar entry and passed in both runs, so it is the click, not the route.
+  Re-run once before investigating a change; treat it as real only if it
+  reproduces twice for the same flow.
+
 ## Session Notes
 
 ## Open Questions

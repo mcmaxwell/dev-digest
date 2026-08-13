@@ -232,9 +232,20 @@ interface IntelConfig {
   filesSkipped: number;
   status: 'full' | 'partial' | 'degraded' | 'failed';
   graph: boolean;
+  /** Dependency chains exist. Independent of `graph`: a ranking is not edges. */
+  chains: boolean;
+  /** Every ranked file shares one percentile — PageRank's edge-less floor. */
+  flatRank: boolean;
 }
 
-const intel: IntelConfig = { filesIndexed: 1200, filesSkipped: 3, status: 'full', graph: true };
+const intel: IntelConfig = {
+  filesIndexed: 1200,
+  filesSkipped: 3,
+  status: 'full',
+  graph: true,
+  chains: true,
+  flatRank: false,
+};
 
 const repoIntelStub = {
   async getIndexState() {
@@ -256,9 +267,12 @@ const repoIntelStub = {
     return intel.graph ? [...RANKED] : [];
   },
   async getCriticalPaths() {
-    return intel.graph ? [['src/server.ts', 'src/middleware/auth.ts']] : [];
+    return intel.graph && intel.chains ? [['src/server.ts', 'src/middleware/auth.ts']] : [];
   },
   async getFileRank(_repoId: string, paths: string[]) {
+    // A flat rank is what an edge-less repository really gets back: PageRank's
+    // uniform floor, one percentile shared by every file.
+    if (intel.flatRank) return paths.map((path) => ({ path, percentile: 1 }));
     return paths.map((path, i) => ({ path, percentile: 0.99 - i / 100 }));
   },
 } as unknown as RepoIntel;
@@ -268,6 +282,19 @@ class FixtureGitClient extends MockGitClient {
   public commits = [
     { sha: 'head-sha-0000001', message: 'latest', author: 'a', date: '2026-06-03' },
   ];
+  /**
+   * Reading a head off a clone is I/O with real latency. Two requests that
+   * arrive while it is in flight are the ordinary double-click, and the delay is
+   * what makes that overlap happen on demand instead of by luck.
+   */
+  public headDelayMs = 0;
+  /**
+   * How many more `currentHead` calls succeed before the clone "goes away".
+   * A generation runs on a queue, so the clone the REQUEST checked can be gone
+   * by the time the JOB reads it — this is how the test puts the failure
+   * between the two, deterministically.
+   */
+  public headBudget = Number.POSITIVE_INFINITY;
 
   constructor(private root: string) {
     super({});
@@ -276,6 +303,11 @@ class FixtureGitClient extends MockGitClient {
     return this.root;
   }
   override async currentHead(): Promise<string> {
+    if (this.headDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, this.headDelayMs));
+    }
+    if (this.headBudget <= 0) throw new Error('ENOENT: the clone is no longer on disk');
+    this.headBudget -= 1;
     return this.head;
   }
   override async readFile(_repo: RepoRef, path: string): Promise<string> {
@@ -396,7 +428,11 @@ d('L06 onboarding tour (Testcontainers pg)', () => {
     intel.filesSkipped = 3;
     intel.status = 'full';
     intel.graph = true;
+    intel.chains = true;
+    intel.flatRank = false;
     git.head = 'head-sha-0000001';
+    git.headDelayMs = 0;
+    git.headBudget = Number.POSITIVE_INFINITY;
   });
 
   function makeApp(over: { db?: typeof pg.handle.db } = {}) {
@@ -562,6 +598,55 @@ d('L06 onboarding tour (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('marks critical paths without the graph while the reading path keeps its ranking (AC-57, AC-58)', async () => {
+    // The import graph is lost in two independent ways. An indexed repository
+    // can have a real file ranking and no usable dependency chains at all, and
+    // AC-58 asks for the marker on the section that was BUILT WITHOUT the
+    // graph — which is critical paths alone here. Reporting that section as
+    // merely `empty` would read as "we looked and found nothing".
+    intel.chains = false;
+
+    const app = await makeApp();
+    const tour = tourOf(await generate(app));
+
+    const critical = tour.sections.find((s) => s.kind === 'critical_paths')!;
+    const reading = tour.sections.find((s) => s.kind === 'reading_path')!;
+    if (critical.kind !== 'critical_paths' || reading.kind !== 'reading_path') throw new Error('kind');
+
+    expect(critical.status).toBe('no_graph');
+    expect(reading.status).toBe('ok');
+    expect(reading.items.length).toBeGreaterThan(0);
+    // AC-57: the section is still POPULATED, from the heuristic.
+    expect(critical.items.length).toBeGreaterThan(0);
+    // The index is healthy — this marker is about the graph, not the index.
+    expect(tour.degraded_reasons).not.toContain('no_index');
+
+    await app.close();
+  });
+
+  it('claims no PageRank ordering when every ranked file shares one floor score (AC-57, AC-58)', async () => {
+    // An edge-less repository does not come back with NO ranking: `computeFileRank`
+    // hands every file PageRank's uniform floor, so "there are ranked files" is
+    // not "there is a ranking". The model is refused here so the deterministic
+    // skeleton IS the tour and its own words are what the assertion reads.
+    intel.flatRank = true;
+    intel.chains = false;
+    llm.mode = 'reject';
+
+    const app = await makeApp();
+    const tour = tourOf(await generate(app));
+
+    const reading = tour.sections.find((s) => s.kind === 'reading_path')!;
+    if (reading.kind !== 'reading_path') throw new Error('kind');
+
+    expect(reading.status).toBe('no_graph');
+    expect(reading.items.length).toBeGreaterThan(0);
+    for (const item of reading.items) expect(item.reason).toContain('no import graph');
+    expect(JSON.stringify(reading.items)).not.toContain('PageRank');
+
+    await app.close();
+  });
+
   it('states each degraded reason exactly once (AC-59)', async () => {
     githubState.fail = true;
     intel.graph = false;
@@ -618,6 +703,40 @@ d('L06 onboarding tour (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('persists an honest degraded tour when the clone goes away before the job runs (AC-60, AC-61, AC-63)', async () => {
+    const app = await makeApp();
+    // Exactly one head read is left: the one the REQUEST makes. The generation
+    // then runs LATER, on the queue, and finds the clone gone — a resync, a
+    // manual delete. A throw there must still leave a stored, readable tour.
+    git.headBudget = 1;
+
+    const res = await app.inject({ method: 'POST', url: `/repos/${repoId}/onboarding/generate` });
+    expect(res.statusCode).toBe(200);
+    await app.container.jobs.onIdle();
+    git.headBudget = Number.POSITIVE_INFINITY;
+
+    const tour = tourOf(await read(app));
+
+    expect(tour.status).toBe('degraded');
+    expect(tour.degraded_reasons).toContain('clone_unavailable');
+    // The model is not blamed for a disk: no call was made, so none is claimed.
+    expect(tour.degraded_reasons).not.toContain('model_failed');
+    expect(llm.onboardingCalls).toBe(0);
+    expect(tour.usage).toBeNull();
+    // AC-60: the five headings are there and the page offers Retry (`degraded`).
+    expect(tour.sections).toHaveLength(5);
+
+    // AC-61 / AC-63: a reload renders the same content, from storage, with no
+    // error state.
+    const reloaded = await makeApp();
+    const stored = tourOf(await read(reloaded));
+    expect(stored.degraded_reasons).toContain('clone_unavailable');
+    expect(stored.sections).toHaveLength(5);
+    await reloaded.close();
+
+    await app.close();
+  });
+
   it('shows token counts and no cost when the provider prices nothing (AC-54)', async () => {
     const app = await makeApp();
     llm.costUsd = null;
@@ -648,6 +767,33 @@ d('L06 onboarding tour (Testcontainers pg)', () => {
 
     // One call for the two requests, and the surviving generation is the FIRST
     // one, which completed normally rather than being abandoned.
+    expect(llm.onboardingCalls).toBe(1);
+    expect(tourOf(await read(app)).status).toBe('ready');
+
+    await app.close();
+  });
+
+  it('refuses the second of two SIMULTANEOUS generate requests, and makes one call (AC-16)', async () => {
+    const app = await makeApp();
+    // Both requests sit inside the repository read and the clone probe at the
+    // same time — the interleaving a double click or a second open tab
+    // produces, and the one a guard placed AFTER those reads cannot see: both
+    // would observe an empty slot and both would enqueue a paid generation.
+    git.headDelayMs = 25;
+
+    const [first, second] = await Promise.all([
+      app.inject({ method: 'POST', url: `/repos/${repoId}/onboarding/generate` }),
+      app.inject({ method: 'POST', url: `/repos/${repoId}/onboarding/generate` }),
+    ]);
+
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+    const refused = first.statusCode === 409 ? first : second;
+    expect(JSON.stringify(refused.json())).toMatch(/already running/i);
+
+    await app.container.jobs.onIdle();
+    git.headDelayMs = 0;
+
+    // One generation, one model call, one tour.
     expect(llm.onboardingCalls).toBe(1);
     expect(tourOf(await read(app)).status).toBe('ready');
 
@@ -909,15 +1055,16 @@ d('L06 onboarding tour (Testcontainers pg)', () => {
       }
       await new Promise((r) => setTimeout(r, 50));
     }
-    expect(trace.prompt_assembly, 'no run trace was written').toBeDefined();
-    const assembly = JSON.stringify(trace.prompt_assembly);
+    const promptAssembly = trace.prompt_assembly;
+    expect(promptAssembly, 'no run trace was written').toBeDefined();
+    const assembly = JSON.stringify(promptAssembly);
 
     // Not one character of the tour reaches the review prompt, and the
     // assembly gained no onboarding slot.
     expect(assembly).not.toContain('ONBOARDING-TOUR-MARKER');
     expect(assembly).not.toContain('Guided reading path');
-    expect(Object.keys(trace.prompt_assembly)).not.toContain('onboarding');
-    expect(Object.keys(trace.prompt_assembly).join(',')).not.toMatch(/onboarding|tour/i);
+    expect(Object.keys(promptAssembly ?? {})).not.toContain('onboarding');
+    expect(Object.keys(promptAssembly ?? {}).join(',')).not.toMatch(/onboarding|tour/i);
 
     await app.close();
   });

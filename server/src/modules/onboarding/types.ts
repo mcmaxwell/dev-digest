@@ -64,6 +64,24 @@ export interface IssueRow {
 }
 
 /**
+ * What each graph-dependent section actually got out of the import graph.
+ *
+ * ONE boolean cannot answer this, because the two sections need different
+ * halves of the graph and can lose them separately. `computeFileRank` gives an
+ * edge-less repository PageRank's uniform floor rather than nothing, so "there
+ * are ranked files" is not "there is a ranking"; `getCriticalPaths` returns
+ * nothing at all without edges. A repository with a real ranking but no usable
+ * chains must therefore mark critical paths `no_graph` while the reading path
+ * stays `ok` (AC-57, AC-58).
+ */
+export interface GraphSignals {
+  /** The file rank carried real variance, so the reading path IS rank-ordered. */
+  reading: boolean;
+  /** Dependency chains existed, so critical paths came from real edges. */
+  critical: boolean;
+}
+
+/**
  * The sets a row may be drawn from. Membership here is what makes AC-8
  * ("order matches getTopFilesByRank") and AC-23 ("entries appear in
  * getCriticalPaths output") true BY CONSTRUCTION rather than by a post-hoc
@@ -77,11 +95,11 @@ export interface CandidateSets {
   markers: MarkerRow[];
   issues: IssueRow[];
   /**
-   * False when the import graph was unavailable and both path sets came from
-   * the directory-prominence heuristic — which is what the per-section
-   * `no_graph` marker reports.
+   * Which of the two path sets came from the graph and which from the
+   * directory-prominence heuristic — what the per-section `no_graph` marker
+   * reports.
    */
-  usedGraph: boolean;
+  usedGraph: GraphSignals;
 }
 
 /** One rank-selected file excerpt bound for the prompt. */
