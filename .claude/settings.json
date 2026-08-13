@@ -9,6 +9,15 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/pr-gate.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/specs-gate.sh"
+          }
+        ]
       }
     ]
   }

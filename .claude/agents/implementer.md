@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Executes an approved Development Plan across the frontend and backend of this repository. Picks the project skills that match the files it touches, makes the changes, runs the existing per-package tests, and reports what was done, what was skipped, and where it deviated from the plan. Use when a plan already exists and needs to be carried out. Do NOT use for planning from scratch, and do not treat its report as architecture or security review - those are separate agents.
+description: Executes an approved Implementation Plan across the frontend and backend of this repository. Picks the project skills that match the files it touches, makes the changes, runs the existing per-package tests, and reports what was done, what was skipped, and where it deviated from the plan. Use when a plan already exists and needs to be carried out. Do NOT use for planning from scratch, and do not treat its report as architecture or security review - those are separate agents.
 tools: Read, Grep, Glob, Edit, Write, Bash, TodoWrite, Skill
 model: inherit
 ---

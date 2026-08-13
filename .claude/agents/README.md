@@ -12,11 +12,12 @@ The rules themselves live in each agent's own file; do not restate them here.
 | Agent | Responsibility | Model | Writes files |
 |-------|----------------|-------|--------------|
 | [researcher](researcher.md) | Answers a question about this repo or about the outside world, with evidence and citations | `sonnet` | no |
-| [planner](planner.md) | Turns a task into a Development Plan bound by the repo's architecture and lessons | `opus` | no |
+| [specreator](specreator.md) | Interrogates a feature idea and its mockups, then writes the product spec with EARS acceptance criteria - specs only, never plans | `opus` | yes (`docs/specs/` only, create-only) |
+| [implementation-planner](implementation-planner.md) | Verifies a task's requirements and turns them into an Implementation Plan bound by the repo's architecture and lessons - plans only, never specs | `opus` | no |
 | [implementer](implementer.md) | Executes an approved plan across frontend and backend, runs the existing tests | `inherit` | yes |
 | [test-writer](test-writer.md) | Writes tests for either side and runs the matching per-package suite | `inherit` | yes (tests only) |
 | [arch-evidence](arch-evidence.md) | Runs the mechanical boundary checks and returns raw observations, no judgement | `sonnet` | no |
-| [architecture-reviewer](architecture-reviewer.md) | Judges those observations against this repo's written boundaries | `opus` | no |
+| [architecture-reviewer](architecture-reviewer.md) | Judges those observations against this repo's written boundaries | `sonnet` | no |
 | [plan-verifier](plan-verifier.md) | Maps every item of a plan to evidence in the code: done, partial, missing, deviated | `sonnet` | no |
 | [doc-writer](doc-writer.md) | Documents implemented work into the right `docs/` or package file, with diagrams | `sonnet` | yes (docs only) |
 
@@ -35,24 +36,37 @@ It owns the whole change set against `merge-base`, the verdict marker in `.git/p
 ```
 researcher (when a fact is missing)
     ↓  report
-planner
+specreator  (when *what* to build is not settled yet)
+    ↓  questions → the user     (discovery pass, writes nothing)
+    ↓  spec → docs/specs/L<NN>-<slug>.md   (the planner reads this)
+implementation-planner
     ↓  contract → docs/plans/<slug>.md     (the implementer reads this)
     ↓  rationale → docs/plans/<slug>.rationale.md   (humans and the verifier read this)
-implementer  ← receives the contract path, not the plan text
-    ↓  implementation report  +  .claude/last-change.json
-test-writer  (when tests are their own piece of work)
+    ↓  execution-mode question → the user  (multi-agent chain or single-agent pass)
+╭─ /run-plan drives everything below, and stops at the triage gate ──────────╮
+│ implementer  ← receives the contract path, not the plan text                │
+│     ↓  implementation report  +  .claude/last-change.json                   │
+│ arch-evidence  ·  plan-verifier   ← both read the manifest, run in parallel │
+│     ↓  observation table              ↓  coverage table                     │
+│ architecture-reviewer  ← judges the evidence table                          │
+│     ↓  findings → one ledger → ⛔ triage gate → the user                     │
+│     ↓  docs/plans/<slug>.fixes-R<N>.md                                      │
+│ implementer  ← the fix addendum, never the original plan                    │
+│     ↺  up to 3 rounds, delta-scoped, then one full pass                     │
+╰────────────────────────────────────────────────────────────────────────────╯
+test-writer  (when tests are their own piece of work - not in /run-plan)
     ↓  test report
-arch-evidence  ← reads the manifest
-    ↓  observation table
-architecture-reviewer  ·  plan-verifier  ← both read the manifest
-    ↓  findings            ↓  coverage table
-doc-writer  (when the feature needs documenting)
+doc-writer  (when the feature needs documenting - /run-plan --docs)
     ↓  docs, written in place
 /pr-self-review  →  /security-review  →  gh pr create
 ```
 
-There is no direct channel between subagents.
-The calling session is always the relay, so each handoff is visible to a human before the next agent starts.
+`specreator` and `implementation-planner` are run by hand, on purpose.
+They are where the product decision and the architecture decision get made, and a decision made inside an automated chain is a decision nobody reviewed.
+Everything after them is mechanical enough to automate, which is what `/run-plan` does.
+
+There is no direct channel between subagents, with one exception: `implementation-planner` may spawn `researcher` subagents itself while planning, because a fact gap discovered mid-plan would otherwise cost a full round trip through the caller.
+Every other handoff relays through the calling session, so it stays visible to a human before the next agent starts.
 
 Three things travel as paths rather than as inlined text, because a fresh context is expensive and re-deriving a fact costs more than reading it:
 
@@ -75,16 +89,44 @@ Three things travel as paths rather than as inlined text, because a fresh contex
 | **Tools** | `Read, Grep, Glob, Bash, WebSearch, WebFetch, TodoWrite` |
 | **Cannot** | Write or edit files, delegate to other agents, invoke `/deep-research` |
 
-### planner
+### specreator
+
+| | |
+|---|---|
+| **Use when** | What the product should do is not settled yet, or a spec is the missing input someone else stopped on |
+| **Input** | A feature idea, plus file paths to any design mockups. On the second pass, the answers to its questions and the word `WRITE` |
+| **Output** | Discovery pass: Understanding, Designs read, Boundaries touched, Blocking and optional questions with recommendations, Design gaps, Proposed identity - and nothing written. Write pass: `docs/specs/L<NN>-<slug>.md` plus a report of criteria, assumptions, and what needs a human edit |
+| **Tools** | `Read, Grep, Glob, Bash, Write, TodoWrite, Skill` |
+| **Preloaded skills** | `mermaid-diagram`, `security`, `onion-architecture` |
+| **Cannot** | Write anywhere but `docs/specs/`, overwrite an existing spec, use `Edit`, decide implementation, delegate, research externally, invoke any implementation skill |
+
+It runs in two passes because a subagent cannot stop and ask.
+The first pass reads the repo and the screenshots and returns at most seven blocking questions, each with the answer it would default to; the second pass writes the file.
+A spec therefore never appears in `docs/specs/` before its product decisions were made by a human.
+
+Acceptance criteria use EARS notation with stable `AC-N` identifiers, so the plan, the tests, and the PR all cite the same requirement instead of paraphrasing it.
+The format contract lives in `docs/specs/README.md`, not in the agent file, so a human writing a spec by hand follows the same rules.
+
+Its three preloaded skills each serve one section: `mermaid-diagram` for Module interactions, `security` for Untrusted inputs, and `onion-architecture` as a feasibility check, so it cannot specify a boundary this repository is not allowed to have.
+The implementation skills are named and forbidden in its file - a spec that starts answering implementation questions has stopped being a spec.
+
+`scripts/specs-gate.sh` enforces the destination mechanically on `PreToolUse`, keyed on `agent_type`, so it is silent for every other caller.
+
+### implementation-planner
 
 | | |
 |---|---|
 | **Use when** | A task touches more than one file or crosses package boundaries |
-| **Input** | A task description, plus a researcher report when an external fact is involved |
-| **Output** | Development Plan: Understanding, Affected modules, Architectural constraints, Lessons from INSIGHTS.md, Skills applied while planning, Skills for the implementer, Steps with files and verify commands, Test strategy, Risks and forks, Acceptance criteria, Out of scope |
-| **Tools** | `Read, Grep, Glob, Bash, TodoWrite, Skill` |
+| **Input** | A task description or requirements, plus a researcher report when an external fact is involved |
+| **Output** | Implementation Plan: Understanding, Affected modules, Architectural constraints, Lessons from INSIGHTS.md, Skills applied while planning, Skills for the implementer, Steps with files and verify commands, Test strategy, Non-functional requirements, Recommendations, Traceability, Risks and forks, Acceptance criteria with verification hints, Out of scope - plus an execution-mode question (multi-agent or single-agent) the caller relays to the user |
+| **Tools** | `Read, Grep, Glob, Bash, TodoWrite, Skill, Agent` (Agent is prompt-scoped to `researcher` only) |
 | **Preloaded skills** | `onion-architecture`, `frontend-ui-architecture`, `next-best-practices`, `postgresql-table-design` |
-| **Cannot** | Write or edit files, delegate to other agents, research externally, run its own review |
+| **Cannot** | Write or edit files, write or draft specs, spawn any agent other than `researcher`, run its own review, start implementation or assume an execution mode |
+
+It verifies the requirements before planning: inconsistencies become findings, ambiguities become at most three clarifying questions with defaults, and better shapes become Recommendations for the user to accept or reject.
+Specs are its input, never its output - product behaviour it cannot source from a spec or the task is a question, not a guess.
+When a fact it needs is out of reach it fans out `researcher` subagents - in parallel when the questions are disjoint - instead of guessing, and it reads only the `INSIGHTS.md` files of the modules the task actually touches.
+Before emitting, it runs a final self-check: requirements traced to steps and acceptance criteria, verify commands sourced, no invented behaviour, execution-mode question last.
 
 The four preloaded skills are the ones that constrain a *decision a plan makes* (which layer, where code lives, the server/client boundary, table and index design), not a line of code someone later writes.
 The `Skill` tool covers the rest on demand: a plan must not mandate something a skill forbids, and the frontmatter alone does not always reveal that.
@@ -126,8 +168,9 @@ It writes the assertion from the stated intended behaviour rather than from the 
 | **Tools** | `Read, Grep, Glob, Bash, TodoWrite` |
 | **Cannot** | Write or edit files, judge anything, assign a severity, invoke a skill, delegate |
 
-The split exists because the two halves of a boundary review have different costs.
-Running depcruise and fifteen greps is mechanical and most rows come back at zero; deciding what a non-zero row means is the part worth an expensive model.
+The split exists because the two halves of a boundary review are different kinds of work.
+Running depcruise and fifteen greps is mechanical and most rows come back at zero; deciding what a non-zero row means is judgement.
+Both halves run on `sonnet` today - the judgement half was on `opus` until 2026-08-13, and the two files are one frontmatter line apart if the verdicts ever look thin.
 This agent is forbidden from using the words that constitute a verdict, so the reviewer cannot inherit a conclusion it did not reach.
 
 ### architecture-reviewer
@@ -186,8 +229,8 @@ Every non-obvious rule in these files traces to one of these.
 | Rule | Source |
 |---|---|
 | `tools` is an allowlist; omitting it inherits the whole subagent pool, which differs between foreground and background runs. Both agents therefore list tools explicitly | [sub-agents](https://code.claude.com/docs/en/sub-agents) |
-| Read-only is expressed by listing only read tools, which is why `planner` has no `Write`/`Edit` | same |
-| A subagent **can** spawn subagents by default, up to three layers. Blocking that requires omitting `Agent` from `tools`, which both agents do | same |
+| Read-only is expressed by listing only read tools, which is why `implementation-planner` has no `Write`/`Edit` | same |
+| A subagent **can** spawn subagents by default, up to three layers. Blocking that requires omitting `Agent` from `tools`, which every agent here does except `implementation-planner`, whose `Agent` use is prompt-scoped to `researcher` only | same |
 | `skills:` injects a skill's full text at startup; without it, the `Skill` tool still discovers and invokes skills at runtime. This is the preload-vs-runtime split above | same, and [skills](https://code.claude.com/docs/en/skills) |
 | A subagent starts with a fresh context and inherits neither conversation history nor already-invoked skills, which is why both agents open with a mandatory read-first step | [sub-agents](https://code.claude.com/docs/en/sub-agents) |
 | Chained subagents hand off through the calling session; no agent-to-agent contract exists | same |
@@ -243,7 +286,7 @@ Sources outside Anthropic that shaped a rule in one of the four newer agents.
 
 Named here so they are not mistaken for documented practice.
 
-- The Development Plan, Implementation Report, Test, Architecture review, Plan verification, and Documentation report templates.
+- The Implementation Plan, Implementation Report, Test, Architecture review, Plan verification, and Documentation report templates.
   The documentation prescribes no handoff schema.
 - The contents of the skill routing tables.
 - `docs/plans/<slug>.md` as the plan location.

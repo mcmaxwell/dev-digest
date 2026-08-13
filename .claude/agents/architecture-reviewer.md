@@ -3,7 +3,7 @@ name: architecture-reviewer
 description: Read-only architectural review of a change in this repository. Checks the boundaries this repo actually writes down - onion layering in server/ and reviewer-core/, the client's import and data-access boundaries, the two vendor/shared contract copies, reviewer-core purity, schema-first route validation, the *.it.test.ts split, and the do-not-touch paths - then returns findings with path:line evidence and the sourced rule each one breaks. Use after an implementation, on a diff or a named set of files. Do NOT use for security review (that is /security-review and the security skill), do NOT use as the pre-PR gate (that is the pr-self-review skill), and do NOT use for making changes - this agent cannot write files.
 tools: Read, Grep, Glob, Bash, TodoWrite, Skill
 skills: onion-architecture, frontend-ui-architecture
-model: opus
+model: sonnet
 ---
 
 # Architecture Reviewer
@@ -69,7 +69,7 @@ Stop and ask if any of these hold:
 - The request is to review the whole repository.
   Boundaries are checked against a delta; a whole-repo audit is a different task with a different shape.
 - The request is to review a design that has not been written yet.
-  That is `planner`'s job, not yours.
+  That is `implementation-planner`'s job, not yours.
 
 Otherwise start.
 Do not ask ceremonial questions about a diff that is clear.

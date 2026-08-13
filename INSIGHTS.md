@@ -22,6 +22,14 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## Codebase Patterns
 
+- [2026-08-13] `implementer` only ever executes a plan file, so review findings
+  cannot be handed to it as prose — a fix round writes
+  `docs/plans/<slug>.fixes-R<N>.md` (one step per finding: file, the claim, the
+  rule broken, "Done when") and passes THAT path. Never re-pass the original
+  plan: it is already executed and re-running it re-implements the same steps.
+  Findings are keyed `<file>|<rule>|<slug of summary>` and NOT by line number,
+  which shifts under every fix and makes the same finding look new each round.
+
 - [2026-07-28] `@devdigest/shared` exists as two vendored copies
   (`server/src/vendor/shared` canonical, `client/src/vendor/shared` for the
   client) — contract changes must be applied to both, there is no sync script.
@@ -89,6 +97,21 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   (`grep -qE "-----BEGIN…"` → "unrecognized option") — in repo shell scripts
   always pass patterns via `grep -e "$pat"` when they can start with a dash.
 
+- [2026-08-13] A `PreToolUse` payload carries `agent_id` + `agent_type` when the
+  call comes from a subagent, so a hook can be scoped to ONE agent instead of
+  firing for everyone: read `agent_type` first and `exit 0` when it is not
+  yours (`scripts/specs-gate.sh` does this for `specreator`). Extracting fields
+  with `grep -Eo '"key"[[:space:]]*:[[:space:]]*"[^"]*"'` is safe from a value
+  forged inside the written `content`, because JSON escapes the inner quotes
+  (`\"`) and the pattern needs bare ones — still validate EVERY match, not just
+  the first, so an ambiguous payload fails closed.
+
+- [2026-08-13] A newly created `.claude/agents/<name>.md` is NOT picked up by
+  the running session: the Agent tool answers "Agent type '<name>' not found"
+  and lists the agents loaded at start. Editing an existing agent file takes
+  effect, adding one needs a session restart — budget for that before planning
+  a live smoke test of a brand-new agent.
+
 ## Recurring Errors & Fixes
 
 - [2026-07-28] On this machine the default shell Node is v17 (nvm), so every
@@ -102,8 +125,29 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   `e2e/` — the packages have separate lockfiles, installing server/client does
   NOT install e2e).
 
+- [2026-08-13] `scripts/pr-gate.sh` matches the gated commands as a raw
+  substring of the WHOLE hook payload, not of the parsed command — so any Bash
+  call whose text merely mentions the blocked string is refused, including a
+  test that pipes it into another script. Build the literal at runtime
+  (`x="gh pr"" create"`) when a command needs to talk about it.
+
 ## Session Notes
 
+- [2026-08-13] `/run-plan` skill added: takes an approved `docs/plans/<slug>.md`
+  and drives `implementer` → (`arch-evidence` ‖ `plan-verifier`) →
+  `architecture-reviewer` → triage gate → fix round, up to 3 rounds, then one
+  full-scope pass. Commits nothing. `specreator` and `implementation-planner`
+  stay manual by design. `test-writer` is out of the chain to save tokens, so
+  every run must report which behaviour shipped untested.
+  `architecture-reviewer` moved `opus` → `sonnet` the same day; `plan-verifier`
+  and `arch-evidence` were already `sonnet`.
+- [2026-08-13] `specreator` agent added: writes product specs into
+  `docs/specs/` only, create-only, in two passes (discovery returns ranked
+  questions and writes nothing; `WRITE` produces the file). Format contract
+  lives in `docs/specs/README.md` — EARS criteria with stable `AC-N` ids that
+  `implementation-planner` cites verbatim in its Traceability table.
+  `scripts/specs-gate.sh` enforces the destination on `PreToolUse`, keyed on
+  `agent_type`. `doc-writer` no longer routes anything to `docs/specs/`.
 - [2026-08-10] L04 Blast Radius + pre-push CLI shipped end-to-end:
   `modules/blast` (`GET /pulls/:id/blast` free, `POST …/blast/summary` behind a
   button) + four repo-intel facade reads + the BlastRadiusCard, plus
@@ -112,7 +156,6 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   needed no model for its main path - every fact was already in the index, and
   the work was reading it honestly: the whole "index status" derivation exists
   so an empty caller list is never mistaken for "nothing calls this".
-
 - [2026-08-04] L02 conventions extractor shipped end-to-end on
   `feat/l02-conventions-extractor`: `modules/conventions` (stratified sampling →
   config rules → per-category LLM fan-out → dedupe → evidence grounding →

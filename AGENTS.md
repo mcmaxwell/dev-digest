@@ -79,6 +79,8 @@ docs/           agent-prompts/ (built-in reviewer prompts) · specs/ (lesson spe
 - …writing or fixing tests (any package) → `TESTING.md`; browser flows → `e2e/README.md`
 - …editing built-in reviewer agent prompts → `docs/agent-prompts/README.md`
 - …implementing a lesson feature → its spec in `docs/specs/`
+- …writing or reviewing a spec (format, EARS criteria, naming) →
+  `docs/specs/README.md`; the `specreator` agent writes them, create-only
 - …starting any task inside a package → that package's `AGENTS.md`, then its
   `INSIGHTS.md` (treat entries as high-confidence guidance)
 

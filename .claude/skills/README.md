@@ -18,6 +18,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+| [run-plan](run-plan/SKILL.md) | Workflow | Executes an approved plan: `implementer`, then a review→fix loop over `arch-evidence` + `plan-verifier` + `architecture-reviewer` until the blocking findings converge. Commits nothing |
 | [pr-self-review](pr-self-review/SKILL.md) | Workflow | Pre-PR self-review: routes the local diff to domain skills, deterministic fast checks, gates `gh pr create` on critical findings |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Captures non-obvious lessons into per-module INSIGHTS.md (capture-as-you-go + wrap-up) |
 
