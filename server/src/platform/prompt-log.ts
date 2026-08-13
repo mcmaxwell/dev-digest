@@ -42,8 +42,17 @@ const MAX_OUTLINE_LINES = 12;
 const SECRET_PATTERNS: { re: RegExp; label: string }[] = [
   { re: /\bsk-[A-Za-z0-9_-]{16,}/g, label: '[redacted:openai-key]' },
   { re: /\bsk-ant-[A-Za-z0-9_-]{16,}/g, label: '[redacted:anthropic-key]' },
+  // Stripe uses an underscore, so the `sk-` pattern above never matched it. This was found by a
+  // test derived from AC-70 of docs/specs/L06-onboarding-tour.md: a README carrying
+  // `STRIPE_KEY=sk_live_…` reached the log verbatim under PROMPT_LOG=verbose. Note that
+  // `sk_live_xxx` is this product's own canonical example of a leaked secret
+  // (server/src/adapters/mocks.ts:195 seeds it as the finding a review is meant to catch), so it
+  // is secret-shaped by the repository's own definition.
+  { re: /\bsk_(live|test)_[A-Za-z0-9]{16,}/g, label: '[redacted:stripe-key]' },
   { re: /\bgh[pousr]_[A-Za-z0-9]{16,}/g, label: '[redacted:github-token]' },
   { re: /\bgithub_pat_[A-Za-z0-9_]{20,}/g, label: '[redacted:github-pat]' },
+  { re: /\bglpat-[A-Za-z0-9_-]{16,}/g, label: '[redacted:gitlab-token]' },
+  { re: /\bxox[abposr]-[A-Za-z0-9-]{10,}/g, label: '[redacted:slack-token]' },
   { re: /\bBearer\s+[A-Za-z0-9._~+/-]{16,}=*/g, label: '[redacted:bearer]' },
   { re: /\bAKIA[0-9A-Z]{16}\b/g, label: '[redacted:aws-key]' },
   { re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, label: '[redacted:private-key]' },

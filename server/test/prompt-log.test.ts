@@ -105,3 +105,104 @@ describe('prompt-log', () => {
     expect(seen).toHaveLength(1);
   });
 });
+
+/**
+ * L06 asks two things of this module that the block above does not pin:
+ *
+ *   AC-55  ONE structured line per generation, carrying the section names,
+ *          their token counts, the MODEL and the CORRELATION ID.
+ *   AC-70  secret-shaped strings are scrubbed from every line — and the only
+ *          channel that can carry a line of a repository file is the verbose
+ *          outline, so that is where the scrub has to be observed rather than
+ *          on `scrubSecrets` in isolation.
+ */
+describe('prompt-log — the onboarding generation line (AC-55, AC-70)', () => {
+  const ONBOARDING_META = {
+    correlationId: '7b1f0f7a-6a2b-4a0a-9b8d-1f2e3d4c5b6a',
+    call: 'onboarding' as const,
+    provider: 'openrouter',
+    model: 'deepseek/deepseek-v4-flash',
+  };
+
+  it('names the call, the correlation id and the model on the record itself', () => {
+    const rec = buildPromptLogRecord(ONBOARDING_META, SECTIONS, count, 'summary');
+    expect(rec).toMatchObject({
+      event: 'prompt.assembled',
+      call: 'onboarding',
+      correlation_id: ONBOARDING_META.correlationId,
+      provider: 'openrouter',
+      model: 'deepseek/deepseek-v4-flash',
+    });
+    // No review-only ids leak onto a generation's line.
+    expect(rec).not.toHaveProperty('pr_id');
+    expect(rec).not.toHaveProperty('run_id');
+    expect(rec).not.toHaveProperty('agent');
+  });
+
+  it('counts tokens per named section, which is what makes the line actionable', () => {
+    const rec = buildPromptLogRecord(ONBOARDING_META, SECTIONS, count, 'summary');
+    for (const row of rec.sections) {
+      expect(row.tokens).toBe(count(SECTIONS.find((s) => s.section === row.section)!.text!));
+      expect(row.tokens).toBeGreaterThan(0);
+    }
+    expect(rec.totals.tokens).toBe(rec.sections.reduce((n, s) => n + s.tokens, 0));
+  });
+
+  it('redacts a secret carried inside a heading the verbose outline keeps', () => {
+    // The exact AC-70 scenario: a README whose heading holds an example API
+    // key. The heading is structure, so the outline keeps the LINE — which is
+    // why the scrub, not the outline filter, is what protects the log here.
+    const key = ['sk', 'abcdefghij0123456789ABCD'].join('-');
+    const readme = [
+      '<untrusted source="README.md">',
+      `# Set OPENAI_API_KEY=${key} before starting`,
+      '</untrusted>',
+    ].join('\n');
+
+    const rec = buildPromptLogRecord(
+      ONBOARDING_META,
+      [{ section: 'readme', source: 'clone:README.md', text: readme }],
+      count,
+      'verbose',
+    );
+    const outline = rec.sections[0]!.outline!.join('\n');
+
+    // The heading survived and only the key was replaced — otherwise the key's
+    // absence would prove nothing but that the whole line was dropped.
+    expect(outline).toContain('before starting');
+    expect(outline).toContain('[redacted:openai-key]');
+    expect(JSON.stringify(rec)).not.toContain(key);
+  });
+
+  it('redacts every vendor shape it claims to know', () => {
+    const cases: Array<[string, string]> = [
+      [['github_pat', 'abcdefghij0123456789ABCDEF'].join('_'), '[redacted:github-pat]'],
+      [`AWS_ACCESS_KEY_ID=${['AKIA', 'IOSFODNN7EXAMPLE'].join('')}`, '[redacted:aws-key]'],
+      ['-----BEGIN RSA PRIVATE KEY-----', '[redacted:private-key]'],
+      [
+        ['eyJhbGciOiJIUzI1NiJ9', 'eyJzdWIiOiIxMjM0NTY3ODkwIn0', 'dozjgNryP4J3jVmNHl0w5N_XgL0'].join('.'),
+        '[redacted:jwt]',
+      ],
+    ];
+    for (const [input, label] of cases) {
+      expect(scrubSecrets(input), input.slice(0, 12)).toContain(label);
+    }
+  });
+
+  it('hands the caller the same record it logged, and nothing without a logger', () => {
+    const seen: { obj: unknown; msg?: string }[] = [];
+    const record = logPromptAssembly(
+      { info: (obj: unknown, msg?: string) => seen.push({ obj, msg }) },
+      'summary',
+      ONBOARDING_META,
+      SECTIONS,
+      count,
+    );
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.obj).toBe(record);
+    expect(seen[0]!.msg).toBe('prompt assembled (onboarding)');
+
+    expect(logPromptAssembly(undefined, 'summary', ONBOARDING_META, SECTIONS, count)).toBeUndefined();
+  });
+});

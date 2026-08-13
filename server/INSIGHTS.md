@@ -7,6 +7,26 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## What Works
 
+- [2026-08-13] To assert on what a SERVICE logged, construct the service
+  directly with your own logger over `app.container` after `buildApp`, rather
+  than reaching it through a route: `routes.ts` hands it `app.log`, which is
+  the noop logger in the test config (`logLevel: 'silent'` → Fastify
+  `logger: false`), so nothing is observable through the HTTP path. `new
+  OnboardingService(app.container, capturingLogger).generate(ws, repo)` is a
+  real generation over the real container and DB with a logger you own — and it
+  is the only honest way to test a criterion whose observation point is "the
+  server log" (`modules/onboarding/onboarding.it.test.ts`, AC-55/AC-70 cases).
+  Corollary for the `verbose` prompt-log branch: pass
+  `config: { ...loadConfig(...), promptLog: 'verbose' }` to `buildApp`, since
+  `PROMPT_LOG` is read once at config load and the default is `summary`.
+
+- [2026-08-13] Give a "hostile string must not reach X" test a second assertion
+  that the SURROUNDING text did reach X. `expect(log).not.toContain(key)` alone
+  passes just as well when the whole line was dropped for an unrelated reason,
+  which is a false negative that hides the day the scrub stops firing. The
+  README-secret case asserts both `toContain('before starting')` and
+  `toContain('[redacted:openai-key]')` before asserting the key is absent.
+
 - [2026-07-31] Give a repository a `transaction(fn)` method and let write
   helpers take an optional `DbOrTx` (`src/db/client.ts`) defaulting to `this.db`.
   The SERVICE picks the boundary, every existing single-write call site keeps
@@ -148,6 +168,20 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   (`modules/onboarding/verify.ts::collectDraftPaths`).
 
 ## What Doesn't Work
+
+- [2026-08-13] `scrubSecrets` (`platform/prompt-log.ts:42-51`) only knows
+  OpenAI/Anthropic `sk-…`, GitHub `ghp_`/`github_pat_`, `Bearer`, AWS `AKIA`,
+  PEM headers and JWTs. It does NOT match Stripe `sk_live_…`/`sk_test_…`, Slack
+  `xoxb-…` or GitLab `glpat-…` — verified by calling the function directly
+  under `pnpm exec tsx`. That matters because the pattern list is the ONLY
+  thing between an untrusted repository file and a log aggregator on the
+  `PROMPT_LOG=verbose` path, where `outlineOf` keeps markdown headings
+  verbatim: a README heading holding `sk_live_…` reaches the log unredacted.
+  Check the list against the shape you care about before trusting it — this
+  repo's own seeded example of a leaked secret is `stripeKey: "sk_live_xxx"`
+  (`adapters/mocks.ts:195`), a shape its own scrubber ignores. Red test:
+  `modules/onboarding/onboarding.it.test.ts`, "scrubs an example API key of any
+  common vendor shape".
 
 - [2026-08-13] A check/claim pair with NO `await` between them
   (`if (map.has(id)) throw; map.set(id, slot)`) is ALREADY mutually exclusive on

@@ -627,7 +627,12 @@ That is a decision inside the spec's stated latitude, not a change to what it re
   sibling of `/` today and stays outside `ShellLayout` (`client/INSIGHTS.md:16-27`).
 - Skills: `next-best-practices`, `frontend-ui-architecture`
 - Verify: `cd client && pnpm typecheck && pnpm lint && pnpm test`, then
-  `grep -rn '"/onboarding"' client/src` returns nothing, then `./scripts/e2e.sh`.
+  `grep -rn 'push("/onboarding")' client/src` returns nothing, then `./scripts/e2e.sh`.
+  **Corrected after verification:** the earlier wording asked for
+  `grep -rn '"/onboarding"' client/src` to return nothing, which this step can never satisfy -
+  `client/src/components/app-shell/helpers.ts:29` still contains `pathname.includes("/onboarding")`
+  and this same step says to leave that line exactly as it is, because it is what highlights the
+  tour. Only the `router.push` call sites move.
 
 ### Step 11 - Client hooks and i18n
 
@@ -850,7 +855,8 @@ That is a decision inside the spec's stated latitude, not a change to what it re
 - [ ] `reviewer-core` is unchanged - verify: `git diff --stat -- reviewer-core` is empty, and
       `cd reviewer-core && npm test` is green
 - [ ] The sidebar highlights Onboarding Tour on the tour page and nothing on `/repos/new`;
-      `grep -rn '"/onboarding"' client/src` returns nothing - verify:
+      `grep -rn 'push("/onboarding")' client/src` returns nothing (the `activeKeyFor` match at
+      `helpers.ts:29` stays, by design) - verify:
       `cd client && pnpm test && pnpm lint` and `./scripts/e2e.sh`
 - [ ] All five cards render for a tour with empty sections, collapse independently, the on-page
       navigation moves focus, a run step copies from the keyboard with an announcement, the cost

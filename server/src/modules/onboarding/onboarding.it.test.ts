@@ -39,7 +39,9 @@ import { loadConfig } from '../../platform/config.js';
 import { seed } from '../../db/seed.js';
 import * as t from '../../db/schema.js';
 import { MockEmbedder, MockGitClient, MockSecretsProvider } from '../../adapters/mocks.js';
+import type { PromptLogRecord, StructuredLogger } from '../../platform/prompt-log.js';
 import { ONBOARDING_SCHEMA_NAME } from './schemas.js';
+import { OnboardingService } from './service.js';
 
 const hasDocker = await dockerAvailable();
 const d = hasDocker ? describe : describe.skip;
@@ -137,6 +139,15 @@ const INTENT_FIXTURE = {
 
 // --- a provider that counts, and can be made to fail or hang ---------------
 
+/**
+ * Secret-shaped, in a shape `scrubSecrets` claims to redact (AC-70).
+ *
+ * Assembled rather than written out, the way `test/prompt-log.test.ts` does it:
+ * a literal here is indistinguishable from a real leaked key to any scanner
+ * reading added lines. The value still looks exactly like one at runtime.
+ */
+const PROVIDER_ERROR_KEY = ['sk', 'abcdefghij0123456789ABCD'].join('-');
+
 type LlmMode = 'ok' | 'reject' | 'gated';
 
 class CountingLLMProvider implements LLMProvider {
@@ -195,7 +206,9 @@ class CountingLLMProvider implements LLMProvider {
     const onboarding = req.schemaName === ONBOARDING_SCHEMA_NAME;
 
     if (onboarding && this.mode === 'reject') {
-      throw new Error(`provider refused (key sk_live_SHOULD_BE_SCRUBBED)`);
+      // A provider error that quotes the key it was called with — the shape
+      // `service.ts` runs through `scrubSecrets` before it reaches a log line.
+      throw new Error(`provider refused: bad credentials for ${PROVIDER_ERROR_KEY}`);
     }
     if (onboarding && this.mode === 'gated') {
       await new Promise<void>((resolve) => {
@@ -435,9 +448,9 @@ d('L06 onboarding tour (Testcontainers pg)', () => {
     git.headBudget = Number.POSITIVE_INFINITY;
   });
 
-  function makeApp(over: { db?: typeof pg.handle.db } = {}) {
+  function makeApp(over: { db?: typeof pg.handle.db; promptLog?: 'off' | 'summary' | 'verbose' } = {}) {
     return buildApp({
-      config: config(),
+      config: over.promptLog ? { ...config(), promptLog: over.promptLog } : config(),
       db: over.db ?? pg.handle.db,
       overrides: {
         embedder: new MockEmbedder(),
@@ -1067,5 +1080,188 @@ d('L06 onboarding tour (Testcontainers pg)', () => {
     expect(Object.keys(promptAssembly ?? {}).join(',')).not.toMatch(/onboarding|tour/i);
 
     await app.close();
+  });
+
+  // --- the server log for a generation (AC-55, AC-70) ----------------------
+  //
+  // The criteria name THE LOG as the observation point, so these drive a real
+  // generation over the real container and read back what the service actually
+  // emitted. The service is constructed directly rather than reached through
+  // the route because that is the only way to hold the logger it writes to:
+  // `routes.ts` hands it `app.log`, which is silent in the test config.
+
+  /** Everything the service logged during one generation. */
+  class CapturingLogger implements StructuredLogger {
+    public lines: { obj: Record<string, unknown>; msg?: string }[] = [];
+    info(obj: unknown, msg?: string): void {
+      this.lines.push({ obj: obj as Record<string, unknown>, msg });
+    }
+    get json(): string {
+      return JSON.stringify(this.lines);
+    }
+    record(event: string): Record<string, unknown> | undefined {
+      return this.lines.find((l) => l.obj.event === event)?.obj;
+    }
+  }
+
+  async function generateWithLogger(
+    app: App,
+    logger: CapturingLogger,
+    id = repoId,
+  ): Promise<void> {
+    await new OnboardingService(app.container, logger).generate(workspaceId, id);
+  }
+
+  it('emits ONE prompt-assembly line per generation, with the section names, their token counts, the model and the correlation id (AC-55)', async () => {
+    const app = await makeApp();
+    const logger = new CapturingLogger();
+    await generateWithLogger(app, logger);
+
+    // One per generation — not one per section, and not one per attempt.
+    const assemblyLines = logger.lines.filter((l) => l.obj.event === 'prompt.assembled');
+    expect(assemblyLines).toHaveLength(1);
+
+    const record = assemblyLines[0]!.obj as unknown as PromptLogRecord;
+    expect(record.call).toBe('onboarding');
+    expect(record.model).toBe('deepseek/deepseek-v4-flash');
+    expect(record.provider).toBe('openrouter');
+    expect(record.correlation_id).toMatch(/^[0-9a-f-]{36}$/);
+
+    // Section names, and a token count on each.
+    const names = record.sections.map((s) => s.section);
+    expect(names).toEqual(expect.arrayContaining(['system', 'repository', 'readme', 'scripts']));
+    expect(names.some((n) => n.startsWith('excerpt:'))).toBe(true);
+    for (const row of record.sections) {
+      expect(Number.isInteger(row.tokens)).toBe(true);
+      expect(row.tokens).toBeGreaterThan(0);
+      expect(row.sha8).toMatch(/^[0-9a-f]{8}$/);
+    }
+    expect(record.totals.tokens).toBeGreaterThan(0);
+
+    // The generation's own summary line ties to the SAME generation.
+    const summary = logger.lines.find((l) => l.msg === 'onboarding: tour generated')!;
+    expect(summary).toBeDefined();
+    expect(summary.obj.correlationId).toBe(record.correlation_id);
+    expect(summary.obj).toMatchObject({ feature: 'onboarding', model: 'deepseek/deepseek-v4-flash' });
+    expect(summary.obj.sections).toEqual([
+      { kind: 'architecture', status: expect.any(String) },
+      { kind: 'critical_paths', status: expect.any(String) },
+      { kind: 'run_locally', status: expect.any(String) },
+      { kind: 'reading_path', status: expect.any(String) },
+      { kind: 'first_tasks', status: expect.any(String) },
+    ]);
+
+    await app.close();
+  });
+
+  it('puts no file content and no model output into any line it emits (AC-55)', async () => {
+    const app = await makeApp();
+    const logger = new CapturingLogger();
+    await generateWithLogger(app, logger);
+
+    for (const forbidden of [
+      // file content, from three different fact channels
+      'A rate-limited public API', // README
+      'export const app = 1', // a ranked-file excerpt
+      'rotate the signing key', // a TODO marker line
+      'pgvector/pgvector:pg16', // the compose file
+      ENV_SECRET, // a value from .env.example
+      // model output
+      'ONBOARDING-TOUR-MARKER',
+      'Every request passes through it.',
+      'Where a request enters.',
+    ]) {
+      expect(logger.json, `"${forbidden}" reached a log line`).not.toContain(forbidden);
+    }
+
+    // …and the line is still useful: it says what happened, in measurements.
+    const summary = logger.lines.find((l) => l.msg === 'onboarding: tour generated')!;
+    expect(summary.obj).toMatchObject({ repoId, attempts: 1, droppedSteps: 1 });
+    expect(summary.obj.promptTokens).toBeGreaterThan(0);
+
+    await app.close();
+  });
+
+  it('still emits the generation line when the model call fails, and scrubs the secret out of the provider error (AC-55, AC-70)', async () => {
+    const app = await makeApp();
+    const logger = new CapturingLogger();
+    llm.mode = 'reject';
+    await generateWithLogger(app, logger);
+
+    // The assembly line survives the failure — it is emitted before the call.
+    expect(logger.lines.filter((l) => l.obj.event === 'prompt.assembled')).toHaveLength(1);
+
+    const summary = logger.lines.find((l) => l.msg === 'onboarding: tour generated')!;
+    expect(summary.obj.reasons).toContain('model_failed');
+    // The reason survives; the key inside it does not.
+    expect(String(summary.obj.error)).toContain('provider refused');
+    expect(String(summary.obj.error)).toContain('[redacted:openai-key]');
+    expect(logger.json).not.toContain(PROVIDER_ERROR_KEY);
+
+    await app.close();
+  });
+
+  it('scrubs an example API key that a README carries into the log (AC-70)', async () => {
+    // The criterion's own observation point: a repository whose README holds an
+    // example API key. `summary` mode keeps no line of a file at all, so the
+    // only channel that can carry one is `verbose`, whose outline keeps
+    // headings — and that is where the scrub has to fire.
+    const README_KEY = ['sk', 'abcdefghij0123456789WXYZ'].join('-');
+    await writeAt(
+      root,
+      'README.md',
+      ['# payments-api', '', `# Set OPENAI_API_KEY=${README_KEY} before starting`, ''].join('\n'),
+    );
+
+    try {
+      const app = await makeApp({ promptLog: 'verbose' });
+      const logger = new CapturingLogger();
+      await generateWithLogger(app, logger);
+
+      const record = logger.record('prompt.assembled') as unknown as PromptLogRecord;
+      const readme = record.sections.find((s) => s.section === 'readme')!;
+      // The outline kept the heading — so this is a real test of the scrub and
+      // not of an empty array.
+      expect(readme.outline).toBeDefined();
+      // The heading survived and only the KEY was replaced — otherwise the
+      // key's absence would prove nothing but that the line was dropped.
+      expect(readme.outline!.join('\n')).toContain('before starting');
+      expect(readme.outline!.join('\n')).toContain('[redacted:openai-key]');
+      expect(logger.json).not.toContain(README_KEY);
+
+      // Verbose still carries structure only: no prose line from the README.
+      expect(readme.outline!.every((line) => /^(#{1,6}\s|<\/?untrusted)/.test(line))).toBe(true);
+
+      await app.close();
+    } finally {
+      await writeAt(root, 'README.md', CLONE_FILES['README.md']!);
+    }
+  });
+
+  it('scrubs an example API key of any common vendor shape, not only OpenAI’s (AC-70)', async () => {
+    // Same channel as the test above, same criterion — "a repository whose
+    // README contains an example API key" — with the example key in Stripe's
+    // format instead of OpenAI's. `sk_live_…` is this product's OWN canonical
+    // example of a leaked secret (`src/adapters/mocks.ts:195` seeds
+    // `stripeKey: "sk_live_xxx"` as the finding a review is supposed to catch),
+    // so it is secret-shaped by the repository's own definition.
+    const README_KEY = ['sk', 'live', '51H8ZzABCDEFGHIJKLMNOPQRS'].join('_');
+    await writeAt(
+      root,
+      'README.md',
+      ['# payments-api', '', `# Set STRIPE_KEY=${README_KEY} before starting`, ''].join('\n'),
+    );
+
+    try {
+      const app = await makeApp({ promptLog: 'verbose' });
+      const logger = new CapturingLogger();
+      await generateWithLogger(app, logger);
+
+      expect(logger.json).not.toContain(README_KEY);
+
+      await app.close();
+    } finally {
+      await writeAt(root, 'README.md', CLONE_FILES['README.md']!);
+    }
   });
 });
