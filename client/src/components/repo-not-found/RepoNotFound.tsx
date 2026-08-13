@@ -17,7 +17,7 @@ export function RepoNotFound() {
       title={t("repoNotFound.title")}
       body={t("repoNotFound.body")}
       cta={t("repoNotFound.cta")}
-      onCta={() => router.push("/onboarding")}
+      onCta={() => router.push("/repos/new")}
     />
   );
 }

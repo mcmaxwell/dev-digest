@@ -78,6 +78,7 @@ flowchart TB
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
     blast["blast<br/>/pulls/:id/blast · /pulls/:id/blast/summary"]
     projectContext["project-context<br/>/repos/:id/context(/doc|/refresh)<br/>/agents/:id/context · /skills/:id/context"]
+    onboarding["onboarding<br/>/repos/:id/onboarding · /repos/:id/onboarding/generate"]
   end
   subgraph Platform["Platform"]
     settings["settings<br/>/settings · /providers"]
@@ -179,6 +180,27 @@ What the reviewer actually sends to the model is assembled in
   logged). Every document the run considered is recorded in
   `RunTrace.specs_read` with its status, so the omissions are visible too. See
   `src/modules/project-context/README.md`.
+
+## Onboarding tour (L06)
+
+`modules/onboarding` turns facts DevDigest already holds — the file ranking, the
+dependency chains, the clone's manifests and task files, `TODO`/`FIXME` markers
+and open `good first issue` issues — plus **exactly one** structured model call
+into five fixed sections, then verifies every path the model emitted against the
+clone at the generation commit before storing anything.
+
+The one-call property is enforced in two places, because two layers could break
+it: no `withRetry` around `completeStructured`, and `retries: 0` on the job
+registration (the runner otherwise re-runs a whole handler twice more, model call
+included). The tour's `usage` record carries the call count, tokens, cost and
+attempts, so "one call" is checkable from the page rather than from a log.
+
+Nothing generates without the user asking, and nothing regenerates on its own.
+A failed call, an absent index or unreachable issues all persist a readable
+`degraded` tour with a stated reason — never an error page. Tour text NEVER
+enters a review, intent or conventions prompt: model output grounding model
+output would let a hallucinated architecture claim pass every grounding gate the
+product has. See `src/modules/onboarding/README.md`.
 
 ## Testing
 

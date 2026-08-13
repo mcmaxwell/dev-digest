@@ -35,7 +35,7 @@ export function HomeView() {
             title={t("home.emptyTitle")}
             body={t("home.emptyBody")}
             cta={t("home.emptyCta")}
-            onCta={() => router.push("/onboarding")}
+            onCta={() => router.push("/repos/new")}
           />
         ) : (
           <div>

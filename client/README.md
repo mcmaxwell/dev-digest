@@ -24,15 +24,17 @@ Routes (`src/app/**/page.tsx`) and the API surface each leans on (via
 ```mermaid
 flowchart TD
   ROOT["/"] -->|"useRepos → GET /repos"| PULLS["/repos/:repoId/pulls<br/>PR list"]
-  ONB["/onboarding<br/>add repo"] -->|"POST /repos"| API[("Fastify API")]
+  ONB["/repos/new<br/>add repo"] -->|"POST /repos"| API[("Fastify API")]
   PULLS --> PR["/pulls/:number<br/>review detail<br/>(overview · diff · findings)"]
 
   AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config)"]
   SETTINGS["/settings/:section<br/>API keys · models"]
   CONTEXT["/repos/:repoId/context<br/>Project Context<br/>(tree + read-only viewer)"]
+  TOUR["/repos/:repoId/onboarding<br/>Onboarding Tour<br/>(five generated sections)"]
 
   PULLS -->|"GET /repos/:id/pulls · /repos/:id/index-state"| API
   CONTEXT -->|"GET /repos/:id/context(/doc) · POST /repos/:id/context/refresh"| API
+  TOUR -->|"GET /repos/:id/onboarding · POST /repos/:id/onboarding/generate"| API
   PR -->|"GET /pulls/:id · /reviews · /pulls/:id/comments<br/>POST /pulls/:id/review · /findings/:id/(accept|dismiss)"| API
   AGENTS -->|"/agents · /agents/:id"| API
   SETTINGS -->|"/settings · /providers"| API

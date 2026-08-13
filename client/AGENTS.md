@@ -17,7 +17,8 @@ pnpm lint        # architecture boundaries + react-hooks (eslint.config.mjs)
 
 ```
 src/app/**/page.tsx        routes: / · /repos/:id/pulls · /pulls/:number ·
-                           /agents(/:id) · /settings/:section · /onboarding
+                           /agents(/:id) · /settings/:section · /repos/new ·
+                           /repos/:id/context · /repos/:id/onboarding
 src/app/**/_components/    feature logic, colocated with its *.test.tsx
 src/components/app-shell/  nav, breadcrumbs, g-then-key shortcuts
 src/lib/api.ts             API base + fetch layer

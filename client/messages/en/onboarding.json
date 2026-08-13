@@ -1,15 +1,90 @@
 {
   "title": "Onboarding Tour",
-  "sections": "Sections",
-  "sectionCount": "{count} sections",
+  "onThisPage": "On this page",
+  "jumpTo": "Jump to section",
   "regenerate": "Regenerate",
+  "retry": "Retry",
   "regenerating": "Regenerating…",
+  "copyMarkdown": "Copy as Markdown",
+  "copied": "Copied",
+  "copyCommand": "Copy command",
+  "copiedCommand": "Command copied",
+  "open": "Open",
+  "openOnGithub": "Open {path} on GitHub",
+  "collapse": "Collapse section",
+  "expand": "Expand section",
   "unknownError": "Unknown error",
+  "sectionTitles": {
+    "architecture": "Architecture overview",
+    "critical_paths": "Critical paths",
+    "run_locally": "How to run locally",
+    "reading_path": "Guided reading path",
+    "first_tasks": "First tasks"
+  },
+  "noClone": {
+    "title": "This repository has no clone yet",
+    "body": "DevDigest reads the tour's facts straight from the clone on disk. The clone job has not finished for this repository, so there is nothing to generate a tour from yet."
+  },
   "generate": {
     "title": "Generate onboarding tour",
-    "body": "DevDigest indexes the repo and specs, then writes a 5-section guided tour: overview, architecture, key modules, getting started, and conventions & gotchas.",
+    "body": "One structured model call turns the facts DevDigest already holds — the file ranking, the dependency chains, the manifests, the task files and the open `good first issue` issues — into five sections: architecture overview, critical paths, how to run locally, a guided reading path, and first tasks.",
     "cta": "Generate onboarding tour",
     "generating": "Generating…"
+  },
+  "generating": {
+    "title": "Generating the tour…",
+    "phase": {
+      "facts": "Reading manifests, task files and the example env file",
+      "graph": "Reading the file ranking and dependency chains",
+      "markers": "Looking for TODO and FIXME markers",
+      "issues": "Fetching issues labelled good first issue",
+      "model": "Writing the tour (one model call)",
+      "verifying": "Checking every path against the clone"
+    }
+  },
+  "header": {
+    "indexedFiles": "Generated from index of {count} files",
+    "skippedFiles": "{count} skipped",
+    "generatedAt": "generated at {sha}",
+    "generatedTime": "on {time}",
+    "commitsBehind": "{count} commits behind",
+    "headMoved": "the head has moved from {tourSha} to {currentSha}",
+    "noExcerpts": "No file excerpts were used — this repository is above the excerpt cutoff.",
+    "dropped": "{rows} row(s) and {steps} run step(s) were dropped for naming files that do not exist."
+  },
+  "cost": {
+    "line": "{calls} call · {tokensIn} in / {tokensOut} out · {cost}",
+    "unavailable": "cost unavailable",
+    "attempts": "{count} attempt(s)",
+    "none": "No usage was recorded for this tour."
+  },
+  "degraded": {
+    "title": "This tour is degraded",
+    "reason": {
+      "no_index": "The repository is not indexed, so the tour was built from deterministic facts alone.",
+      "partial_index": "The repository's index is incomplete, so parts of the tour were built from deterministic facts.",
+      "repo_too_large": "The repository is above the excerpt cutoff, so no file excerpts reached the model.",
+      "model_failed": "The model call failed, so the tour below is the deterministic skeleton. Retry to try again.",
+      "issues_unavailable": "GitHub issues could not be read, so first tasks come from TODO and FIXME markers alone."
+    }
+  },
+  "status": {
+    "noGraph": "Computed without the import graph"
+  },
+  "empty": {
+    "architecture": "Nothing was readable in the clone to describe the shape of this repository.",
+    "critical_paths": "No dependency chains were available. Critical paths appear once the repository is indexed.",
+    "run_locally": "No runnable commands were found in package.json scripts, Makefile, Justfile or Taskfile.yml.",
+    "reading_path": "No ranked files were available. The reading path appears once the repository is indexed.",
+    "first_tasks": "No first tasks were found. Looked for TODO and FIXME markers in the highest-ranked files, and for open issues labelled good first issue."
+  },
+  "rows": {
+    "rank": "rank {percentile}",
+    "step": "Step {n}",
+    "sourcePrefix": "from",
+    "order": "{n}",
+    "issue": "issue #{number}",
+    "marker": "{path}:{line}"
   },
   "loadError": {
     "title": "Couldn’t load the onboarding tour"

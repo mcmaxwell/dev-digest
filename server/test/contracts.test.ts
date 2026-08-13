@@ -128,7 +128,21 @@ describe('AI contracts parse fixtures', () => {
     ).not.toThrow();
     expect(() =>
       Onboarding.parse({
-        sections: [{ kind: 'architecture', title: 'T', body: 'b', links: [] }],
+        repo_id: 'r1',
+        status: 'ready',
+        degraded_reasons: [],
+        head_sha: 'abc1234',
+        index_sha: 'abc1234',
+        files_indexed: 120,
+        files_skipped: 3,
+        excerpts_used: 4,
+        dropped_rows: 0,
+        dropped_steps: 0,
+        generated_at: '2026-08-13T00:00:00Z',
+        sections: [
+          { kind: 'architecture', title: 'T', body: 'b', status: 'ok', links: [], diagram: null },
+        ],
+        usage: null,
       }),
     ).not.toThrow();
     expect(() =>

@@ -363,6 +363,33 @@ export class OctokitGitHubClient implements GitHubClient {
     };
   }
 
+  /**
+   * Open issues carrying EVERY label in `labels` (GitHub ANDs a comma-joined
+   * list), newest first, one page of `limit`. The endpoint returns pull
+   * requests too — they carry a `pull_request` key — so they are dropped here
+   * rather than at every call site.
+   */
+  async listIssues(
+    repo: RepoRef,
+    opts: { labels: string[]; limit: number },
+  ): Promise<IssueMeta[]> {
+    const res = await withRetry(() =>
+      withTimeout(
+        this.octokit.rest.issues.listForRepo({
+          owner: repo.owner,
+          repo: repo.name,
+          state: 'open',
+          labels: opts.labels.join(','),
+          per_page: opts.limit,
+        }),
+        TIMEOUT,
+      ),
+    );
+    return res.data
+      .filter((i) => !i.pull_request)
+      .map((i) => ({ number: i.number, title: i.title, body: i.body, state: i.state }));
+  }
+
   async currentLogin(): Promise<string> {
     const res = await withRetry(() =>
       withTimeout(this.octokit.rest.users.getAuthenticated(), TIMEOUT),

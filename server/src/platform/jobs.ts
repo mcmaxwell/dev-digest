@@ -31,6 +31,7 @@ export class JobRunner {
   private queue: PQueue;
   private handlers = new Map<string, JobHandler>();
   private kindTimeouts = new Map<string, number>();
+  private kindRetries = new Map<string, number>();
   private timeoutMs: number;
   private retries: number;
 
@@ -49,10 +50,23 @@ export class JobRunner {
    * timeout only rejects the awaited promise, it cannot cancel the work, so an
    * under-budgeted job is marked `failed` while its pipeline keeps running and
    * whatever row it opened is left dangling.
+   *
+   * `retries` overrides the runner's ambient retry FOR THIS KIND, and `0`
+   * disables it. Every handler is otherwise wrapped in `withRetry` at the
+   * runner's default of 2, which re-runs the WHOLE handler — fine for an
+   * idempotent clone or index, wrong for a handler that spends money: a throw
+   * after a successful model call would re-issue that call. A kind whose work
+   * is billable and non-idempotent registers with `retries: 0` and lets the
+   * user retry deliberately.
    */
-  register(kind: string, handler: JobHandler, opts: { timeoutMs?: number } = {}): void {
+  register(
+    kind: string,
+    handler: JobHandler,
+    opts: { timeoutMs?: number; retries?: number } = {},
+  ): void {
     this.handlers.set(kind, handler);
     if (opts.timeoutMs) this.kindTimeouts.set(kind, opts.timeoutMs);
+    if (opts.retries !== undefined) this.kindRetries.set(kind, opts.retries);
   }
 
   async enqueue(workspaceId: string, kind: string, payload: unknown): Promise<EnqueuedJob> {
@@ -65,6 +79,7 @@ export class JobRunner {
       .returning({ id: t.jobs.id });
     const jobId = row!.id;
     const timeoutMs = this.kindTimeouts.get(kind) ?? this.timeoutMs;
+    const retries = this.kindRetries.get(kind) ?? this.retries;
 
     const done = this.queue.add(async () => {
       await this.db
@@ -81,7 +96,7 @@ export class JobRunner {
                 .where(eq(t.jobs.id, jobId));
             }),
           {
-            retries: this.retries,
+            retries,
             onRetry: async (attempt) => {
               await this.db
                 .update(t.jobs)

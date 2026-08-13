@@ -133,6 +133,13 @@ export interface GitHubClient {
   ): Promise<PrReviewComment>;
   openPullRequest(repo: RepoRef, payload: OpenPrPayload): Promise<{ url: string }>;
   getIssue(repo: RepoRef, n: number): Promise<IssueMeta>;
+  /**
+   * Open issues carrying every label in `labels`, newest first, capped at
+   * `limit`. One page is the contract — `limit` IS the cap, and a caller that
+   * wants more asks for more rather than paginating. Pull requests are filtered
+   * out: GitHub's issues endpoint returns them too.
+   */
+  listIssues(repo: RepoRef, opts: { labels: string[]; limit: number }): Promise<IssueMeta[]>;
   /** GET /user — for "posting as @user". */
   currentLogin(): Promise<string>;
 }
@@ -179,7 +186,18 @@ export interface GitClient {
   currentHead(repo: RepoRef): Promise<string>;
   diff(repo: RepoRef, base: string, head: string): Promise<UnifiedDiff>;
   blame(repo: RepoRef, path: string): Promise<BlameLine[]>;
-  log(repo: RepoRef, path?: string): Promise<GitCommit[]>;
+  /**
+   * Commits reachable from HEAD, newest first. `maxCount` bounds the walk: a
+   * caller on a latency budget (the onboarding read counts a tour's commit
+   * distance) must not depend on the clone happening to be shallow.
+   */
+  log(repo: RepoRef, path?: string, opts?: { maxCount?: number }): Promise<GitCommit[]>;
+  /**
+   * Repo-relative paths TRACKED at HEAD, capped at `limit`. Backed by
+   * `git ls-files`, so ignored and generated files never appear — which is what
+   * makes it usable as a candidate set when the import graph is unavailable.
+   */
+  listFiles(repo: RepoRef, opts?: { limit?: number }): Promise<string[]>;
   readFile(repo: RepoRef, path: string): Promise<string>;
   clonePathFor(repo: RepoRef): string;
 }

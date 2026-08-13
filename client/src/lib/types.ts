@@ -55,6 +55,21 @@ export type {
   SetContextDocsBody,
   SpecsReadEntry,
 } from "@devdigest/shared";
+export type {
+  Onboarding,
+  OnboardingPage,
+  OnboardingSection,
+  OnboardingSectionKind,
+  OnboardingSectionStatus,
+  OnboardingDegradedReason,
+  OnboardingGeneration,
+  OnboardingUsage,
+  OnboardingLink,
+  OnboardingCriticalPath,
+  OnboardingRunStep,
+  OnboardingReadingEntry,
+  OnboardingFirstTask,
+} from "@devdigest/shared";
 
 /** UI-only view model for a PR list row (derives display fields from PrMeta). */
 export interface PrRowView {

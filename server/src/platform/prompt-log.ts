@@ -73,8 +73,11 @@ export interface PromptSectionInput {
 export interface PromptLogMeta {
   /** Ties every model call of one user action together, including across agents. */
   correlationId: string;
-  /** Which call this is. Two per review: the cheap classifier, then the reviewer. */
-  call: 'intent' | 'review';
+  /**
+   * Which call this is. Two per review: the cheap classifier, then the
+   * reviewer. `onboarding` is the one structured call of a tour generation.
+   */
+  call: 'intent' | 'review' | 'onboarding';
   provider: string;
   model: string;
   prId?: string;
@@ -96,7 +99,7 @@ export interface PromptSectionLog {
 export interface PromptLogRecord {
   event: 'prompt.assembled';
   correlation_id: string;
-  call: 'intent' | 'review';
+  call: 'intent' | 'review' | 'onboarding';
   provider: string;
   model: string;
   pr_id?: string;

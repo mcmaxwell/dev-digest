@@ -127,6 +127,13 @@
       "when": 1786636604766,
       "tag": "0017_mighty_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786649075817,
+      "tag": "0018_shallow_toro",
+      "breakpoints": true
     }
   ]
 }

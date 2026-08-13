@@ -132,6 +132,17 @@ export interface MockGitHubOptions {
    * `true` throws a generic error; a string is used as the message.
    */
   issueError?: boolean | string;
+  /**
+   * Issues returned by `listIssues`, regardless of the labels asked for —
+   * label filtering is the real API's job, and a test that wants the "no
+   * labelled issues" branch just leaves this empty.
+   */
+  issues?: IssueMeta[];
+  /**
+   * Make `listIssues` REJECT — the "issues unavailable" branch (no token, rate
+   * limit), which must degrade rather than fail a generation.
+   */
+  listIssuesError?: boolean | string;
 }
 
 export class MockGitHubClient implements GitHubClient {
@@ -246,6 +257,17 @@ export class MockGitHubClient implements GitHubClient {
     return { number: n, title: `Issue #${n}`, body: 'mock issue', state: 'open' };
   }
 
+  async listIssues(_repo: RepoRef, _opts: { labels: string[]; limit: number }): Promise<IssueMeta[]> {
+    if (this.opts.listIssuesError) {
+      throw new Error(
+        typeof this.opts.listIssuesError === 'string'
+          ? this.opts.listIssuesError
+          : 'Issues are unavailable',
+      );
+    }
+    return this.opts.issues ?? [];
+  }
+
   async currentLogin(): Promise<string> {
     return this.opts.login ?? 'mock-user';
   }
@@ -261,6 +283,10 @@ export interface MockGitOptions {
   head?: string;
   /** Head `currentHead()` returns AFTER `sync()` runs — simulates fetch+reset advancing HEAD. */
   syncedHead?: string;
+  /** Tracked paths returned by `listFiles` (the no-graph candidate source). */
+  fileList?: string[];
+  /** Commits returned by `log()`, newest first — drives "N commits behind". */
+  commits?: GitCommit[];
 }
 
 export class MockGitClient implements GitClient {
@@ -299,8 +325,15 @@ export class MockGitClient implements GitClient {
   async blame(): Promise<BlameLine[]> {
     return [{ line: 1, sha: 'a1b2c3d4', author: 'marisa.koch', date: '2026-06-01', summary: 'init' }];
   }
-  async log(): Promise<GitCommit[]> {
-    return [{ sha: 'a1b2c3d4', message: 'init', author: 'marisa.koch', date: '2026-06-01' }];
+  async log(_repo?: RepoRef, _path?: string, opts?: { maxCount?: number }): Promise<GitCommit[]> {
+    const all = this.opts.commits ?? [
+      { sha: 'a1b2c3d4', message: 'init', author: 'marisa.koch', date: '2026-06-01' },
+    ];
+    return opts?.maxCount ? all.slice(0, opts.maxCount) : all;
+  }
+  async listFiles(_repo: RepoRef, opts?: { limit?: number }): Promise<string[]> {
+    const all = this.opts.fileList ?? [];
+    return opts?.limit ? all.slice(0, opts.limit) : all;
   }
   async readFile(_repo: RepoRef, path: string): Promise<string> {
     return this.opts.files?.[path] ?? '';

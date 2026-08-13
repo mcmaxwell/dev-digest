@@ -36,7 +36,7 @@ export function useShellContext({ onOpenCommandPalette }: ShellContextOptions): 
     [setRepoId, router],
   );
 
-  const onAddRepo = React.useCallback(() => router.push("/onboarding"), [router]);
+  const onAddRepo = React.useCallback(() => router.push("/repos/new"), [router]);
 
   const onRemoveRepo = React.useCallback(
     (id: string) => {
@@ -49,7 +49,7 @@ export function useShellContext({ onOpenCommandPalette }: ShellContextOptions): 
         onSuccess: () => {
           if (repoId === id) {
             const next = repos.find((r) => r.id !== id);
-            router.push(next ? `/repos/${next.id}/pulls` : "/onboarding");
+            router.push(next ? `/repos/${next.id}/pulls` : "/repos/new");
           }
         },
       });

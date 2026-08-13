@@ -21,10 +21,16 @@ the root INSIGHTS.md. Format and quality gates:
   instead of rendering `<AppShell>` themselves. Wired for
   `repos/[repoId]/pulls/`, `agents/`, `settings/` (each got its own
   `layout.tsx` using the shared `ShellLayout` component in
-  `components/app-shell/`) — `/` (home) and `/onboarding` were NOT hoisted
-  since they sit as siblings directly under `src/app/`, so a root layout would
-  wrap onboarding too; that needs route groups (not done — bigger/riskier
-  diff for a nav-remount perf nit).
+  `components/app-shell/`) — `/` (home) and the add-repository screen were NOT
+  hoisted since they sit as siblings directly under `src/app/`, so a root
+  layout would wrap the add-repo screen too; that needs route groups (not done
+  — bigger/riskier diff for a nav-remount perf nit).
+  - [2026-08-13] L06 moved the add-repository screen from `/onboarding` to
+    `/repos/new` and gave `/repos/:repoId/onboarding` to the Onboarding Tour,
+    which DOES get a `layout.tsx` mounting `ShellLayout`. So "`/onboarding` is
+    deliberately outside the shell" is no longer the whole truth: the shell-less
+    screen is `/repos/new`, and it is still a direct sibling under `src/app/`
+    for the same reason.
 
 ## What Doesn't Work
 
@@ -67,6 +73,15 @@ the root INSIGHTS.md. Format and quality gates:
 
 ## Codebase Patterns
 
+- [2026-08-13] `repoIdFromPath` in `lib/repo-context.tsx` matches
+  `^/repos/([^/]+)` with NO exclusion for static segments, so adding any static
+  route under `/repos/` makes `useActiveRepo()` report that segment as the
+  active repo id — L06's `/repos/new` yields `repoId === "new"` and
+  `activeRepo === null`. Harmless there only because the add-repository screen
+  renders no `ShellLayout` and reads neither value. Any FUTURE page under
+  `/repos/<static>/…` that uses `useActiveRepo` (or any nav href resolving
+  `:repoId`) will silently address a repository called `new`; fix it at
+  `repoIdFromPath` with a static-segment denylist, not at the call site.
 - [2026-08-10] Two vendored primitives silently render a `<button>` where a
   caller may not want one, and `src/vendor/ui/**` is frozen, so the workaround
   belongs in the FEATURE: `MonoLink` without an `href` is an inert button with

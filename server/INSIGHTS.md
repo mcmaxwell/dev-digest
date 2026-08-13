@@ -171,6 +171,37 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## Codebase Patterns
 
+- [2026-08-13] `JobRunner.enqueue` wraps EVERY handler in
+  `withRetry(..., { retries: this.retries })` and `container.ts` constructs the
+  runner with the default of 2 — so a handler that spends money is re-run up to
+  three times per click, and the retry re-issues the LLM call even when the
+  throw happened AFTER the call succeeded (a `repo.upsert` blip, any bug in the
+  persistence tail). `register(kind, handler, { timeoutMs })` had no way to say
+  otherwise; it now takes `retries` too, and any billable, non-idempotent kind
+  must register with `retries: 0` and let the USER retry deliberately
+  (`modules/onboarding/service.ts::registerGenerateJobHandler`). Banning
+  `withRetry` around the model call in the service is only half the fix — the
+  queue re-creates the same anti-pattern one layer up, invisibly.
+
+- [2026-08-13] An acceptance criterion of the form "the rows are in
+  `getTopFilesByRank` order" or "every entry appears in `getCriticalPaths`
+  output" CANNOT be satisfied by verifying model output afterwards: those are
+  membership and ORDERING properties, and a post-hoc check can only ever test
+  existence. Build the rows from the candidate set instead (pass the set into
+  the prompt, then drop any row outside it in verification) — then ordering is
+  true by construction and the verifier only has to catch prose paths, links and
+  cited sources. `modules/onboarding/{candidates,verify}.ts` is the shape.
+
+- [2026-08-13] A "collected facts" struct must carry the PATHS of the files it
+  read, not their content. `.env.example` is on every sensible fact-file list
+  and routinely holds a real key someone forgot to blank, so a struct that keeps
+  raw content is one careless `logger.info(facts)` or one new prompt block away
+  from leaking it — and nothing downstream needs it, because every consumer
+  wants a DERIVED field (`envKeys`, `scripts`, `stack`) anyway. Caught by
+  asserting `JSON.stringify(facts)` contains no value from the example env file
+  (`modules/onboarding/facts.ts::extractFacts`,
+  `DeterministicFacts.present: string[]`).
+
 - [2026-08-07] A module that only JOINS other modules' data needs no
   `repository.ts` at all. `modules/smart-diff` reads everything through
   `container.reviewRepo` (`getPull` / `getPrFiles` / `reviewsForPull`), so it

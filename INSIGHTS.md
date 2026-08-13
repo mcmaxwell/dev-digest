@@ -48,6 +48,14 @@ the matching one, never rewrite old entries. Package-specific lessons go to
     client's `adapters.ts` lacks the `openrouter` provider id). Any automated
     sync check must scope to files touched by the current diff, or it fails on
     every run; a blanket `diff -rq` of the two trees is always red.
+  - [2026-08-13] The "4 files" above is STALE for `contracts/knowledge.ts`: the
+    two copies were byte-identical before L06 and L06 kept them so, which is why
+    step 1 of that change could verify with a plain
+    `diff -q server/src/vendor/shared/contracts/knowledge.ts
+    client/src/vendor/shared/contracts/knowledge.ts`. `.claude/repo-facts.md` is
+    generated and lists the CURRENT drift set (three files: `adapters.ts`,
+    `contracts/eval-ci.ts`, `contracts/productionize.ts`) — read that rather
+    than this bullet before choosing between `diff -q` and a symbol grep.
 - [2026-08-10] The `@devdigest/shared` barrel does `export *` over every
   contract file, so a NEW contract file must not re-export a name it imports
   from a sibling - `contracts/blast.ts` builds on `BlastCaller` /

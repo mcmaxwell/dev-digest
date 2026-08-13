@@ -25,26 +25,193 @@ export const Conformance = z.object({
 });
 export type Conformance = z.infer<typeof Conformance>;
 
-// ---- Onboarding ----
+// ---- Onboarding (L06 — Onboarding Tour) ----
+/**
+ * One generated, grounded tour per imported repository: five fixed sections,
+ * their rows, the provenance that pins every link to a commit, and the usage
+ * record that makes "exactly one model call" falsifiable from the page.
+ *
+ * These are the PERSISTED and READ shapes. What the model is asked to return is
+ * a different, flatter schema (`modules/onboarding/schemas.ts`): rows there are
+ * unverified, ordinals and rank percentiles are ours, and provenance and usage
+ * are ours. The two must not be merged.
+ */
 export const OnboardingLink = z.object({
   label: z.string(),
   path: z.string(),
 });
 export type OnboardingLink = z.infer<typeof OnboardingLink>;
 
-export const OnboardingSection = z.object({
-  kind: z.string(),
+/** The five sections, in the order the page renders them. */
+export const OnboardingSectionKind = z.enum([
+  'architecture',
+  'critical_paths',
+  'run_locally',
+  'reading_path',
+  'first_tasks',
+]);
+export type OnboardingSectionKind = z.infer<typeof OnboardingSectionKind>;
+
+/**
+ * Per-section state. `no_graph` is not a failure: the section was built from
+ * directory prominence and entry-point heuristics because the import graph was
+ * unavailable, and the page says so rather than pretending otherwise.
+ */
+export const OnboardingSectionStatus = z.enum(['ok', 'empty', 'no_graph']);
+export type OnboardingSectionStatus = z.infer<typeof OnboardingSectionStatus>;
+
+export const OnboardingDegradedReason = z.enum([
+  'no_index',
+  'partial_index',
+  'repo_too_large',
+  'model_failed',
+  'issues_unavailable',
+]);
+export type OnboardingDegradedReason = z.infer<typeof OnboardingDegradedReason>;
+
+export const OnboardingCriticalPath = z.object({
+  path: z.string(),
+  reason: z.string(),
+  /** From `repoIntel.getFileRank`; null when the graph could not supply one. */
+  rank_percentile: z.number().nullable(),
+});
+export type OnboardingCriticalPath = z.infer<typeof OnboardingCriticalPath>;
+
+export const OnboardingRunStep = z.object({
+  step: z.number().int().positive(),
+  command: z.string(),
+  /** The repo-relative file the command was read from — the reader's check. */
+  source: z.string(),
+});
+export type OnboardingRunStep = z.infer<typeof OnboardingRunStep>;
+
+export const OnboardingReadingEntry = z.object({
+  order: z.number().int().positive(),
+  path: z.string(),
+  reason: z.string(),
+});
+export type OnboardingReadingEntry = z.infer<typeof OnboardingReadingEntry>;
+
+export const OnboardingFirstTask = z.object({
+  title: z.string(),
+  origin: z.enum(['todo', 'issue']),
+  path: z.string().nullish(),
+  line: z.number().int().positive().nullish(),
+  issue_number: z.number().int().positive().nullish(),
+});
+export type OnboardingFirstTask = z.infer<typeof OnboardingFirstTask>;
+
+const OnboardingSectionBase = z.object({
   title: z.string(),
   body: z.string(), // markdown
-  diagram: z.string().nullish(), // mermaid
+  status: OnboardingSectionStatus,
+  /** Up to a handful of supporting files; every one verified to exist. */
   links: z.array(OnboardingLink),
 });
+
+/**
+ * A discriminated union HERE is deliberate and safe: no model ever sees this
+ * schema. The model's own schema stays flat (a `oneOf` degrades output badly);
+ * this one is what the page narrows on.
+ */
+export const OnboardingSection = z.discriminatedUnion('kind', [
+  OnboardingSectionBase.extend({
+    kind: z.literal('architecture'),
+    /** Mermaid source. Permitted on this section and no other. */
+    diagram: z.string().nullish(),
+  }),
+  OnboardingSectionBase.extend({
+    kind: z.literal('critical_paths'),
+    items: z.array(OnboardingCriticalPath),
+  }),
+  OnboardingSectionBase.extend({
+    kind: z.literal('run_locally'),
+    items: z.array(OnboardingRunStep),
+  }),
+  OnboardingSectionBase.extend({
+    kind: z.literal('reading_path'),
+    items: z.array(OnboardingReadingEntry),
+  }),
+  OnboardingSectionBase.extend({
+    kind: z.literal('first_tasks'),
+    items: z.array(OnboardingFirstTask),
+  }),
+]);
 export type OnboardingSection = z.infer<typeof OnboardingSection>;
 
+/**
+ * What one generation cost. `calls` is always 1 — it is on the record so the
+ * page can state it rather than the reader having to grep a log. Token and cost
+ * fields are nullable because a failed call still produces a usage record, and
+ * because not every provider prices its own output.
+ */
+export const OnboardingUsage = z.object({
+  calls: z.number().int(),
+  provider: z.string(),
+  model: z.string(),
+  tokens_in: z.number().int().nullable(),
+  tokens_out: z.number().int().nullable(),
+  cost_usd: z.number().nullable(),
+  attempts: z.number().int(),
+  duration_ms: z.number().int(),
+});
+export type OnboardingUsage = z.infer<typeof OnboardingUsage>;
+
+/**
+ * `sections` is deliberately NOT length-constrained. Five sections are
+ * guaranteed by the assembler; a `.length(5)` here would turn a malformed
+ * STORED document into a thrown response, and a tour must never render as an
+ * error page.
+ */
 export const Onboarding = z.object({
+  repo_id: z.string(),
+  status: z.enum(['ready', 'degraded']),
+  degraded_reasons: z.array(OnboardingDegradedReason),
+  /** The commit the clone stood at when facts were collected; links pin to it. */
+  head_sha: z.string(),
+  /** What repo-intel last indexed, which may lag `head_sha`. */
+  index_sha: z.string().nullable(),
+  files_indexed: z.number().int(),
+  files_skipped: z.number().int(),
+  excerpts_used: z.number().int(),
+  /** Rows and steps the verification pass dropped for citing a missing path. */
+  dropped_rows: z.number().int(),
+  dropped_steps: z.number().int(),
+  generated_at: z.string(),
   sections: z.array(OnboardingSection),
+  usage: OnboardingUsage.nullable(),
 });
 export type Onboarding = z.infer<typeof Onboarding>;
+
+/**
+ * In-flight state. Not persisted: an in-memory single-flight guard dies with
+ * the process, which is the correct behaviour for a running-generation lock (a
+ * `running` ROW would need a boot reaper).
+ */
+export const OnboardingGeneration = z.object({
+  status: z.enum(['idle', 'running']),
+  phase: z.enum(['facts', 'graph', 'markers', 'issues', 'model', 'verifying']).nullable(),
+  started_at: z.string().nullable(),
+});
+export type OnboardingGeneration = z.infer<typeof OnboardingGeneration>;
+
+/** GET /repos/:id/onboarding — the whole page in one read. */
+export const OnboardingPage = z.object({
+  repo_id: z.string(),
+  clone: z.enum(['ready', 'absent']),
+  tour: Onboarding.nullable(),
+  generation: OnboardingGeneration,
+  current_head_sha: z.string().nullable(),
+  stale: z.boolean(),
+  /**
+   * How far the clone's head has moved past the tour's. Null when the tour's
+   * sha is not reachable from the current head — a depth-1 clone that has never
+   * been resynced has no history to count through, and this feature does not
+   * put a GitHub round trip on a read path to invent one.
+   */
+  commits_behind: z.number().int().nullable(),
+});
+export type OnboardingPage = z.infer<typeof OnboardingPage>;
 
 // ---- Eval ----
 export const EvalPerTrace = z.object({

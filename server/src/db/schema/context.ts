@@ -117,10 +117,36 @@ export const references = pgTable(
   }),
 );
 
+/**
+ * `onboarding` — one generated tour per imported repository (L06).
+ *
+ * The tour DOCUMENT lives in `json` (the `Onboarding` contract): sections,
+ * rows, degraded reasons and the usage record are document-shaped and have no
+ * access path of their own.
+ *
+ * `head_sha` and `status` are PROJECTIONS of two fields inside that document,
+ * promoted to columns so "which repositories have a stale or degraded tour" is
+ * answerable without a jsonb scan. Both are written from the same object in the
+ * SAME upsert as `json` — they can never disagree with it, and a reader must
+ * not treat them as an independent source of truth.
+ *
+ * There is deliberately no `generating` status: a table with a `running` state
+ * needs a boot reaper, and a crashed generation would leave a row that
+ * permanently blocks the feature. The in-flight guard is in memory instead.
+ */
 export const onboarding = pgTable('onboarding', {
   repoId: uuid('repo_id')
     .primaryKey()
     .references(() => repos.id, { onDelete: 'cascade' }),
   json: jsonb('json').notNull(),
+  /**
+   * Projection of `json.head_sha`. Nullable only because the column was added
+   * to an existing table — same convention as `ConventionEvidence.sha`.
+   */
+  headSha: text('head_sha'),
+  /** Projection of `json.status`. Defaulted so the migration cannot fail on an existing row. */
+  status: text('status', { enum: ['ready', 'degraded'] })
+    .notNull()
+    .default('ready'),
   generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
 });

@@ -44,7 +44,7 @@ so must an mcp test that needs a live API.
 
 ## Server modules
 
-`server/src/modules/`: _shared, agents, blast, conventions, intent, polling, project-context, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
+`server/src/modules/`: _shared, agents, blast, conventions, intent, onboarding, polling, project-context, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
 
 Registered statically in `server/src/modules/index.ts` (one import + one entry).
 Shared helpers live in `modules/_shared/`: context.ts, diff-loader.ts, logger.ts, schemas.ts, severity.ts

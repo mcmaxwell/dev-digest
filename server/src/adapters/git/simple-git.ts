@@ -116,14 +116,35 @@ export class SimpleGitClient implements GitClient {
     return parseBlamePorcelain(raw);
   }
 
-  async log(repo: RepoRef, path?: string): Promise<GitCommit[]> {
-    const log = await this.git(repo).log(path ? { file: path } : undefined);
+  async log(
+    repo: RepoRef,
+    path?: string,
+    opts?: { maxCount?: number },
+  ): Promise<GitCommit[]> {
+    const log = await this.git(repo).log({
+      ...(path ? { file: path } : {}),
+      ...(opts?.maxCount ? { maxCount: opts.maxCount } : {}),
+    });
     return log.all.map((c) => ({
       sha: c.hash,
       message: c.message,
       author: c.author_name,
       date: c.date,
     }));
+  }
+
+  /**
+   * `git ls-files` — paths TRACKED at HEAD. Deliberately not a working-tree
+   * walk: ignored output, `node_modules` and build artefacts are exactly what a
+   * file listing must not surface.
+   */
+  async listFiles(repo: RepoRef, opts?: { limit?: number }): Promise<string[]> {
+    const raw = await this.git(repo).raw(['ls-files']);
+    const all = raw
+      .split('\n')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    return opts?.limit ? all.slice(0, opts.limit) : all;
   }
 
   async readFile(repo: RepoRef, path: string): Promise<string> {
