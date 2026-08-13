@@ -1,0 +1,19 @@
+{
+  "name": "Onboarding Tour is reachable from the sidebar and renders the clone-less prerequisite state",
+  "description": "L06. The seeded stack has NO clone — seed.ts inserts acme/payments-api with clonePath: null and scripts/e2e.sh uses an ephemeral Postgres — so this flow asserts exactly the states a clone-less stack produces: the sidebar carries 'Onboarding Tour' in the WORKSPACE group and navigates to /repos/:repoId/onboarding (AC-2), and the page renders the prerequisite state naming the clone (AC-37). Read-only: nothing here writes, so the flow is re-runnable against a stack it does not own. A generation, a regeneration and a copy are NOT reachable without a real clone, and faking one would mean writing into server/clones/** — those are covered by the server integration lane. Two things this flow deliberately does not assert, because agent-browser's deterministic locators cannot: the ABSENCE of a Generate control (there is no negative assertion), and which sidebar item is highlighted (the active state is styling with no accessible attribute) — both are covered by the client suite instead.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "initial data fetch settles" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "root redirects to a repo's PRs" },
+    { "cmd": ["find", "text", "Onboarding Tour", "click"], "label": "sidebar entry navigates to the Onboarding Tour (AC-2)" },
+    { "cmd": ["wait", "--url", "/onboarding"], "label": "repo-scoped onboarding route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "the tour page's read settles" },
+    { "cmd": ["wait", "--text", "This repository has no clone yet"], "label": "prerequisite state renders (AC-37)" },
+    { "cmd": ["wait", "--text", "The clone job has not finished for this repository"], "label": "the state names the clone as the missing prerequisite" },
+    { "cmd": ["find", "text", "Project Context", "click"], "label": "the neighbouring WORKSPACE entry still navigates" },
+    { "cmd": ["wait", "--url", "/context"], "label": "Project Context route reached" },
+    { "cmd": ["open", "{BASE}/repos/new"], "label": "the add-repository screen no longer owns /onboarding (AC-3)" },
+    { "cmd": ["wait", "--url", "/repos/new"], "label": "add-repository route reached" },
+    { "cmd": ["wait", "--text", "Add a repository"], "label": "the add-repository heading renders" }
+  ]
+}

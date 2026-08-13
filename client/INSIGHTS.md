@@ -199,6 +199,30 @@ the root INSIGHTS.md. Format and quality gates:
   relative import to the `@/` alias, since `@/app/…/_components/…` then reads
   as a sibling import and trips the rule.
 
+- [2026-08-13] jsdom implements neither `Element.prototype.scrollIntoView` nor
+  `navigator.clipboard`, so any surface with a "jump to section" control or a
+  copy button needs both stubbed in the test file or it throws before the
+  assertion: `Element.prototype.scrollIntoView = vi.fn()` and
+  `Object.defineProperty(navigator, "clipboard", { value: { writeText },
+  configurable: true })` — plain assignment to `navigator.clipboard` is a
+  no-op because the property is a getter. `configurable: true` is what lets a
+  second test redefine it. Also make the test `async` and `await
+  screen.findByRole("button", { name: "Copied" })` after the click: the
+  clipboard write is a promise, so the confirmation state lands in a microtask
+  and an unawaited click prints an `act(...)` warning
+  (`app/repos/[repoId]/onboarding/.../OnboardingTourView.test.tsx`).
+
+- [2026-08-13] The sidebar's active item carries NO accessible attribute — it
+  is `fontWeight`/`background`/an accent bar in `vendor/ui/shell/NavItem.tsx`
+  and nothing else — so "the right nav item is highlighted" is NOT assertable
+  from an e2e flow (deterministic locators only) or from a rendered-DOM query.
+  Assert the seam instead: `activeKeyFor(pathname)` in
+  `components/app-shell/helpers.ts` is the single input the highlight derives
+  from, and `NAV` from `@devdigest/ui` carries the ordering — see
+  `components/app-shell/helpers.test.ts`. Adding `aria-current="page"` to
+  `NavItem` would make it observable, but `vendor/ui/**` is frozen except
+  `nav.ts` data edits.
+
 ## Recurring Errors & Fixes
 
 - [2026-08-05] "invariant expected app router to be mounted" in a jsdom test

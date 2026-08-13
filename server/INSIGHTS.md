@@ -99,6 +99,29 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   testcontainers run (`modules/project-context/repository.ts::usageCounts`).
 >>>>>>> fd9de1b (feat(project-context): L05 project documents end to end)
 
+- [2026-08-13] To prove a `jobs.register(kind, h, { retries: 0 })` is
+  load-bearing without editing the code under test, register a THROWAWAY kind
+  on the same runner inside the test, throw the same error from it, and assert
+  it ran more than once — then assert the real kind's side effect (the model
+  call) happened exactly once. Without that control the "exactly one call"
+  assertion is vacuous, because `withRetry`'s default `isRetryable` only
+  retries 429/5xx/network shapes: a plain `new Error('boom')` from the
+  handler's persistence tail is NOT retried, so the post-call throw a
+  regression test injects must carry `{ status: 503 }` (or an `ECONNRESET`
+  code) or it tests nothing. Injecting the throw itself is a `Proxy` over the
+  drizzle `db` that intercepts `insert` for one table
+  (`modules/onboarding/onboarding.it.test.ts`, "keeps ONE model call when the
+  handler throws AFTER the call succeeded").
+
+- [2026-08-13] A mock LLM provider that HANGS to hold a single-flight slot open
+  must expose a "the call has reached the gate" promise, and the test must
+  await it before releasing. Releasing early is a no-op (the resolver does not
+  exist yet), the generation then sits in `withTimeout(..., MODEL_TIMEOUT_MS)`
+  and the test still goes green — after 90 REAL seconds, via the degraded
+  `model_failed` path rather than the success path it meant to assert. The tell
+  is a per-test duration of ~90,000 ms in the vitest output; read those
+  durations, they are the only symptom.
+
 ## What Doesn't Work
 
 - [2026-08-13] Do NOT trust `server/CLAUDE.md`'s claim that "the DB schema
@@ -138,6 +161,15 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   `run-executor.ts` while `saveRunTrace` runs just after it, so the trace read can
   race and return 404/empty. Poll for the trace document itself (see
   `test/skills.it.test.ts`).
+  - [2026-08-13] This race is INVISIBLE when the file runs alone and fires in
+    the full `--no-file-parallelism` lane, where the machine is busier: the new
+    AC-4 case in `modules/onboarding/onboarding.it.test.ts` passed on its own
+    and failed the lane with `JSON.stringify(trace.prompt_assembly)` →
+    `undefined` and the unhelpful chai message "the given combination of
+    arguments (undefined and string) is invalid for this assertion". So a
+    single-file green run is NOT evidence the read is safe — the loop over
+    `GET /runs/:id/trace` until `prompt_assembly` exists is mandatory, not
+    defensive.
 - [2026-07-28] Rolling up PR-list aggregates from only the LATEST review
   diverges from the detail page, which flattens findings across ALL review
   runs (multi-agent: the newest run can be clean while others hold findings)

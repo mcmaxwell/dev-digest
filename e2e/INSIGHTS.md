@@ -19,6 +19,14 @@ the root INSIGHTS.md. Format and quality gates:
   label is a prefix of another ("Accept" vs "Accepted"). Bit flow
   `08-conventions`, which passed review and only failed on its first CI run.
 
+- [2026-08-13] A flow can never assert the ABSENCE of anything: every step is a
+  command whose non-zero exit fails the flow, so there is no "expect this to
+  time out". An acceptance criterion phrased as "offers NO generate control" or
+  "highlights nothing" therefore belongs to the client suite, and the flow's
+  `description` should say which criterion it is NOT carrying and where that
+  lives — otherwise the next reader assumes the browser lane covered it
+  (`specs/12-onboarding-tour.flow.json`, AC-37's "no Generate control" half).
+
 ## Codebase Patterns
 
 - [2026-08-04] A flow that WRITES (accept, dismiss, toggle) must undo itself in
