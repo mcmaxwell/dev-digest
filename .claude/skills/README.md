@@ -21,6 +21,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [run-plan](run-plan/SKILL.md) | Workflow | Executes an approved plan: `implementer`, then a review→fix loop over `arch-evidence` + `plan-verifier` + `architecture-reviewer` until the blocking findings converge. Commits nothing |
 | [pr-self-review](pr-self-review/SKILL.md) | Workflow | Pre-PR self-review: routes the local diff to domain skills, deterministic fast checks, gates `gh pr create` on critical findings |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Captures non-obvious lessons into per-module INSIGHTS.md (capture-as-you-go + wrap-up) |
+| [workflow-retro](workflow-retro/SKILL.md) | Workflow | Retro on a multi-agent run: measures tokens, launch order and duplicated reads with `collect.py`, then writes agent lessons to `.claude/agents/INSIGHTS.md` |
 
 ## What Are Skills?
 

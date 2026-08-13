@@ -90,6 +90,16 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## What Doesn't Work
 
+- [2026-08-13] Do NOT trust `server/CLAUDE.md`'s claim that "the DB schema
+  already contains EVERY table for all course lessons" as a reason to skip
+  checking. It is false for at least L05 project context: `src/db/schema*.ts`
+  has no table for project documents and none for agent→document or
+  skill→document attachments. The nearest thing, `code_chunks`
+  (`source: 'code' | 'docs' | 'spec'` + a 1536-dim `embedding`), is repo-intel's
+  indexing table and is NOT an attachment store. ALWAYS grep `src/db/schema*.ts`
+  for the lesson's nouns before planning; the "empty tables sit there by design"
+  rule tells you not to DELETE unused tables, not that every table you need
+  exists.
 - [2026-08-10] `repo_index_state.stats` UNDER-REPORTS the T3 artifacts: the
   incremental pipeline (`pipeline/incremental.ts`) rebuilds `file_rank` and
   `file_facts` but only records `edgesWritten` in its stats blob, so anything

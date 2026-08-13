@@ -21,6 +21,10 @@ The rules themselves live in each agent's own file; do not restate them here.
 | [plan-verifier](plan-verifier.md) | Maps every item of a plan to evidence in the code: done, partial, missing, deviated | `sonnet` | no |
 | [doc-writer](doc-writer.md) | Documents implemented work into the right `docs/` or package file, with diagrams | `sonnet` | yes (docs only) |
 
+[`INSIGHTS.md`](INSIGHTS.md) next to this file holds what past runs learned about these agents: which chain shapes paid off, which agent needs what in its prompt, what a given fan-out actually cost.
+It is written by the `workflow-retro` skill after a multi-agent run and worth reading before launching a chain.
+Lessons about the *code* never go there; those belong in `<package>/INSIGHTS.md`.
+
 Architecture review **is** an agent here, because the boundaries it checks are written down in this repository and can be cited line by line: `onion-architecture`, `frontend-ui-architecture`, the two `vendor/shared` copies, `reviewer-core` purity, the `*.it.test.ts` split, the do-not-touch list.
 A rule with a source is reviewable by a worker with a fixed input and a fixed output; taste is not.
 

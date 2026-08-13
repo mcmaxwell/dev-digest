@@ -17,6 +17,16 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   (`ConventionFileSelection` → `ConventionExtraction`). The mock adapters'
   comments in particular document the SHAPE a lesson's model calls are meant to
   take — read them before designing the pipeline.
+  - [2026-08-13] The pre-shipped scaffolding often spans ALL THREE packages, so
+    grep the client too, not just server + engine. Spec'ing L05 project context
+    found the whole path already built and merely unfed: `PromptParts.specs` →
+    `## Project context` with `wrapUntrusted('spec-N', …)`
+    (`reviewer-core/src/prompt.ts:44-52,109-113`), `RunTrace.specs_read` in the
+    vendored contract, and `client/.../RunTraceDrawer/TraceBody.tsx` already
+    rendering both the `Specs read` config row and the prompt-assembly block,
+    with `run-executor.ts:404` hardcoding `specs_read: []` as the only missing
+    link. Checking the CLIENT renderer before planning UI work is what tells you
+    whether a lesson is a wiring job or a build.
 
 ## What Doesn't Work
 

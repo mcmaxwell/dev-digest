@@ -80,11 +80,11 @@ These are intentionally **not** in the starter — each lesson adds one back:
 
 | Lesson | You build |
 |--------|-----------|
-| L01 | Run cost badge · severity filter on findings |
-| L02 | Skills in the product · Conventions extractor |
-| L03 | Intent layer · Smart Diff |
+| L01 | Run cost badge · severity filter on findings · [spec](docs/specs/L01-cost-badge.md) |
+| L02 | Skills in the product · Conventions extractor · [spec](docs/specs/L02-skills.md) |
+| L03 | Intent layer · Smart Diff · specs: [intent](docs/specs/L03-intent.md), [smart-diff](docs/specs/L03-smart-diff.md) |
 | L04 | Blast Radius card + `get_blast_radius` (reads `repo-intel`, no model) · `devdigest review` pre-push CLI |
-| L05 | Project Context Folder · Onboarding generator · PR Brief card |
+| L05 | Project Context Folder · Onboarding generator · PR Brief card · [spec](docs/specs/L05-project-context.md) |
 | L06 | Eval pipeline · Secret/Phantom gates · Plan Verifier · Export to CI |
 | L07 | Multi-agent review · Run Trace / Live Log · Persistent memory · per-agent stats |
 | L08 | Plugin export/import · Agent performance dashboard · weekly digest |

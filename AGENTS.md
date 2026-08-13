@@ -90,3 +90,8 @@ Use the `engineering-insights` skill: capture non-obvious lessons into the
 touched module's `INSIGHTS.md` as they surface during the task, and run its
 wrap-up check before finishing — do not skip it. Trivial tasks (no problem,
 solution, or discovery) are exempt.
+
+`workflow-retro` is the separate, **manually invoked** counterpart for lessons
+about the agents rather than the code (ledger: `docs/retro/ledger.md`). Never
+run it on your own initiative, not even after a large multi-agent task - it
+starts only when the user asks for it.
