@@ -78,6 +78,7 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   migration. Cheaper than the two-pass split noted below, and it works when the
   two-pass trick cannot (a rename is not an add-then-drop you can sequence).
 
+<<<<<<< HEAD
 - [2026-08-10] When a read must NOT fall into a facade's expensive fallback
   branch, gate it at the CALLER on a separate, honest health read - do not rely
   on the branch not being reached. `RepoIntelService.getBlastRadius` degrades to
@@ -87,6 +88,16 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   (`modules/blast/service.ts`). The guarantee is then structural, and
   `blast.it.test.ts` proves it with a spy on `container.codeIndex` rather than
   by asserting a shape.
+=======
+- [2026-08-13] To count "distinct enabled agents that reach X, directly OR
+  through an enabled linked skill" in ONE query, `union()` the two reach paths
+  as `(agent_id, path)` pairs and group the result — `UNION` (not `UNION ALL`)
+  dedupes the pairs, so a plain `count()` already means "count distinct agents".
+  Drizzle 0.38 supports `union(a, b).as('reach')` as a subquery you can
+  `.select().from()` — smoke-tested with `pnpm exec tsx` against the dev DB
+  before writing the test, which is much faster than discovering it in a
+  testcontainers run (`modules/project-context/repository.ts::usageCounts`).
+>>>>>>> fd9de1b (feat(project-context): L05 project documents end to end)
 
 ## What Doesn't Work
 
@@ -136,6 +147,27 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   - [2026-07-28] Same divergence existed for the SCORE ring; fixed via
     `worstLatestScoreByPr` (`src/modules/pulls/status.ts`) — worst score among
     each agent's latest review, unit-tested in `test/pulls-status.test.ts`.
+
+- [2026-08-13] `pnpm exec vitest run .it.test --no-file-parallelism` SKIPS whole
+  files at random under load: every `*.it.test.ts` opens with
+  `const hasDocker = await dockerAvailable()` at module scope, and that probe
+  returns false when the Docker socket is busy starting another container — the
+  file then reports "N skipped" with a `[name] Docker not available` warning and
+  the lane still exits 0. A green integration run is NOT evidence a file ran;
+  read the per-file lines. Re-run the skipped files individually to confirm
+  (this run silently skipped `context.it.test.ts`, `reviews.it.test.ts` and
+  `skills-versions.it.test.ts`).
+
+- [2026-08-13] Do NOT use `vitest -t '<name>'` to prove a new integration test
+  really fails without its trigger. An `*.it.test.ts` file is ONE Postgres
+  container and one fixture whose state earlier tests build up, so `-t` skips
+  the siblings and the test fails for the wrong reason — removing
+  `git.unreadable.add(...)` from the new read-failure test in
+  `src/modules/project-context/context.it.test.ts` gave "expected 404 to be 500"
+  under `-t` (no scan had ever run, so the doc row did not exist) versus the
+  real "expected 200 to be 500" when the whole file ran. Always run the WHOLE
+  file for a deliberate-failure check, and read the expected-vs-received values,
+  not just the red.
 
 ## Codebase Patterns
 
@@ -290,6 +322,12 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   Guard with `raw && raw.trim().length > 0`, not `raw !== null`.
 
 ## Recurring Errors & Fixes
+
+- [2026-08-13] A single `*.it.test.ts` file failing the whole SUITE (not a test)
+  with testcontainers' `Error: No host port found for host IP` from
+  `startPg` is a Docker port-binding race in the sequential lane, not a code
+  failure — the file passes on its own and on the next full run. Re-run before
+  investigating; only treat it as real if it reproduces for the same file twice.
 
 - [2026-08-02] `pnpm exec vitest run .it.test` failing en masse with
   `No space left on device` / `Health check failed: unhealthy` is the DOCKER VM

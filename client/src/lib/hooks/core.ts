@@ -15,8 +15,6 @@ import type {
   Repo,
   PrMeta,
   PrDetail,
-  SpecFile,
-  IndexStatus,
 } from "@/lib/types";
 
 // ---- Settings (F1: GET/PUT /settings, POST /settings/test-connection) ----
@@ -135,19 +133,6 @@ export function usePullDetailByNumber(
   });
 }
 
-// ---- Project Context (A3 contract; safe to call once API exposes it) ----
-export function useContextFiles(repoId: string | null | undefined) {
-  return useQuery({
-    queryKey: ["context", repoId],
-    queryFn: () => api.get<SpecFile[]>(`/repos/${repoId}/context`),
-    enabled: !!repoId,
-  });
-}
-
-export function useReindexContext() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (repoId: string) => api.post<IndexStatus>(`/repos/${repoId}/context/reindex`),
-    onSuccess: (_d, repoId) => qc.invalidateQueries({ queryKey: ["context", repoId] }),
-  });
-}
+// Project Context lives in its own hook file (`hooks/project-context.ts`) as of
+// L05. The scaffolding hooks that used to sit here pointed at
+// `/repos/:id/context/reindex`, an endpoint the shipped feature does not have.

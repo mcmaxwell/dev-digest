@@ -49,7 +49,7 @@
       "tokens": "≈{count} tok",
       "memory": "Memory (dynamic)",
       "repoMap": "Repo skeleton — repo-intel (dynamic)",
-      "specs": "Project context (dynamic)",
+      "specs": "Project context — attached specs (untrusted)",
       "callers": "Callers of changed symbols — repo-intel (dynamic)",
       "user": "User / diff (dynamic)",
       "copy": "Copy",
@@ -61,6 +61,13 @@
       "args": "args",
       "result": "result",
       "previewTruncated": "(preview truncated)"
+    },
+    "specsRead": {
+      "ok": "ok",
+      "missing": "missing",
+      "truncated": "truncated",
+      "tokens": "≈{count} tok",
+      "origin": "{origin}"
     }
   },
   "drawer": {

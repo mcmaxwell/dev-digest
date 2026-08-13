@@ -120,6 +120,13 @@
       "when": 1786415908707,
       "tag": "0016_blue_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786636604766,
+      "tag": "0017_mighty_red_skull",
+      "breakpoints": true
     }
   ]
 }

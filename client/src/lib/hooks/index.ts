@@ -4,6 +4,7 @@
 export * from "./core";
 export * from "./agents";
 export * from "./skills";
+export * from "./project-context";
 export * from "./conventions";
 export * from "./intent";
 export * from "./blast";

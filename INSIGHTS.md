@@ -93,6 +93,16 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   docs used to imply `pnpm lint` was available server-side; an agent told to
   run it just fails.
 
+- [2026-08-13] Widening a contract field to a UNION (`RunTrace.specs_read`:
+  `z.array(z.string())` → `z.array(z.union([z.string(), SpecsReadEntry]))`)
+  breaks the CLIENT typecheck the moment it lands, because the drawer renders
+  those entries as bare React children and an object is not a valid child. The
+  contract change and its client-side normaliser are one unit — plan them as one
+  step, or expect `cd client && pnpm typecheck` to stay red in between. The
+  normaliser is also the only runtime guard there is: `GET /runs/:id/trace`
+  returns the stored jsonb with no zod parse and no response schema, so nothing
+  upgrades an old trace on the way out.
+
 ## Tool & Library Notes
 
 - [2026-07-31] `Finding` in `contracts/findings.ts` doubles as the LLM
@@ -143,6 +153,16 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## Session Notes
 
+- [2026-08-13] L05 project context implemented end-to-end on
+  `feat/l05-project-context`: `contracts/project-context.ts` +
+  `PromptAssembly.specs_tokens` + a widened `RunTrace.specs_read` (both vendored
+  copies) → four new tables (migration `0016_mighty_red_skull`, additive) →
+  `modules/project-context` (walk/paths/assemble pure files, repository,
+  service, seven routes, a scan job) → `run-executor.buildProjectContext` filling
+  the long-unfed `specs` seam → `/repos/:id/context` page, agent + skill Context
+  tabs, trace drawer chips → e2e flow 11. `reviewer-core` moved
+  `## Project context` above `## Repo skeleton`. Spec:
+  `docs/specs/L05-project-context.md`, plan: `docs/plans/l05-project-context.md`.
 - [2026-08-13] `/run-plan` skill added: takes an approved `docs/plans/<slug>.md`
   and drives `implementer` → (`arch-evidence` ‖ `plan-verifier`) →
   `architecture-reviewer` → triage gate → fix round, up to 3 rounds, then one

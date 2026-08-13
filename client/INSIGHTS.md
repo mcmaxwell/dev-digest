@@ -55,6 +55,16 @@ the root INSIGHTS.md. Format and quality gates:
   regression-tested by "requests the skill draft once" in
   `ConventionsView.test.tsx`.
 
+- [2026-08-13] Adding an editor tab is THREE edits, not two: the `TABS` array in
+  the editor's `constants.ts`, the conditional branch in `<XEditor>`, AND the
+  `VALID_TABS` allowlist in the ROUTE PAGE (`app/agents/[id]/page.tsx:16`,
+  `app/skills/[id]/page.tsx:15`), which normalises any unlisted `?tab=` value
+  back to `"config"`. Miss the third and the tab renders in the bar, sets the
+  query param, and then silently shows the Config tab — typecheck, lint and the
+  component test all pass, because the component test renders `<XEditor>` with
+  `tab` as a prop and never goes through the page. Only `./scripts/e2e.sh`
+  caught it (L05's Context tab).
+
 ## Codebase Patterns
 
 - [2026-08-10] Two vendored primitives silently render a `<button>` where a
@@ -122,6 +132,16 @@ the root INSIGHTS.md. Format and quality gates:
   `messages/en/runs.json`. Typecheck cannot catch the omission. (`pr_description`
   has been in the contract since A2 and still has no block — that is the failure
   mode, not a deliberate choice.)
+
+- [2026-08-13] To hold a document steady while a background refetch returns new
+  content ("don't swap the text under the reader"), keep the shown snapshot in
+  `useState` and adjust it DURING RENDER
+  (`if (data && current?.path !== data.path) setCurrent(...)` — React's
+  "information from previous renders" pattern), never in a `useRef`. A ref makes
+  the "not swapping" half work and the "adopt the new version" button a no-op,
+  because mutating a ref schedules no re-render — the banner appears and its
+  button does nothing. Caught by the client test, not by typecheck
+  (`repos/[repoId]/context/.../DocViewer.tsx`).
 
 ## Tool & Library Notes
 

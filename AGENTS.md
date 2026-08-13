@@ -72,6 +72,8 @@ docs/           agent-prompts/ (built-in reviewer prompts) · specs/ (lesson spe
 - …changing the review pipeline, prompts, or grounding → `reviewer-core/README.md`
 - …adding/changing API routes, DB schema, or adapters → `server/README.md`
 - …touching indexing, the repo map, or the Indexed badge → `server/src/modules/repo-intel/README.md`
+- …touching project-document discovery, the Context tabs, or what reaches the
+  prompt's `## Project context` → `server/src/modules/project-context/README.md`
 - …working on UI routes, hooks, or components → `client/README.md`
 - …changing the MCP tools, their descriptions, or the token budget →
   `mcp/README.md`, then `mcp/AGENTS.md` (tool descriptions are taxed in every

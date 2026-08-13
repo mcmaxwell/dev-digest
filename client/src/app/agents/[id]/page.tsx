@@ -13,7 +13,9 @@ import { AgentEditor } from "./_components/AgentEditor";
 import { useAgents, useAgent, useUpdateAgent } from "@/lib/hooks/agents";
 import { ApiError } from "@/lib/api";
 
-const VALID_TABS = ["config", "skills"];
+/** Must stay in step with `AgentEditor/constants.ts` TABS — a key missing here
+    is silently normalised back to "config", so the tab can never be opened. */
+const VALID_TABS = ["config", "skills", "context"];
 
 export default function AgentEditorPage() {
   const t = useTranslations("agents");

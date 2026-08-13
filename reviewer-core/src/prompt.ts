@@ -47,8 +47,9 @@ export interface PromptParts {
   specs?: string[];
   /**
    * Repo skeleton / map (T3): top-ranked symbols by signature, token-budgeted.
-   * Untrusted (derived from repo code) — delimiter-wrapped. Rendered before
-   * `## Project context` so the model sees structure first. Empty/undefined →
+   * Untrusted (derived from repo code) — delimiter-wrapped. Rendered AFTER
+   * `## Project context` (L05): the project's written rules frame what the
+   * structure is supposed to be, so they come first. Empty/undefined →
    * section omitted (no behavior change).
    */
   repoMap?: string;
@@ -128,10 +129,12 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   }
   if (skillsBlock) userSections.push(`## Skills / rules\n${skillsBlock}`);
   if (memoryBlock) userSections.push(`## Relevant memory\n${memoryBlock}`);
+  // The project's own written rules sit next to the rules the agent was given,
+  // and before the repo structure they describe.
+  if (specsBlock) userSections.push(`## Project context\n${specsBlock}`);
   if (parts.repoMap && parts.repoMap.trim().length > 0) {
     userSections.push(`## Repo skeleton\n${wrapUntrusted('repo-map', parts.repoMap)}`);
   }
-  if (specsBlock) userSections.push(`## Project context\n${specsBlock}`);
   if (parts.callers && parts.callers.trim().length > 0) {
     userSections.push(
       `## Callers of changed symbols\n${wrapUntrusted('callers', parts.callers)}`,
@@ -158,6 +161,8 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     // Counted server-side at trace-build time (the engine has no tokenizer),
     // exactly like `skills_tokens`.
     intent_tokens: null,
+    // Counted server-side at trace-build time, exactly like `intent_tokens`.
+    specs_tokens: null,
     user,
   };
 

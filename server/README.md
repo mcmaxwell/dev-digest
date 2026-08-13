@@ -77,6 +77,7 @@ flowchart TB
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
     blast["blast<br/>/pulls/:id/blast · /pulls/:id/blast/summary"]
+    projectContext["project-context<br/>/repos/:id/context(/doc|/refresh)<br/>/agents/:id/context · /skills/:id/context"]
   end
   subgraph Platform["Platform"]
     settings["settings<br/>/settings · /providers"]
@@ -168,6 +169,16 @@ What the reviewer actually sends to the model is assembled in
 - **Grounding is mandatory.** Every finding must cite a line that exists in the
   diff or it is dropped (`groundFindings`), and the score is recomputed from the
   surviving findings — the model's self-reported score is ignored.
+- **Project context (L05) is opt-in per agent, and untrusted.** Documents a user
+  attached to the agent — plus the ones it inherits from its enabled linked
+  skills — are read from the clone at run time and passed to the engine as
+  `specs`, which renders them into `## Project context`, each entry
+  `wrapUntrusted`-wrapped. With nothing attached the prompt is byte-identical to
+  a pre-L05 run. Budgets: 8,000 tokens per document (truncated at a heading
+  boundary with an explicit marker) and 20,000 per run (the tail is dropped and
+  logged). Every document the run considered is recorded in
+  `RunTrace.specs_read` with its status, so the omissions are visible too. See
+  `src/modules/project-context/README.md`.
 
 ## Testing
 

@@ -12,7 +12,9 @@ import { ApiError } from "@/lib/api";
 import { typeColor } from "../_components/SkillFormFields";
 import { SkillEditor } from "./_components/SkillEditor";
 
-const VALID_TABS = ["config", "stats", "history"];
+/** Must stay in step with `SkillEditor/constants.ts` TABS — a key missing here
+    is silently normalised back to "config", so the tab can never be opened. */
+const VALID_TABS = ["config", "stats", "history", "context"];
 
 export default function SkillEditorPage() {
   const t = useTranslations("skills");

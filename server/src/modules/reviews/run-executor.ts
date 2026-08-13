@@ -17,6 +17,7 @@ import {
 // Cross-module read through the documented composition seam: a module may
 // construct another module's SERVICE (see .dependency-cruiser.cjs).
 import { IntentService } from '../intent/service.js';
+import { ProjectContextService } from '../project-context/service.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -239,6 +240,11 @@ export class ReviewRunExecutor {
       // skipped for every agent without unlinking it.
       const skillBlocks = await this.buildSkillBlocks(agent.id, runLog);
 
+      // L05 — attached project documents (the agent's own, plus the ones it
+      // inherits from its enabled linked skills), read from THIS repository's
+      // clone. Best-effort in the same way skills and intent are.
+      const projectContext = await this.buildProjectContext(agent.id, repo, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -253,6 +259,10 @@ export class ReviewRunExecutor {
         strategy: agent.strategy ?? REVIEW_STRATEGY,
         // L02 — resolved skill bodies; assemblePrompt omits the section when empty.
         ...(skillBlocks.length > 0 ? { skills: skillBlocks } : {}),
+        // L05 — attached project documents, as TEXT. The engine never learns
+        // that they are files; with none attached the prompt is byte-identical
+        // to a pre-L05 run.
+        ...(projectContext.bodies.length > 0 ? { specs: projectContext.bodies } : {}),
         // T1.3 — pass the callers digest only when we built one. assemblePrompt
         // omits the section when this is empty/undefined.
         ...(callersDigest ? { callers: callersDigest } : {}),
@@ -392,6 +402,11 @@ export class ReviewRunExecutor {
             outcome.assembly.intent != null
               ? this.container.tokenizer.count(outcome.assembly.intent)
               : null,
+          // L05 — same per-block attribution for the project-context slot.
+          specs_tokens:
+            outcome.assembly.specs != null
+              ? this.container.tokenizer.count(outcome.assembly.specs)
+              : null,
         },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
@@ -401,7 +416,9 @@ export class ReviewRunExecutor {
         })),
         raw_output: outcome.raw,
         memory_pulled: [],
-        specs_read: [],
+        // L05 — one entry per document the run CONSIDERED, statuses included:
+        // the omissions are as much a part of "what was read" as the hits.
+        specs_read: projectContext.specsRead,
         // L03 — what the scope filter suppressed. The Live Log carries the same
         // drops, but it scrolls; this is the record that survives.
         scope_dropped: outcome.scopeDropped.map(({ finding, reason }) => ({
@@ -471,6 +488,41 @@ export class ReviewRunExecutor {
         (skippedDisabled > 0 ? ` (${skippedDisabled} disabled skipped)` : ''),
     );
     return enabled.map(({ skill }) => skillToBlock(skill));
+  }
+
+  /**
+   * L05 — resolve the agent's attached project documents into prompt-ready
+   * bodies, plus the per-document record the trace persists.
+   *
+   * Assembly lives HERE, in the executor, rather than in the reviews service:
+   * `executor.executeRuns` is the single entry point every review path goes
+   * through, so a CI-sourced run assembles project context by exactly the same
+   * rules as a studio run — by placement, not by a second code path.
+   *
+   * Best-effort like skills and intent: any failure degrades to a
+   * document-less prompt, which is byte-identical to a pre-L05 run, and never
+   * to a failed review.
+   */
+  private async buildProjectContext(
+    agentId: string,
+    repo: typeof schema.repos.$inferSelect,
+    runLog: RunLogger,
+  ): Promise<{ bodies: string[]; specsRead: RunTrace['specs_read'] }> {
+    try {
+      const service = new ProjectContextService(this.container);
+      const result = await service.assembleForRun({
+        agentId,
+        repo: { id: repo.id, owner: repo.owner, name: repo.name },
+        onLog: (msg) => runLog.info(msg),
+      });
+      if (result.bodies.length > 0) {
+        runLog.info(`project context: ${result.bodies.length} document(s) attached`);
+      }
+      return result;
+    } catch (err) {
+      runLog.info(`project context: load failed — ${(err as Error).message}`);
+      return { bodies: [], specsRead: [] };
+    }
   }
 
   /**

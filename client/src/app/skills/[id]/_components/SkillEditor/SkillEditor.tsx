@@ -10,6 +10,7 @@ import type { Skill } from "@devdigest/shared";
 import { ConfigTab } from "./_components/ConfigTab";
 import { StatsTab } from "./_components/StatsTab";
 import { HistoryTab } from "./_components/HistoryTab";
+import { ContextTab } from "./_components/ContextTab";
 import { TABS } from "./constants";
 import { s } from "./styles";
 
@@ -36,6 +37,8 @@ export function SkillEditor({
           <StatsTab key={skill.id} skill={skill} />
         ) : tab === "history" ? (
           <HistoryTab key={skill.id} skill={skill} />
+        ) : tab === "context" ? (
+          <ContextTab key={skill.id} skill={skill} />
         ) : (
           <ConfigTab key={skill.id} skill={skill} />
         )}

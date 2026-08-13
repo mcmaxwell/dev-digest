@@ -1,24 +1,64 @@
 {
   "title": "Project Context",
-  "chunks": "{count} chunks",
-  "reindex": "Re-index",
-  "indexing": "Indexing…",
-  "resync": "Resync",
-  "resyncing": "Resyncing…",
-  "indexStatus": "Index status: {status}",
-  "loadError": "Couldn’t load specs",
-  "kb": "{kb}kb",
+  "subtitle": "Documents this repository carries under .devdigest/, docs/, specs/ and insights/. Read-only mirrors of the clone.",
+  "treeLabel": "Project documents",
+  "refresh": "Refresh",
+  "refreshing": "Refreshing…",
+  "loading": "Loading…",
+  "loadError": "Couldn’t load documents",
+  "select": "Select a document to read it.",
+  "back": "Back to documents",
+  "footer": "{count} documents · ≈{tokens} tokens · {scanned}",
+  "scannedAt": "scanned {when}",
+  "neverScanned": "never scanned",
+  "skipped": "{count} skipped (over 256 KB)",
+  "bounded": "{count} beyond the 500-document cap",
+  "scanFailed": "The last scan failed: {error}",
+  "notCloned": {
+    "title": "This repository has no clone yet",
+    "body": "Project documents are read from the repository's clone on disk. Once the clone job finishes, the documents appear here."
+  },
   "empty": {
-    "title": "No spec files yet",
-    "body": "Drop your PRDs, tech specs, and acceptance criteria under .devdigest/specs/. Every agent and the PR brief read them as grounding context."
+    "title": "No project documents found",
+    "globs": "Discovery looks for Markdown under these four roots: .devdigest/**/*.md, docs/**/*.md, specs/**/*.md, insights/**/*.md"
   },
-  "mode": {
-    "preview": "preview",
-    "edit": "edit"
+  "readError": "Couldn’t read {path}",
+  "retry": "Retry",
+  "usedBy": "Used by {count} agents",
+  "reload": {
+    "text": "This document changed in the repository.",
+    "action": "Load the new version"
   },
-  "editor": {
-    "loadError": "Couldn’t load spec",
-    "save": "Save",
-    "saving": "Saving…"
+  "tab": {
+    "title": "Project context",
+    "attachedCount": "{attached} of {available} attached",
+    "filterPlaceholder": "Filter documents…",
+    "orderHint": "Order matters — earlier documents appear earlier in the assembled prompt. Use the arrows to reorder.",
+    "agentHint": "Attached documents are injected into every review this agent runs.",
+    "skillHint": "Every agent that links this skill inherits these documents.",
+    "attached": "Attached",
+    "available": "Available",
+    "inherited": "Inherited from skills",
+    "inheritedHint": "Attached to a linked skill — detach it on the skill instead.",
+    "viaSkill": "via {skill}",
+    "otherRepo": "Other repository: {repo}",
+    "notUsedHere": "not used on this repo",
+    "missing": "missing",
+    "attach": "Attach {path}",
+    "detach": "Detach {path}",
+    "moveUp": "Move {path} up",
+    "moveDown": "Move {path} down",
+    "noMatch": "No document matches “{filter}”.",
+    "clearFilter": "Clear filter",
+    "emptyTitle": "0 of 0 attached",
+    "emptyBody": "This repository has no project documents to attach yet.",
+    "emptyLink": "Open Project Context",
+    "noRepo": "Pick a repository to attach its documents.",
+    "tokens": "≈ {tokens} tokens",
+    "rowTokens": "≈{tokens} tok",
+    "tokensWarning": "≈ {tokens} tokens — over {warn}, close to the {budget}-token run budget",
+    "contributes": "CONTRIBUTES",
+    "contributesRow": "- {path} · ≈{tokens} tok",
+    "contributesEmpty": "No documents attached, so this skill contributes no project context."
   }
 }

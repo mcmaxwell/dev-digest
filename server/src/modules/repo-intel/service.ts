@@ -57,6 +57,7 @@ import {
   REVERSE_MAX_EDGES,
   SUPPORTED_EXT,
 } from './constants.js';
+import { SCAN_JOB_KIND } from '../project-context/constants.js';
 import { runFullIndex, type IndexPayload } from './pipeline/full.js';
 import { runIncremental } from './pipeline/incremental.js';
 
@@ -163,7 +164,22 @@ export class RepoIntelService implements RepoIntel {
         reason: `sync_failed:${err instanceof Error ? err.message : String(err)}`,
       };
     }
-    return runIncremental(this.container, this.repo, { repoId });
+    const result = await runIncremental(this.container, this.repo, { repoId });
+
+    // L05 — the working tree just moved, so the project-document list is stale.
+    // Best-effort, in its own try/catch: a resync must not fail because the
+    // follow-up scan could not be queued (the Project Context page also scans
+    // lazily on read).
+    try {
+      const workspaceId = await this.container.reposRepo.workspaceIdFor(repoId);
+      if (workspaceId) {
+        await this.container.jobs.enqueue(workspaceId, SCAN_JOB_KIND, { repoId });
+      }
+    } catch {
+      // swallow — degraded path
+    }
+
+    return result;
   }
 
   /**

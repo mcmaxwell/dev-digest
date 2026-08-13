@@ -43,6 +43,18 @@ export type {
   RiskArea,
   RiskAreaKind,
 } from "@devdigest/shared";
+export type {
+  ProjectDoc,
+  ProjectDocBody,
+  ProjectDocCategory,
+  ProjectDocList,
+  ProjectDocScan,
+  ContextAttachment,
+  AgentContext,
+  SkillContext,
+  SetContextDocsBody,
+  SpecsReadEntry,
+} from "@devdigest/shared";
 
 /** UI-only view model for a PR list row (derives display fields from PrMeta). */
 export interface PrRowView {

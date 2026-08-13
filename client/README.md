@@ -29,8 +29,10 @@ flowchart TD
 
   AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config)"]
   SETTINGS["/settings/:section<br/>API keys · models"]
+  CONTEXT["/repos/:repoId/context<br/>Project Context<br/>(tree + read-only viewer)"]
 
   PULLS -->|"GET /repos/:id/pulls · /repos/:id/index-state"| API
+  CONTEXT -->|"GET /repos/:id/context(/doc) · POST /repos/:id/context/refresh"| API
   PR -->|"GET /pulls/:id · /reviews · /pulls/:id/comments<br/>POST /pulls/:id/review · /findings/:id/(accept|dismiss)"| API
   AGENTS -->|"/agents · /agents/:id"| API
   SETTINGS -->|"/settings · /providers"| API

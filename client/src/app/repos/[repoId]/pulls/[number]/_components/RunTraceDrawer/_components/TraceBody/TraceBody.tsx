@@ -8,7 +8,7 @@ import { Badge } from "@devdigest/ui";
 import type { RunTrace, FindingRecord } from "@devdigest/shared";
 import { formatUsd } from "@/lib/format";
 import { PROMPT_COLORS } from "../../constants";
-import { formatSeconds, formatTokens } from "../../helpers";
+import { formatSeconds, formatTokens, toSpecsReadEntry } from "../../helpers";
 import { s } from "../../styles";
 import { TraceSection } from "../TraceSection";
 import { ToolCallRow } from "../ToolCallRow";
@@ -41,9 +41,23 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
               {trace.specs_read.length === 0 ? (
                 <span style={s.specsNone}>{t("trace.config.none")}</span>
               ) : (
-                trace.specs_read.map((sp, i) => (
+                trace.specs_read.map(toSpecsReadEntry).map((sp, i) => (
                   <span key={i} className="mono" style={s.spec}>
-                    {sp}
+                    {sp.path}
+                    {sp.status != null && (
+                      <>
+                        {" "}
+                        <Badge
+                          color={sp.status === "ok" ? "var(--ok)" : "var(--warn)"}
+                        >
+                          {t(`trace.specsRead.${sp.status}`)}
+                        </Badge>{" "}
+                        <Badge color="var(--text-muted)">
+                          {t("trace.specsRead.tokens", { count: sp.tokens ?? 0 })}
+                        </Badge>{" "}
+                        <Badge color="var(--text-muted)">{sp.origin}</Badge>
+                      </>
+                    )}
                   </span>
                 ))
               )}
@@ -100,11 +114,22 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
         {trace.prompt_assembly.memory != null && (
           <PromptBlock label={t("trace.prompt.memory")} text={trace.prompt_assembly.memory} color={PROMPT_COLORS.memory} />
         )}
+        {/* L05 — project context sits between skills/memory and the repo
+            skeleton, matching the order `assemblePrompt` renders. */}
+        {trace.prompt_assembly.specs != null && (
+          <PromptBlock
+            label={t("trace.prompt.specs")}
+            text={trace.prompt_assembly.specs}
+            color={PROMPT_COLORS.specs}
+            meta={
+              trace.prompt_assembly.specs_tokens != null
+                ? t("trace.prompt.tokens", { count: trace.prompt_assembly.specs_tokens })
+                : undefined
+            }
+          />
+        )}
         {trace.prompt_assembly.repo_map != null && (
           <PromptBlock label={t("trace.prompt.repoMap")} text={trace.prompt_assembly.repo_map} color={PROMPT_COLORS.repoMap} />
-        )}
-        {trace.prompt_assembly.specs != null && (
-          <PromptBlock label={t("trace.prompt.specs")} text={trace.prompt_assembly.specs} color={PROMPT_COLORS.specs} />
         )}
         {trace.prompt_assembly.callers != null && (
           <PromptBlock label={t("trace.prompt.callers")} text={trace.prompt_assembly.callers} color={PROMPT_COLORS.callers} />

@@ -35,7 +35,8 @@
     "tabs": {
       "config": "Configuration",
       "stats": "Statistics",
-      "history": "Version history"
+      "history": "Version history",
+      "context": "Context"
     }
   },
   "stats": {

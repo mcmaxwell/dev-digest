@@ -43,6 +43,7 @@ export const PromptAssembly = z.object({
   /** Token count of the skills block (tokenizer estimate); null when absent. */
   skills_tokens: z.number().int().nullish(),
   memory: z.string().nullish(),
+  /** L05 — the assembled `## Project context` block; null when absent. */
   specs: z.string().nullish(),
   /** Callers-of-changed-symbols digest (T1.3); null when absent. */
   callers: z.string().nullish(),
@@ -55,6 +56,9 @@ export const PromptAssembly = z.object({
   intent: z.string().nullish(),
   /** Token count of the intent block (tokenizer estimate); null when absent. */
   intent_tokens: z.number().int().nullish(),
+  /** L05 — token count of the project-context block (tokenizer estimate);
+      null when absent. Counted server-side at trace-build time. */
+  specs_tokens: z.number().int().nullish(),
   user: z.string(),
 });
 export type PromptAssembly = z.infer<typeof PromptAssembly>;
@@ -92,6 +96,22 @@ export const ScopeDropped = z.object({
 });
 export type ScopeDropped = z.infer<typeof ScopeDropped>;
 
+/**
+ * L05 — one entry per project document the run CONSIDERED, not only per
+ * document it sent. The omissions are the point: a `missing` document was
+ * attached and unreadable, a `truncated` one was cut at a heading boundary.
+ *
+ * `origin` is `agent` for the agent's own attachment, `skill:<name>` for one
+ * inherited through an enabled linked skill.
+ */
+export const SpecsReadEntry = z.object({
+  path: z.string(),
+  status: z.enum(['ok', 'missing', 'truncated']),
+  tokens: z.number().int().min(0),
+  origin: z.string(),
+});
+export type SpecsReadEntry = z.infer<typeof SpecsReadEntry>;
+
 /** The single-document trace stored in `run_traces.trace`. */
 export const RunTrace = z.object({
   config: z.object({
@@ -107,7 +127,11 @@ export const RunTrace = z.object({
   tool_calls: z.array(ToolCall),
   raw_output: z.string(),
   memory_pulled: z.array(MemoryPulled),
-  specs_read: z.array(z.string()),
+  /**
+   * Traces persisted before L05 carry bare paths, so the union is permanent:
+   * an old trace must still parse and still render (AC-44).
+   */
+  specs_read: z.array(z.union([z.string(), SpecsReadEntry])),
   scope_dropped: z.array(ScopeDropped).nullish(),
   log: z.array(RunLogLine),
 });

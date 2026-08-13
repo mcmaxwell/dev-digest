@@ -12,6 +12,7 @@ import {
   INDEX_JOB_KIND,
   REFRESH_JOB_KIND,
 } from '../repo-intel/constants.js';
+import { SCAN_JOB_KIND } from '../project-context/constants.js';
 
 /**
  * F1 — repos service. Business logic for the Repositories feature:
@@ -74,6 +75,15 @@ export class RepoService {
         // No handler registered or transient enqueue failure — clone has
         // already succeeded, so we don't fail the job for an index-followup
         // miss. The user can hit POST /repos/:id/reindex to retry.
+      }
+
+      // L05 — build the project-document list from the fresh clone. Same
+      // best-effort shape as the index enqueue above: the Project Context page
+      // also scans lazily on its first read, so a miss here is recoverable.
+      try {
+        await this.container.jobs.enqueue(workspaceId, SCAN_JOB_KIND, { repoId });
+      } catch {
+        // swallow — degraded path
       }
     }
   }
