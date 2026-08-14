@@ -100,13 +100,16 @@ Three things travel as paths rather than as inlined text, because a fresh contex
 | **Use when** | What the product should do is not settled yet, or a spec is the missing input someone else stopped on |
 | **Input** | A feature idea, plus file paths to any design mockups. On the second pass, the answers to its questions and the word `WRITE` |
 | **Output** | Discovery pass: Understanding, Designs read, Boundaries touched, Blocking and optional questions with recommendations, Design gaps, Proposed identity - and nothing written. Write pass: `docs/specs/L<NN>-<slug>.md` plus a report of criteria, assumptions, and what needs a human edit |
-| **Tools** | `Read, Grep, Glob, Bash, Write, TodoWrite, Skill` |
+| **Tools** | `Read, Grep, Glob, Bash, Write, TodoWrite, Skill, Agent` |
 | **Preloaded skills** | `mermaid-diagram`, `security`, `onion-architecture` |
-| **Cannot** | Write anywhere but `docs/specs/`, overwrite an existing spec, use `Edit`, decide implementation, delegate, research externally, invoke any implementation skill |
+| **Cannot** | Write anywhere but `docs/specs/`, overwrite an existing spec, use `Edit`, decide implementation, spawn any agent but `researcher`, reach the web itself, invoke any implementation skill |
 
 It runs in two passes because a subagent cannot stop and ask.
 The first pass reads the repo and the screenshots and returns at most seven blocking questions, each with the answer it would default to; the second pass writes the file.
 A spec therefore never appears in `docs/specs/` before its product decisions were made by a human.
+
+Its `Agent` tool is scoped to `researcher`, the same way `implementation-planner`'s is: an outside fact that would change the spec gets researched rather than guessed at or bounced back to the caller.
+It has no `WebSearch` or `WebFetch` of its own - the `researcher` carries both, so there is one place external evidence is gathered and cited.
 
 Acceptance criteria use EARS notation with stable `AC-N` identifiers, so the plan, the tests, and the PR all cite the same requirement instead of paraphrasing it.
 The format contract lives in `docs/specs/README.md`, not in the agent file, so a human writing a spec by hand follows the same rules.

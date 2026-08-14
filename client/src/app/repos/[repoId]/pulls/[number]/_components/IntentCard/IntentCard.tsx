@@ -8,13 +8,15 @@ import {
   Card,
   EmptyState,
   ErrorState,
-  Icon,
   SectionLabel,
   Skeleton,
 } from "@devdigest/ui";
 import { usePrIntent, useDetectIntent } from "@/lib/hooks/intent";
 import type { PrIntent } from "@devdigest/shared";
-import { CONFIDENCE_COLOR, RISK_COLOR, RISK_ICON } from "./constants";
+// `RISK_COLOR` / `RISK_ICON` stay in `./constants` even though this file no
+// longer reads them: they are the risk-area vocabulary, and deleting them would
+// be a second, unrelated change riding along with the rendering move.
+import { CONFIDENCE_COLOR } from "./constants";
 import { s } from "./styles";
 
 interface IntentCardProps {
@@ -146,22 +148,13 @@ function IntentBody({
           <ScopeColumn label={t("intent.outOfScope")} items={intent.out_of_scope} />
         </div>
 
-        {intent.risk_areas.length > 0 && (
-          <div style={{ marginTop: 18 }}>
-            <div style={s.columnLabel}>{t("intent.riskAreas")}</div>
-            <div style={s.chipRow}>
-              {intent.risk_areas.map((risk, i) => {
-                const RiskIcon = Icon[RISK_ICON[risk.kind]];
-                return (
-                  <Badge key={`${risk.kind}-${i}`} color={RISK_COLOR[risk.kind]}>
-                    <RiskIcon size={12} />
-                    {risk.label}
-                  </Badge>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* The risk-area chips used to render here. L07 absorbed them into the
+            PR Brief card, whose risks each name a file the reader can click —
+            a chip that says "Auth surface touched" and nothing else still leaves
+            a reviewer searching nine files for the auth surface. The Overview
+            tab now carries exactly one risk list.
+            `pr_intent.risk_areas` is still produced, still stored, and still fed
+            to the reviewer prompt; only its rendering moved. */}
 
         {missing.length > 0 && (
           <div style={s.missing}>

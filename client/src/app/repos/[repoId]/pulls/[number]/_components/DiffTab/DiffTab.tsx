@@ -22,6 +22,12 @@ interface DiffTabProps {
   /** Lifted to the URL so the choice survives a trip to another tab. */
   order: DiffOrder;
   onOrderChange: (next: DiffOrder) => void;
+  /**
+   * A path the tab should open expanded and scroll to, from `?file=` — how a
+   * review-focus click on the Overview tab lands here. Optional, and null on
+   * every existing entry point, so nothing else changes behaviour.
+   */
+  focusFile?: string | null;
 }
 
 export function DiffTab({
@@ -32,6 +38,7 @@ export function DiffTab({
   onOpenFinding,
   order,
   onOrderChange,
+  focusFile,
 }: DiffTabProps) {
   const t = useTranslations("prReview");
   const { data: comments } = usePrComments(prId);
@@ -58,7 +65,7 @@ export function DiffTab({
     },
   };
 
-  const plainDiff = <DiffViewer files={files} commenting={commenting} />;
+  const plainDiff = <DiffViewer files={files} commenting={commenting} focusFile={focusFile} />;
 
   return (
     <section>
@@ -91,6 +98,7 @@ export function DiffTab({
           commenting={commenting}
           onUnavailable={plainDiff}
           onOpenFinding={onOpenFinding}
+          focusFile={focusFile}
         />
       ) : (
         plainDiff

@@ -14,9 +14,12 @@ import { FileCard } from "@/components/diff-viewer/FileCard";
 export function DiffViewer({
   files,
   commenting,
+  focusFile,
 }: {
   files: PrFile[];
   commenting?: DiffCommentApi;
+  /** A path to open expanded and scroll to, from the `?file=` param. */
+  focusFile?: string | null;
 }) {
   const t = useTranslations("shell");
   if (!files || files.length === 0) {
@@ -25,7 +28,12 @@ export function DiffViewer({
   return (
     <div style={s.list}>
       {files.map((f) => (
-        <FileCard key={f.path} file={f} commenting={commenting} />
+        <FileCard
+          key={f.path}
+          file={f}
+          commenting={commenting}
+          focusPath={focusFile}
+        />
       ))}
     </div>
   );

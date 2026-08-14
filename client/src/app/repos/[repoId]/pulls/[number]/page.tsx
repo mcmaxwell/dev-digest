@@ -87,6 +87,11 @@ export default function PRDetailPage() {
   // so the jump survives a reload and can be shared, and so the Files tab can
   // drive it across a tab switch without lifting the Findings tab's state.
   const focusFindingId = search.get("finding");
+  // Which file the Files changed tab should open expanded. In the URL for the
+  // same reasons `finding` is: the jump survives a reload, it can be shared, and
+  // the Overview tab can drive it across a tab switch without the Files tab
+  // lifting any state.
+  const focusFile = search.get("file");
   // Also in the URL: the tab unmounts on every switch, so component state would
   // silently drop the reader back to Smart order each time they came back.
   const rawOrder = search.get("order");
@@ -107,9 +112,19 @@ export default function PRDetailPage() {
     );
   };
   const setParam = (key: string, val: string | null) => setParams({ [key]: val });
-  // Clearing `finding` on a plain tab change keeps a stale jump from re-firing
-  // every time the user comes back to Findings by hand.
-  const setTab = (t: string) => setParams({ tab: t, finding: null });
+  // Clearing `finding` and `file` on a plain tab change keeps a stale jump from
+  // re-firing every time the user comes back to that tab by hand.
+  const setTab = (t: string) => setParams({ tab: t, finding: null, file: null });
+  // The same destination a review-focus click navigates to, as a real URL, so
+  // the brief's file references can be anchors: announced as links, reachable by
+  // Tab, and still openable in a new tab with a modified click.
+  const fileHref = (path: string) => {
+    const sp = new URLSearchParams(search.toString());
+    sp.set("tab", "diff");
+    sp.set("file", path);
+    sp.delete("finding");
+    return `/repos/${repoId}/pulls/${number}?${sp.toString()}`;
+  };
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = React.useMemo(() => reviews ?? [], [reviews]);
@@ -178,6 +193,15 @@ export default function PRDetailPage() {
             repoId={repoId}
             repoFullName={repoFullName}
             headSha={pr.head_sha}
+            commits={pr.commits}
+            fileHref={fileHref}
+            // Crossing to the Files changed tab with that file expanded — the
+            // mirror of the diff's severity marks jumping into Findings.
+            // `scroll: false` because the App Router otherwise jumps to the top
+            // AFTER the card has scrolled itself into view, undoing the jump.
+            onOpenFile={(path) =>
+              setParams({ tab: "diff", file: path, finding: null }, { scroll: false })
+            }
           />
         )}
 
@@ -209,6 +233,7 @@ export default function PRDetailPage() {
             files={pr.files}
             canComment={pr.status === "open"}
             order={diffOrder}
+            focusFile={focusFile}
             onOrderChange={(next) => setParam("order", next === "smart" ? null : next)}
             // Clicking a severity mark in the diff crosses to the Findings tab
             // and reveals that exact card — both params move in one navigation.

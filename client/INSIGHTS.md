@@ -71,7 +71,30 @@ the root INSIGHTS.md. Format and quality gates:
   `tab` as a prop and never goes through the page. Only `./scripts/e2e.sh`
   caught it (L05's Context tab).
 
+- [2026-08-14] A fixture whose ARRAY ORDER was written to match what the
+  component happens to render is a test that cannot fail. `PrBriefCard.test.tsx`
+  asserted "the brief history renders newest first" against a `commits` fixture
+  hand-ordered newest-first, so it passed against a `BriefHistory` that simply
+  mapped the prop in place — and production, which is oldest-first, rendered the
+  oldest brief at the top. For any assertion about ORDER, copy the fixture's
+  order from the PRODUCER (here `adapters/github/octokit.ts`, which returns
+  `pulls.listCommits` untouched), never from the consumer, then confirm the
+  assertion goes red before fixing the component.
+
 ## Codebase Patterns
+
+- [2026-08-14] The order of a PR's `commits` array is not a contract anywhere in
+  this stack: GitHub returns `pulls.listCommits` oldest-first,
+  `adapters/github/octokit.ts` neither reverses nor sorts it, and
+  `pulls/repository.ts#getCommits` has no `orderBy` at all. Any surface that
+  needs a particular order must establish it itself (`RunHistory.tsx` sorts by
+  `ts` desc; `PrBriefCard`'s `commitsNewestFirst` does the same). When the sort
+  key is nullish — `PrCommit.committed_at` is, and the mock platform returns
+  null for every commit — decide it ONCE for the whole list rather than per row:
+  a per-row `committed_at ?? somethingElse` fallback sorts the timestamped rows
+  into one block and the rest into another, which is exactly the interleaving
+  the feature needed (a commit with no brief must keep its place in the
+  sequence).
 
 - [2026-08-13] `repoIdFromPath` in `lib/repo-context.tsx` matches
   `^/repos/([^/]+)` with NO exclusion for static segments, so adding any static
@@ -82,6 +105,17 @@ the root INSIGHTS.md. Format and quality gates:
   `/repos/<static>/…` that uses `useActiveRepo` (or any nav href resolving
   `:repoId`) will silently address a repository called `new`; fix it at
   `repoIdFromPath` with a static-segment denylist, not at the call site.
+- [2026-08-14] A card that renders SEVERAL sibling lists must give each `<ul>` an
+  `aria-label`, or its own test cannot address them and neither can a screen
+  reader. `PrBriefCard` renders risks, review focus, prior PRs and the brief
+  timeline as four unlabelled `<ul>`s at first, and
+  `getByRole("link", { name: … })` then failed with "multiple elements" because
+  the same path is legitimately cited by both a risk and a focus entry.
+  `getByText(label).parentElement!.parentElement!` is the tempting escape and is
+  worse: it encodes the DOM shape, so any wrapper `<div>` added later breaks a
+  test that has nothing to do with layout. Label the list, then scope with
+  `within(screen.getByRole("list", { name }))`.
+
 - [2026-08-10] Two vendored primitives silently render a `<button>` where a
   caller may not want one, and `src/vendor/ui/**` is frozen, so the workaround
   belongs in the FEATURE: `MonoLink` without an `href` is an inert button with
@@ -211,6 +245,17 @@ the root INSIGHTS.md. Format and quality gates:
   clipboard write is a promise, so the confirmation state lands in a microtask
   and an unawaited click prints an `act(...)` warning
   (`app/repos/[repoId]/onboarding/.../OnboardingTourView.test.tsx`).
+  - [2026-08-14] Stubbing it is only half the job when the call is deferred. The
+    codebase's "jump to X" controls all wrap the scroll in
+    `requestAnimationFrame` so the target's body has mounted
+    (`diff-viewer/FileCard`'s `jumpToFirstFinding` and, now, its `focusPath`
+    effect), and jsdom runs rAF on a ~16 ms timer — so
+    `expect(scrollIntoView).toHaveBeenCalled()` in the same tick fails against
+    CORRECT code. Assert it through `await waitFor(...)`. The trap is the
+    NEGATIVE case: `expect(...).not.toHaveBeenCalled()` in the same tick passes
+    against a broken implementation too, so give it a window it would have fired
+    in (`await new Promise(r => setTimeout(r, 50))`) before asserting the
+    absence (`components/diff-viewer/DiffViewer/DiffViewer.test.tsx`).
 
 - [2026-08-13] The sidebar's active item carries NO accessible attribute — it
   is `fontWeight`/`background`/an accent bar in `vendor/ui/shell/NavItem.tsx`

@@ -52,6 +52,19 @@ export class ReviewRepository {
     return pullRepo.getPrFiles(this.db, prId);
   }
 
+  /**
+   * Prior PRs of the same repo whose changed files overlap `paths`, newest
+   * first. Read by `modules/brief`, which owns no `pr_files` query of its own.
+   */
+  overlappingPulls(
+    repoId: string,
+    prId: string,
+    paths: string[],
+    limit: number,
+  ): Promise<pullRepo.OverlappingPull[]> {
+    return pullRepo.overlappingPulls(this.db, repoId, prId, paths, limit);
+  }
+
   // ---- reviews + findings -------------------------------------------------
 
   insertReview(values: {
