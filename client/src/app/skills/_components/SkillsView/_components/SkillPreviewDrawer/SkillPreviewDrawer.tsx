@@ -4,25 +4,18 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Badge, Button, Drawer, FormField, SelectInput, TextInput, Textarea, Toggle } from "@devdigest/ui";
-import type { Skill, SkillType } from "@devdigest/shared";
+import { Badge, Button, Drawer, Toggle } from "@devdigest/ui";
+import type { Skill } from "@devdigest/shared";
 import { useDeleteSkill, useUpdateSkill } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
-import { SKILL_TYPES } from "../../constants";
-import { typeColor } from "../../helpers";
+import { SkillFormFields, typeColor, type SkillForm } from "../../../SkillFormFields";
 import { s } from "./styles";
-
-interface SkillForm {
-  name: string;
-  description: string;
-  type: SkillType;
-  body: string;
-  enabled: boolean;
-}
 
 export function SkillPreviewDrawer({ skill, onClose }: { skill: Skill; onClose: () => void }) {
   const t = useTranslations("skills");
+  const router = useRouter();
   const toast = useToast();
   const update = useUpdateSkill();
   const del = useDeleteSkill();
@@ -37,7 +30,6 @@ export function SkillPreviewDrawer({ skill, onClose }: { skill: Skill; onClose: 
     setForm((f) => ({ ...f, [key]: value }));
 
   const untrusted = skill.source !== "manual";
-  const typeOptions = SKILL_TYPES.map((v) => ({ value: v, label: t(`listItem.type.${v}`) }));
 
   const save = () =>
     update.mutate(
@@ -74,6 +66,13 @@ export function SkillPreviewDrawer({ skill, onClose }: { skill: Skill; onClose: 
           <Button kind="ghost" icon="Trash" onClick={remove} disabled={del.isPending}>
             {t("preview.delete")}
           </Button>
+          <Button
+            kind="secondary"
+            icon="ExternalLink"
+            onClick={() => router.push(`/skills/${skill.id}`)}
+          >
+            {t("detail.openEditor")}
+          </Button>
           <div style={s.footerRight}>
             <label style={s.enabledLabel}>
               {form.enabled ? t("preview.enabled") : t("preview.disabled")}
@@ -87,22 +86,7 @@ export function SkillPreviewDrawer({ skill, onClose }: { skill: Skill; onClose: 
       }
     >
       {untrusted && <div style={s.untrustedNotice}>{t("preview.untrustedNotice")}</div>}
-      <FormField label={t("preview.nameLabel")} required>
-        <TextInput value={form.name} onChange={set("name")} mono />
-      </FormField>
-      <FormField label={t("preview.descriptionLabel")} hint={t("preview.descriptionHint")}>
-        <TextInput value={form.description} onChange={set("description")} />
-      </FormField>
-      <FormField label={t("preview.typeLabel")}>
-        <SelectInput
-          value={form.type}
-          onChange={(v) => set("type")(v as SkillType)}
-          options={typeOptions}
-        />
-      </FormField>
-      <FormField label={t("preview.bodyLabel")} hint={t("preview.bodyHint")}>
-        <Textarea value={form.body} onChange={set("body")} rows={16} mono />
-      </FormField>
+      <SkillFormFields form={form} onChange={set} />
     </Drawer>
   );
 }

@@ -7,7 +7,8 @@ import { Button, FormField, Modal, SelectInput, TextInput, Textarea } from "@dev
 import type { SkillType } from "@devdigest/shared";
 import { useCreateSkill } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
-import { CREATE_MODAL_WIDTH, SKILL_TYPES } from "../../constants";
+import { SKILL_TYPES } from "../../../SkillFormFields";
+import { CREATE_MODAL_WIDTH } from "../../constants";
 import { s } from "./styles";
 
 export function CreateSkillModal({ onClose }: { onClose: () => void }) {

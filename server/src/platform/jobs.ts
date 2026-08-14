@@ -107,6 +107,12 @@ export class JobRunner {
       }
     }) as Promise<void>;
 
+    // Callers that fire-and-forget (every production enqueue) never observe
+    // `done`; without this, one exhausted-retries job failure becomes an
+    // unhandled rejection and kills the whole process. Awaiting callers
+    // (tests, chained flows) still see the rejection through `done` itself.
+    done.catch(() => {});
+
     return { id: jobId, done };
   }
 

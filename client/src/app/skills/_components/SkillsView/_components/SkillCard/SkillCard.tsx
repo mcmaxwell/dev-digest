@@ -6,7 +6,8 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, Toggle } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
-import { needsVetting, typeColor } from "../../helpers";
+import { typeColor } from "../../../SkillFormFields";
+import { needsVetting } from "../../helpers";
 import { s } from "./styles";
 
 export function SkillCard({

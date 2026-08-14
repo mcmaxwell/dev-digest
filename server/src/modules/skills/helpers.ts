@@ -1,9 +1,9 @@
 import { unzipSync } from 'fflate';
-import type { Skill, SkillSource, SkillType } from '@devdigest/shared';
+import type { Skill, SkillSource, SkillType, SkillVersion } from '@devdigest/shared';
 import { SkillType as SkillTypeSchema } from '@devdigest/shared';
 import { ValidationError } from '../../platform/errors.js';
 import { DERIVED_DESCRIPTION_MAX_CHARS, IMPORT_MAX_FILE_BYTES } from './constants.js';
-import type { SkillRow } from './repository.js';
+import type { SkillRow, SkillVersionRow } from './repository.js';
 
 /**
  * Pure helpers for the skills module — DB row ⇄ DTO mapping and the import
@@ -25,6 +25,16 @@ export function toSkillDto(row: SkillRow): Skill {
     enabled: row.enabled,
     version: row.version,
     evidence_files: row.evidenceFiles ?? null,
+  };
+}
+
+/** Map a `skill_versions` snapshot row to the public `SkillVersion` DTO. */
+export function toSkillVersionDto(row: SkillVersionRow): SkillVersion {
+  return {
+    skill_id: row.skillId,
+    version: row.version,
+    body: row.body,
+    created_at: row.createdAt.toISOString(),
   };
 }
 

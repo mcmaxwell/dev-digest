@@ -1,4 +1,4 @@
-import type { Skill, SkillType } from "@devdigest/shared";
+import type { Skill } from "@devdigest/shared";
 
 /** Case-insensitive name/description/type filter for the skills grid. */
 export function filterSkills(skills: Skill[], query: string): Skill[] {
@@ -10,20 +10,6 @@ export function filterSkills(skills: Skill[], query: string): Skill[] {
       s.description.toLowerCase().includes(q) ||
       s.type.toLowerCase().includes(q),
   );
-}
-
-/** Badge colour per skill type (matches the trace/legend accents). */
-export function typeColor(type: SkillType): string {
-  switch (type) {
-    case "rubric":
-      return "var(--accent)";
-    case "convention":
-      return "var(--ok)";
-    case "security":
-      return "var(--crit)";
-    default:
-      return "var(--text-secondary)";
-  }
 }
 
 /** A skill from a non-manual source that is still disabled needs vetting. */
