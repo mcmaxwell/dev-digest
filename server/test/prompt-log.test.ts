@@ -178,7 +178,7 @@ describe('prompt-log — the onboarding generation line (AC-55, AC-70)', () => {
     const cases: Array<[string, string]> = [
       [['github_pat', 'abcdefghij0123456789ABCDEF'].join('_'), '[redacted:github-pat]'],
       [`AWS_ACCESS_KEY_ID=${['AKIA', 'IOSFODNN7EXAMPLE'].join('')}`, '[redacted:aws-key]'],
-      ['-----BEGIN RSA PRIVATE KEY-----', '[redacted:private-key]'],
+      [['-----BEGIN RSA', 'PRIVATE KEY-----'].join(' '), '[redacted:private-key]'],
       [
         ['eyJhbGciOiJIUzI1NiJ9', 'eyJzdWIiOiIxMjM0NTY3ODkwIn0', 'dozjgNryP4J3jVmNHl0w5N_XgL0'].join('.'),
         '[redacted:jwt]',
