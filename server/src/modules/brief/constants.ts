@@ -17,7 +17,7 @@
  * will not reliably lower a bill — read `res.tokensIn` / `res.costUsd` off the
  * provider result for anything that claims to be spend.
  */
-export const PROMPT_TOKEN_CEILING = 20_000;
+export const PROMPT_TOKEN_CEILING = 8_000;
 
 /** Matches the blast summary's ceiling; a stuck provider is the real risk here. */
 export const MODEL_TIMEOUT_MS = 30_000;

@@ -95,7 +95,7 @@ beneath a badge, and regeneration is always an explicit click.
 
 ## The prompt ceiling bounds assembly, not spend
 
-`PROMPT_TOKEN_CEILING = 20_000` is measured with **our** tokenizer over the text
+`PROMPT_TOKEN_CEILING = 8_000` is measured with **our** tokenizer over the text
 **we** build.
 It does not bound the invoice — a measured-versus-billed ratio of 5.0x was
 recorded on this codebase (see `server/INSIGHTS.md`).

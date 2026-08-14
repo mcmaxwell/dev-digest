@@ -26,7 +26,7 @@ The cost is a review that spends its attention uniformly across a change whose r
 1. Every risk the brief states names at least one real file in the PR, so a reviewer can click it instead of searching for it.
 2. A ranked review-focus list tells the reviewer which files to open first and why, in the reviewer's own terms.
 3. A single risk level summarises the brief so the PR page can be scanned without reading it.
-4. The Overview tab carries exactly **one** model-written paragraph, not three.
+4. The Overview tab carries exactly **two** model-written prose blocks - L03's intent quote and the brief's own prose - and not a third. See the amendment note under AC-20.
 5. A reviewer can see how the brief changed across the PR's commits, so a PR that grew a second purpose mid-flight is visible as such.
 6. Nothing the model invents ever renders. A file path or line the input data does not contain is dropped, and the drop is counted and shown.
 7. The four index-honesty affordances L04 shipped survive this feature unchanged.
@@ -106,7 +106,7 @@ flowchart TD
 
 The response envelope carries, in shape terms rather than field-by-field code:
 
-- **`prose`** - the single model-written paragraph. Two named parts, `what` and `why`, kept as separate fields rather than one blob, because they are graded by different rules: `what` states reach and is checkable against the blast lists beside it, `why` states purpose and is checkable against the intent quote beside it. One field would make the "never claim a defect" criterion (AC-16) untestable, since a grader could not say which half broke it.
+- **`prose`** - the single model-written paragraph. Two named parts, `what` and `why`, kept as separate fields rather than one blob, because they are graded by different rules: `what` states reach and is checkable against the blast lists beside it, `why` states purpose and is checkable against the intent quote beside it. One field would make the "never claim a defect" criterion (AC-22) untestable, since a grader could not say which half broke it.
 - **`risk_level`** - one of `high`, `medium`, `low`.
 - **`risks[]`** - each with a kind, a title, an explanation, a severity, and one or more file references. Reuses `contracts/brief.ts`'s existing `Risk` vocabulary.
 - **`review_focus[]`** - an ordered list, each entry a file reference, an optional line, and one sentence of reason.
@@ -300,7 +300,7 @@ Amended 2026-08-14, during the L07 run, after `plan-verifier` found the original
 
 | Requirement | Number |
 | --- | --- |
-| Prompt assembly ceiling | 20,000 tokens, measured with our tokenizer over the text we build |
+| Prompt assembly ceiling | 8,000 tokens, measured with our tokenizer over the text we build. Lowered from 20,000 on 2026-08-14 to the agreed budget; the unit is the tokenizer's count over the assembled text, never the provider's billed count |
 | Model call timeout | 30,000 ms, matching the blast summary's ceiling |
 | Schema repairs | At most 2, giving at most 3 attempts |
 | Retry wrapper around the call | None - a retry re-issues a paid call |
