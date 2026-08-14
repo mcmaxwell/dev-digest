@@ -7,6 +7,16 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## What Works
 
+- [2026-08-14] An `*.it.test.ts` that MUTATES the seeded fixture (a head SHA, a
+  repo row) must restore it in `beforeEach`, never at the end of the mutating
+  test. One file is one container and one accumulated fixture, so restoring at
+  the end means the first failure cascades into every later case and you debug
+  five red tests instead of one - seen when `brief.it.test.ts` left `head_sha`
+  at `moved-on-0001`. Related trap in the same file: `seed()` leaves
+  `repos.clone_path` NULL, so any feature with a clone gate degrades in tests
+  unless the fixture sets it, and the degraded path is not what you meant to
+  assert.
+
 - [2026-08-13] To assert on what a SERVICE logged, construct the service
   directly with your own logger over `app.container` after `buildApp`, rather
   than reaching it through a route: `routes.ts` hands it `app.log`, which is
@@ -294,6 +304,30 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   not just the red.
 
 ## Codebase Patterns
+
+- [2026-08-14] A membership property is enforced by the SIGNATURE, not the body.
+  `modules/brief/candidates.ts` takes caller file PATHS, endpoint STRINGS and job
+  STRINGS - never a `BlastCaller` - so `BlastCaller.line`, which is a position in
+  the DEFAULT BRANCH at `last_indexed_sha` and not in the PR, cannot become a
+  location the UI renders. A filter is one refactor from deletion; an absent
+  parameter is a compile error. Same shape as `modules/onboarding/candidates.ts`.
+  Project the offending field away at the caller (`brief/service.ts:197-204`
+  builds its digest without it) rather than filtering downstream.
+
+- [2026-08-14] A mechanical honesty check that is a PREFIX property of a whole
+  artifact makes that artifact's own formatting part of the invariant. "The
+  persisted prompt contains no line beginning with `+` or `-` outside a
+  reconstructed `@@` header" was written to catch a diff-body leak, and instead
+  caught our own markdown bullets: every `- path` list item sits at column 0.
+  Indent list markers two spaces in anything that must satisfy such a check
+  (`modules/brief/prompt.ts`), leaving only `buildFileMap`'s output at column 0.
+
+- [2026-08-14] Counting "sentence-terminating marks" naively (`[.!?]`) cuts
+  prose in half at `src/config.ts`. Where the prose is ABOUT file paths - which
+  is the whole point of a review brief - a terminator must be `[.!?]+` followed
+  by whitespace or end-of-string (`modules/brief/service.ts::clampProse`). If a
+  criterion is later verified with a naive count, the two numbers disagree on
+  path-heavy text, and the code is the one that is right.
 
 - [2026-08-13] Path-classification knowledge that TWO modules need
   (test/config/generated denylists) belongs in the owning module's

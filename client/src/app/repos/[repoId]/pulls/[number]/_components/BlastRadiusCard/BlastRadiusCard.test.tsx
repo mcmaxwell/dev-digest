@@ -14,14 +14,15 @@ import brief from "../../../../../../../../messages/en/brief.json";
 import { BlastRadiusCard } from "./BlastRadiusCard";
 
 const usePrBlast = vi.hoisted(() => vi.fn());
-const useBlastSummary = vi.hoisted(() => vi.fn());
 const useResyncRepoIntel = vi.hoisted(() => vi.fn());
 
 // The mocks FORWARD prId, so a component that stopped passing it (which would
 // silently disable the query via `enabled: !!prId`) fails here.
+// `useBlastSummary` is deliberately NOT mocked: L07 moved the impact summary
+// into the PR Brief card, and this card no longer calls it. A mock for a hook
+// the component does not use would pass whether or not the call came back.
 vi.mock("@/lib/hooks/blast", () => ({
   usePrBlast: (prId: string | null) => usePrBlast(prId),
-  useBlastSummary: (prId: string | null) => useBlastSummary(prId),
 }));
 vi.mock("@/lib/hooks/repo-intel", () => ({
   useResyncRepoIntel: (repoId: string | null) => useResyncRepoIntel(repoId),
@@ -92,7 +93,6 @@ function renderCard(props: Partial<Parameters<typeof BlastRadiusCard>[0]> = {}) 
 
 beforeEach(() => {
   usePrBlast.mockReturnValue({ data: response(), isLoading: false, isError: false, refetch: vi.fn() });
-  useBlastSummary.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
   useResyncRepoIntel.mockReturnValue({ mutate: vi.fn(), isPending: false, isSuccess: false });
 });
 
@@ -328,36 +328,5 @@ describe("BlastRadiusCard links", () => {
     });
     renderCard();
     expect(screen.getByText("src/server.ts:30").closest("a")).toBeNull();
-  });
-});
-
-describe("BlastRadiusCard summary", () => {
-  it("never generates on render - it takes a click", () => {
-    const mutate = vi.fn();
-    useBlastSummary.mockReturnValue({ mutate, isPending: false, isError: false });
-    renderCard();
-    expect(mutate).not.toHaveBeenCalled();
-    screen.getByRole("button", { name: blast.summary.generate }).click();
-    expect(mutate).toHaveBeenCalled();
-  });
-
-  it("marks a summary generated against an older commit or index as out of date", () => {
-    usePrBlast.mockReturnValue({
-      data: response({
-        summary: {
-          text: "Touches the rate limiter.",
-          provider: "openai",
-          model: "gpt-4.1",
-          generated_at: "2026-08-09T09:00:00.000Z",
-          stale: true,
-        },
-      }),
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
-    renderCard();
-    expect(screen.getByText("Touches the rate limiter.")).toBeTruthy();
-    expect(screen.getByText(blast.summary.stale)).toBeTruthy();
   });
 });

@@ -7,7 +7,7 @@
  * diff still reachable when the grouping call fails.
  */
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, within, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { PrFile, ReviewRecord, SmartDiffResponse } from "@devdigest/shared";
 import prReview from "../../../../../../../../messages/en/prReview.json";
@@ -28,6 +28,10 @@ vi.mock("@/lib/hooks/reviews", () => ({
 }));
 
 afterEach(cleanup);
+
+// jsdom implements neither; the focused file scrolls itself into view.
+const scrollIntoView = vi.fn();
+Element.prototype.scrollIntoView = scrollIntoView;
 
 const FILES: PrFile[] = [
   {
@@ -130,6 +134,7 @@ function renderViewer(over: Partial<React.ComponentProps<typeof SmartDiffViewer>
 }
 
 beforeEach(() => {
+  scrollIntoView.mockClear();
   smartDiff.mockReturnValue({ data: DIFF, isLoading: false, isError: false });
   prReviews.mockReturnValue({ data: REVIEWS });
 });
@@ -161,6 +166,25 @@ describe("SmartDiffViewer", () => {
     renderViewer();
     expect(smartDiff).toHaveBeenCalledWith("pr-1");
     expect(prReviews).toHaveBeenCalledWith("pr-1");
+  });
+
+  it("opens the ?file= target even when its role would leave it collapsed", async () => {
+    // How a review-focus click on the Overview tab lands here (L07): the
+    // lock file is boilerplate and closed by default, and naming it in the URL
+    // must be enough to open it — otherwise the jump silently does nothing.
+    renderViewer({ focusFile: "package-lock.json" });
+    const boilerplate = screen.getByRole("region", { name: "Boilerplate" });
+    expect(within(boilerplate).getByText("new")).toBeInTheDocument();
+    // The scroll waits a frame for the body to mount, so it lands one
+    // `requestAnimationFrame` after render rather than in this tick.
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+  });
+
+  it("leaves every other file exactly as it was when a file is focused", () => {
+    renderViewer({ focusFile: "package-lock.json" });
+    // The core file still opens on its own heuristic, and the OTHER boilerplate
+    // behaviour is untouched: the focus is additive, never a re-layout.
+    expect(screen.getByText(/const key = bucketKey/)).toBeInTheDocument();
   });
 
   it("opens core files and leaves boilerplate collapsed", () => {

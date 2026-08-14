@@ -16,11 +16,12 @@ export const INTENT_LLM_TIMEOUT_MS = 45_000;
 export const INTENT_LLM_MAX_RETRIES = 1;
 
 // --- File map ---------------------------------------------------------------
-
-/** Files listed by name in the file map before it collapses to "... and N more". */
-export const MAX_FILE_MAP_FILES = 40;
-/** Hunk headers shown per file. Enough to see WHERE a file changed, not what. */
-export const MAX_HUNKS_PER_FILE = 6;
+//
+// `buildFileMap` and its two caps (`MAX_FILE_MAP_FILES`, `MAX_HUNKS_PER_FILE`)
+// moved to `modules/_shared/hunk-map.ts` when L07's brief needed the same map
+// and the same `@@` ranges: `no-cross-module-imports` does not exempt a
+// sibling's `hunk-map.ts`, and a second copy would let the rendered map and the
+// grounding ranges drift.
 
 // --- Source caps ------------------------------------------------------------
 
