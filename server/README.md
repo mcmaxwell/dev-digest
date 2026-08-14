@@ -69,13 +69,14 @@ flowchart TB
     polling["polling<br/>/repos/:id/poll"]
   end
   subgraph Review["Review & runs"]
-    reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace)"]
+    reviews["reviews<br/>/pulls/:id/review · /reviews/diff · /reviews<br/>/findings/:id/(accept|dismiss) · /runs/:id/(events|trace)"]
   end
   subgraph Agents["Agents"]
     agents["agents<br/>/agents · /agents/:id"]
   end
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
+    blast["blast<br/>/pulls/:id/blast · /pulls/:id/blast/summary"]
   end
   subgraph Platform["Platform"]
     settings["settings<br/>/settings · /providers"]

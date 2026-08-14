@@ -26,8 +26,28 @@ export const EXCLUDED_DIRS = [
 ] as const;
 
 // --- Read-time limits -------------------------------------------------------
-/** [T1] Caller fan-out cap per changed symbol (ORDER BY rank DESC LIMIT N). */
+/**
+ * [T1] Caller fan-out cap PER CHANGED SYMBOL.
+ *
+ * Enforced in SQL by `getResolvedCallersTopN`
+ * (`row_number() OVER (PARTITION BY to_symbol ...)`), not by slicing the flat
+ * result: a global slice lets one hot symbol eat every slot and starve the rest,
+ * which is the opposite of what a per-symbol cap is for.
+ */
 export const MAX_CALLERS_PER_SYMBOL = 20;
+
+/**
+ * [T3] Reverse (who-imports-me) walk limits, used by `getReverseImporters`.
+ *
+ * The walk exists so an endpoint two hops away (`routes -> service ->
+ * repository`) is still attributed to a change in the repository: the endpoint's
+ * file never names the changed symbol, so caller rows alone cannot find it.
+ * It feeds ONLY endpoints/crons - an import edge is not proof of a call, so it
+ * never adds callers.
+ */
+export const REVERSE_FANOUT_PER_LEVEL = 200;
+/** Hard ceiling on rows fetched per level, before the fan-out cap is applied. */
+export const REVERSE_MAX_EDGES = 2000;
 
 /**
  * [T1] Bumped whenever the AST extractor or symbol schema changes. A mismatch

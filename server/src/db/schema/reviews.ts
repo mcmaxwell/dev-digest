@@ -104,6 +104,34 @@ export const prIntent = pgTable('pr_intent', {
   trace: jsonb('trace'),
 });
 
+/**
+ * L04 — the optional one-paragraph impact summary of a PR's blast radius
+ * (owned by `modules/blast`).
+ *
+ * Written ONLY by `POST /pulls/:id/blast/summary`; the GET never spends a
+ * token. Like `pr_intent` it carries no `workspace_id` — tenancy comes from
+ * `BlastService` resolving the PR through `reviewRepo.getPull(workspaceId, …)`
+ * before this table is touched.
+ *
+ * `stale` is NOT a column. It is derived on read against BOTH shas: a summary
+ * rots when the PR moves (`head_sha`) and equally when the repo is re-indexed
+ * underneath it (`indexed_sha`), and a single stored flag could not catch the
+ * second. No index: `pr_id` is the primary key and the only access path.
+ */
+export const prBlastSummary = pgTable('pr_blast_summary', {
+  prId: uuid('pr_id')
+    .primaryKey()
+    .references(() => pullRequests.id, { onDelete: 'cascade' }),
+  text: text('text').notNull(),
+  /** The PR head the summary described. */
+  headSha: text('head_sha'),
+  /** The `repo_index_state.last_indexed_sha` the underlying facts came from. */
+  indexedSha: text('indexed_sha'),
+  provider: text('provider'),
+  model: text('model'),
+  generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const prBrief = pgTable('pr_brief', {
   prId: uuid('pr_id')
     .primaryKey()

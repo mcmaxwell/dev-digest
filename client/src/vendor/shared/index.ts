@@ -4,6 +4,8 @@
  * Exports (Zod schemas + inferred TS types):
  *  - contracts/findings   Review, Finding, Severity, Verdict, FindingAction, trifecta
  *  - contracts/brief      Intent, BlastRadius, Risks, PrHistory, SmartDiff, PrBrief
+ *  - contracts/blast      PrBlastRadius, BlastIndexState, PrBlastResponse (L04)
+ *  - contracts/review-diff  ReviewDiffRequest/Response - PR-less diff review (L04)
  *  - contracts/intent     PrIntent, IntentSource, RiskArea (L03 intent layer)
  *  - contracts/knowledge  Conformance, Onboarding, EvalRun/EvalCase, MemoryItem,
  *                         Skill/CommunitySkill, ConventionCandidate, Agent
@@ -18,6 +20,8 @@
 export * from './contracts/findings.js';
 export * from './contracts/review-api.js';
 export * from './contracts/brief.js';
+export * from './contracts/blast.js';
+export * from './contracts/review-diff.js';
 export * from './contracts/intent.js';
 export * from './contracts/knowledge.js';
 export * from './contracts/trace.js';

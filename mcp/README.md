@@ -61,7 +61,7 @@ prefixed - `devdigest_list_agents` would become
 | `run_agent_on_pr` | **yes** | Runs ONE agent on an already-imported PR, waits, returns the verdict and findings. |
 | `get_findings` | no | Reads a review that already ran, by `run_id` or by `repo` + `pr_number`. |
 | `get_conventions` | no | The repository's accepted house rules, each with a measured adherence rate. |
-| `get_blast_radius` | no | **Not implemented** - the L04 exercise. Calling it returns instructions for building it. |
+| `get_blast_radius` | no | What a PR reaches: changed symbols, the files that call them, and the endpoints and jobs behind those callers. Reads the prebuilt index, and reports when that index is partial. |
 
 `run_agent_on_pr` waits for up to `wait_seconds` (180 by default, 300 max). When
 it runs out of patience it does **not** fail: it returns `status: running` plus
@@ -71,6 +71,33 @@ a `run_id`, and the run keeps going on the server. Read the result later with
 `get_findings` by `run_id` only works for runs THIS server started - the API has
 no route mapping a run back to its pull request. Use `repo` + `pr_number` for
 anything else.
+
+## `devdigest review` - the pre-push CLI
+
+The same package ships a second binary. It reviews your UNCOMMITTED changes
+before you push, through the same agents and the same engine:
+
+```sh
+./mcp/bin/devdigest review --mode working --fail-on critical
+echo $?      # 0 clean · 1 blockers · 2 review failed · 3 usage · 4 nothing to review
+```
+
+Only TRACKED files are sent. Untracked files are untracked on purpose
+(`.env.local`, `credentials.json`, scratch notes) and this command uploads what
+it collects to a hosted model, so they are excluded, named on stderr on every
+run, and listed under `untracked_excluded` in `--format json`.
+
+There is no pull request here, so the prompt gets no repo map, no callers, no
+issue and no PR description - but it keeps the agent's system prompt and skills,
+the injection guard, the scope filter and the citation gate. `--help` says all
+of this, and lists every exit code.
+
+As a `pre-push` hook:
+
+```sh
+#!/bin/sh
+devdigest review --mode working --fail-on critical || exit $?
+```
 
 ## Configuration
 
@@ -98,13 +125,13 @@ cd mcp && pnpm budget
 ```
 tool              tokens   bytes
 --------------------------------
-get_blast_radius     524    2310
+get_blast_radius     691    3126
 run_agent_on_pr      323    1408
 get_findings         296    1291
-get_conventions      263    1230
+get_conventions      263    1227
 list_agents          163     731
 --------------------------------
-TOTAL               1571
+TOTAL               1738
 ```
 
 The same counter runs in `test/tools-list.test.ts`, together with a structural

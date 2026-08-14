@@ -4,6 +4,10 @@ Exposes DevDigest to an editor agent as five tools: `list_agents`,
 `run_agent_on_pr`, `get_findings`, `get_conventions`, `get_blast_radius`.
 Reaches the domain over HTTP to `http://localhost:3001` and nothing else.
 
+It also ships a second binary, `bin/devdigest` (`devdigest review --mode
+working`): the pre-push CLI. Separate entry file, separate stdout contract -
+see `src/cli/main.ts`.
+
 ## Read this first: the SDK is v2, and most tutorials are v1
 
 `@modelcontextprotocol/sdk` is the OLD line (v1).
@@ -36,9 +40,11 @@ So:
   Changing one is a deliberate decision plus a `pnpm budget` re-run, never a
   side effect of a refactor. `test/tools-list.test.ts` holds an independent
   transcription of the approved wording; drift fails there.
-- Long, teaching text lives in `src/format/errors.ts` and in the
-  `get_blast_radius` stub body. It costs nothing until something goes wrong,
-  and that is where a model most needs prose.
+- Long, teaching text lives in `src/format/errors.ts` and in the RESULT BODIES
+  the renderers build (`src/format/render.ts`) - for instance the paragraph
+  `get_blast_radius` prints when a repository has no index. It costs nothing
+  until it fires, and that is where a model most needs prose. (Until L04 landed
+  this sentence pointed at the `get_blast_radius` STUB body; the stub is gone.)
 - The whole `tools/list` payload has a hard budget of **2500 tokens** (warn band
   2200), measured with `pnpm budget` and enforced in CI by the same counter.
 
@@ -46,6 +52,7 @@ So:
 
 ```sh
 pnpm dev          # run the server on this terminal's stdio (rarely useful directly)
+./bin/devdigest review --mode working   # the pre-push CLI (see src/cli/)
 pnpm typecheck
 pnpm arch:check   # dependency-cruiser boundaries
 pnpm test         # hermetic: no network, no Docker, no keys
@@ -57,7 +64,9 @@ pnpm inspect      # MCP Inspector against bin/devdigest-mcp
 ## Rules
 
 - **stdout is the JSON-RPC channel.** No `console.log`, anywhere, ever - one
-  stray write breaks `initialize`. Diagnostics go to `console.error`, one line
+  stray write breaks `initialize`. The CLI is the ONE thing that writes to
+  stdout, which is exactly why it has its own entry file and its own launcher,
+  and why `cli-does-not-import-the-mcp-server` keeps the two apart. Diagnostics go to `console.error`, one line
   per HTTP call, and **never a response body**: `GET /agents` carries
   `system_prompt` and `GET /repos` carries `clone_path`.
 - **`createServer(deps: { api: ApiClient })` takes the HTTP client as an
@@ -131,9 +140,12 @@ src/api/            index.ts = the ApiClient PORT (the only file tools may impor
                     resolve.ts = owner/name -> uuid, slug -> uuid, 60s cache
 src/wait.ts         poll GET /pulls/:id/runs to a terminal status (not SSE - see the file)
 src/run-index.ts    bounded LRU run_id -> { prId, repo, prNumber }
-src/rules/          latest-reviews.ts (THIRD copy of a server rule) · severity.ts
+src/rules/          latest-reviews.ts (THIRD copy of a server rule) · severity.ts ·
+                    blast-shape.ts (envelope -> get_blast_radius outputSchema)
 src/format/         render.ts · errors.ts (all model-facing failure text) · slug.ts · truncate.ts
 src/tools/          one file per tool + shared.ts (approved descriptions, ok/fail)
+src/cli/            `devdigest review` - main.ts is the ONLY file that prints or
+                    exits; args/help/git/modes/render/exit are pure or I/O-only
 scripts/token-budget.ts   pnpm budget; exports the counter the gate test uses
 ```
 

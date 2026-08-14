@@ -44,6 +44,30 @@ module.exports = {
       to: { path: '^src/api/', pathNot: '^src/api/index\\.ts$' },
     },
     {
+      name: 'cli-goes-through-the-api-port',
+      comment:
+        'The `devdigest review` CLI talks to the same `ApiClient` PORT the tools ' +
+        'use (src/api/index.ts), never to the fetch wrapper or the response ' +
+        'parsers directly. Same reason as tools-go-through-the-api-port: one ' +
+        'seam, and a test can hand over a plain object.',
+      severity: 'error',
+      from: { path: '^src/cli' },
+      to: { path: '^src/api/', pathNot: '^src/api/index\\.ts$' },
+    },
+    {
+      name: 'cli-does-not-import-the-mcp-server',
+      comment:
+        'The CLI prints to stdout; the MCP server owns stdout as its JSON-RPC ' +
+        'channel. They share the API port and the formatters, never the server, ' +
+        'its tools, or the SDK - importing any of those is how a stray write ends ' +
+        'up breaking `initialize` for every session.',
+      severity: 'error',
+      from: { path: '^src/cli' },
+      to: {
+        path: '^(src/(server|index)\\.ts|src/tools/|node_modules/@modelcontextprotocol/)',
+      },
+    },
+    {
       name: 'no-circular',
       comment: 'Circular imports make the DI wiring in src/server.ts unreadable.',
       severity: 'error',

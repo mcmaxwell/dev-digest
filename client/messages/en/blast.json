@@ -3,16 +3,59 @@
     "symbols": "symbols",
     "callers": "callers",
     "endpoints": "endpoints",
-    "crons": "cron/jobs"
+    "crons": "cron"
   },
   "view": {
     "tree": "tree",
-    "graph": "graph"
+    "graph": "graph",
+    "label": "Blast radius view"
   },
-  "callerCount": "{count} callers",
-  "noDownstream": "{count} changed symbol(s), no downstream callers found.",
+  "callerCount": "{count, plural, one {# caller} other {# callers}}",
+  "noDownstream": "{count, plural, one {# more changed symbol has} other {# more changed symbols have}} no downstream callers in the index.",
   "graph": {
     "empty": "No downstream callers to graph.",
     "ariaLabel": "Blast radius graph"
+  },
+  "loading": "Reading the index…",
+  "errorTitle": "Could not load the blast radius",
+  "emptyTitle": "Nothing indexed for these files",
+  "emptyBody": "The index holds no symbols for the {count} file(s) this PR changes.",
+  "notIndexedTitle": "Repository not analyzed yet",
+  "notIndexedBody": "The blast radius is read from a prebuilt index. Until this repository is analyzed, DevDigest cannot say what this change reaches — which is not the same as saying it reaches nothing.",
+  "reindex": "Re-analyze repository",
+  "reindexing": "Re-analyzing…",
+  "reindexQueued": "Re-analysis queued. It appears here once the index is rebuilt.",
+  "symbolsCaveat": "The index is built from the default branch, so symbols this PR ADDS are not visible here, and symbols it DELETES may still show callers.",
+  "attribution": "Endpoints and jobs are attributed per FILE, so symbols declared in the same changed file share them.",
+  "truncated": "{shown} of {total} callers shown.",
+  "symbolsTruncated": "Showing {shown} of {total} changed symbols, most-called first.",
+  "linkUnavailable": "No GitHub link: this repository has no full name, or the index has no commit.",
+  "linkTitle": "Open {file} at line {line} on the indexed commit",
+  "noCallers": "No known callers.",
+  "endpointsLabel": "Endpoints",
+  "cronsLabel": "Jobs",
+  "index": {
+    "partialTitle": "This picture may be incomplete",
+    "flag_off": "Repository analysis is switched off for this deployment.",
+    "not_indexed": "This repository has never been analyzed.",
+    "index_failed": "The last analysis failed, so no index is available.",
+    "index_degraded": "The last analysis degraded and produced no usable index.",
+    "stale_indexer": "The index was built by an older analyzer; re-analyze to refresh it.",
+    "no_rank": "File importance was never computed, so callers are listed unranked, not by impact.",
+    "soft_budget": "Analysis ran out of time and skipped the import graph, so endpoints and jobs are likely missing.",
+    "graph_failed": "The import graph could not be built, so endpoints and jobs behind these callers are missing.",
+    "parse_errors": "Some files could not be parsed, so their symbols and callers are missing.",
+    "index_partial": "The last analysis finished only partially.",
+    "none": ""
+  },
+  "summary": {
+    "title": "Impact summary",
+    "generate": "Summarize impact",
+    "regenerate": "Re-summarize",
+    "generating": "Summarizing…",
+    "stale": "Out of date",
+    "staleHint": "Generated for an earlier commit or an earlier index.",
+    "by": "{provider} · {model}",
+    "failed": "Could not generate the summary."
   }
 }

@@ -16,6 +16,11 @@ the root INSIGHTS.md. Format and quality gates:
   in a handler. Verify such a rule actually fires before trusting it: drop a
   throwaway `src/tools/_probe.ts` importing `../api/http.js`, run
   `pnpm arch:check`, confirm the error names the rule, delete the probe.
+  - [2026-08-10] Done again for the two CLI rules
+    (`cli-goes-through-the-api-port`, `cli-does-not-import-the-mcp-server`): one
+    throwaway `src/cli/_probe.ts` importing BOTH `../api/http.js` and
+    `../server.js` trips both rules in a single run, and the output names each
+    one. Two rules, one probe, one command.
 - [2026-08-10] For an async wait loop, inject BOTH `sleep` and `now`
   (`src/wait.ts`, `WaitOptions`) rather than reaching for
   `vi.useFakeTimers()`. The MCP SDK drives handlers through its own async
@@ -24,6 +29,14 @@ the root INSIGHTS.md. Format and quality gates:
   a test assert the exact sleep sequence (`test/run-agent-on-pr.test.ts`).
 
 ## What Doesn't Work
+
+- [2026-08-10] Do NOT put a tool's output-SHAPE type in the tool file when
+  `src/format/render.ts` also needs it: the tool imports the renderer, so the
+  renderer importing the tool is a cycle and `no-circular` fails. The shaping
+  rules are business rules anyway (what `min_rank` means on an unranked index,
+  what the caps do), so they belong in `src/rules/` -
+  `src/rules/blast-shape.ts` holds `ShapedBlast` + `shape()`, and both the tool
+  and the renderer import it.
 
 - [2026-08-10] Do NOT add a `paths` alias to `@devdigest/shared` here. The MCP
   SDK v2 pins zod 4 and `server/`, `client/`, `reviewer-core/` are all zod 3.
@@ -87,6 +100,13 @@ the root INSIGHTS.md. Format and quality gates:
   binary as a platform-specific optional dependency rather than through the
   postinstall script. Do not "fix" it with `pnpm approve-builds`.
 
+- [2026-08-10] Once TWO binaries share `src/api/http.ts`, its one-line-per-call
+  stderr log has to take its prefix from the caller (`RequestOptions.label`,
+  defaulted to `devdigest-mcp`, set to `devdigest` in `src/cli/main.ts`).
+  Hardcoding it means a user who typed `devdigest` reads
+  `devdigest-mcp: POST /reviews/diff -> 400`, which sends them to the wrong
+  program when something fails.
+
 ## Recurring Errors & Fixes
 
 - [2026-08-10] A `console.log` anywhere in `src/**` breaks the MCP handshake:
@@ -97,6 +117,14 @@ the root INSIGHTS.md. Format and quality gates:
   - it must print exactly `1`.
 
 ## Session Notes
+
+- [2026-08-10] L04 blast + CLI landed here: `get_blast_radius` is real (grouped
+  by changed symbol, `index_status` instead of `degraded: boolean`), and
+  `bin/devdigest` (`src/cli/`) reviews the working tree before a push. Measured
+  `tools/list` went 1571 -> 1738 against the 2500 budget / 2200 warn band, so no
+  cuts were needed. Budget was measured BEFORE the handler was written, which is
+  the point of that ordering: it is cheap to cut a schema field and expensive to
+  cut one after the code depends on it.
 
 - [2026-08-10] L04 `/mcp` implemented: fifth standalone package, five tools over
   stdio, HTTP-only access to the API, `tools/list` measured at 1571 tokens

@@ -57,9 +57,9 @@ export const CATEGORY_DESC = 'Only rules in this category.';
 export const STATUS_DESC =
   'accepted means a human confirmed the rule; all adds unreviewed candidates.';
 export const EVIDENCE_DESC = 'Include one file:line pointer proving each rule.';
-export const MAX_CALLERS_DESC = 'Maximum caller rows, highest-ranked first.';
-export const MIN_RANK_DESC = 'Drop callers whose file rank is below this.';
-export const INCLUDE_ENDPOINTS_DESC = 'Include the HTTP endpoints the callers sit behind.';
+export const MAX_CALLERS_DESC = 'Maximum callers listed per changed symbol, highest-ranked first.';
+export const MIN_RANK_DESC = 'Drop callers whose file rank is below this. Ignored on an unranked index.';
+export const INCLUDE_ENDPOINTS_DESC = 'Include the endpoints and scheduled jobs the callers sit behind.';
 
 // ---------------------------------------------------------------------------
 // Shared parameter schemas

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Launcher for the devdigest CLI (`devdigest review`).
+#
+# Sibling of bin/devdigest-mcp, and deliberately a SEPARATE entry point: that one
+# speaks JSON-RPC on stdout and must never print anything else there, this one
+# prints a review for a human. Two launchers, two src entry files, no shared
+# stdout contract to get wrong.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ ! -x "$here/node_modules/.bin/tsx" ]; then
+  echo "devdigest: dependencies are not installed." >&2
+  echo "  Run: cd $here && pnpm install" >&2
+  echo "  (or run ./scripts/dev.sh from the repo root, which installs them)" >&2
+  exit 3
+fi
+
+exec "$here/node_modules/.bin/tsx" "$here/src/cli/main.ts" "$@"

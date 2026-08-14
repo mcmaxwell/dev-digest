@@ -30,6 +30,21 @@ the matching one, never rewrite old entries. Package-specific lessons go to
     client's `adapters.ts` lacks the `openrouter` provider id). Any automated
     sync check must scope to files touched by the current diff, or it fails on
     every run; a blanket `diff -rq` of the two trees is always red.
+- [2026-08-10] The `@devdigest/shared` barrel does `export *` over every
+  contract file, so a NEW contract file must not re-export a name it imports
+  from a sibling - `contracts/blast.ts` builds on `BlastCaller` /
+  `DownstreamImpact` / `BlastRadius` from `contracts/brief.ts` and exports only
+  new names (`RankedBlastCaller`, `BlastDownstream`, `PrBlastRadius`). A
+  re-export is a duplicate-export build error in every consumer, and it appears
+  the moment the barrel line is added, not when the file is written.
+- [2026-08-10] A server integration test can parse its own response with the
+  CLIENT's copy of a contract
+  (`import { PrBlastResponse } from '../../client/src/vendor/shared/contracts/blast.js'`
+  in `server/test/blast.it.test.ts`). The server's `tsconfig.json` only includes
+  `src/**`, so `pnpm typecheck` never sees the test file, and vitest resolves
+  `zod` from the client's own `node_modules` - both packages are on the same
+  zod 3. That turns the two-copies rule from a review checklist item into a
+  failing test, which is the only enforcement that has ever worked here.
 - [2026-08-02] The Drizzle schema is a DIRECTORY (`server/src/db/schema/*.ts`:
   core, pulls, reviews, runs), not the single `server/src/db/schema.ts` that
   CLAUDE.md's do-not-touch note implies — path checks/greps must match
@@ -88,6 +103,15 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   NOT install e2e).
 
 ## Session Notes
+
+- [2026-08-10] L04 Blast Radius + pre-push CLI shipped end-to-end:
+  `modules/blast` (`GET /pulls/:id/blast` free, `POST …/blast/summary` behind a
+  button) + four repo-intel facade reads + the BlastRadiusCard, plus
+  `POST /reviews/diff` and `mcp/bin/devdigest review --mode working`. Two
+  contracts (`blast.ts`, `review-diff.ts`) in BOTH vendored copies. The feature
+  needed no model for its main path - every fact was already in the index, and
+  the work was reading it honestly: the whole "index status" derivation exists
+  so an empty caller list is never mistaken for "nothing calls this".
 
 - [2026-08-04] L02 conventions extractor shipped end-to-end on
   `feat/l02-conventions-extractor`: `modules/conventions` (stratified sampling →

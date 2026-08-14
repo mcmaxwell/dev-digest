@@ -1,101 +1,89 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod';
+import { describeApiError, unknownRepoMessage } from '../format/errors.js';
+import { renderBlast } from '../format/render.js';
+import { MAX_LINE, shape, type ShapeOptions } from '../rules/blast-shape.js';
 import {
-  fail,
   INCLUDE_ENDPOINTS_DESC,
   MAX_CALLERS_DESC,
   MIN_RANK_DESC,
+  fail,
+  ok,
   prNumberParam,
   repoParam,
   type ToolDeps,
 } from './shared.js';
 
 /**
- * Real capability first, so the schema below makes sense, then the flag, so no
- * call is wasted. The long "how to build it" instruction lives in the ERROR
- * BODY, not here: a description is taxed on every session, an error body only
- * when it fires.
+ * What it does, then the two things that decide whether the model should trust
+ * the answer: it is free (so there is no reason not to call it), and it says
+ * when the index is partial (so an empty caller list is never read as proof).
  */
 export const GET_BLAST_RADIUS_DESCRIPTION =
-  'Map the impact of a pull request: which symbols it changes, which files call them, and which HTTP endpoints sit behind those callers. NOT IMPLEMENTED YET - this is the L04 exercise; calling it returns an error that spells out exactly what to build.';
+  'Map the impact of a pull request: which symbols it changes, which files call them, and which HTTP endpoints and cron jobs sit behind those callers. Reads a prebuilt index, costs nothing, and reports when that index is partial so missing callers are never mistaken for none.';
+
+/** Per-symbol caller ceiling. The result text always says how many were hidden. */
+const MAX_CALLERS_LIMIT = 100;
 
 /**
- * The ONLY tool here with an `outputSchema`, because the schema IS the exercise
- * contract: it is what the finished body has to produce.
+ * GROUPED BY CHANGED SYMBOL, not a flat caller list.
  *
- * It mirrors the ENGINE's `BlastResult`
- * (server/src/modules/repo-intel/types.ts:57-87) one to one - `changedSymbols`,
- * `callers[].viaSymbol -> via`, `impactedEndpoints`, with `factsByFile` and
- * `reason` dropped as noise.
+ * The flat shape this replaced made the model re-join `callers[].via` back onto
+ * `changed_symbols` itself, and it had no way at all to express "this symbol has
+ * no known callers" - the row simply was not there, which reads as absence of
+ * data rather than as a fact.
  *
- * CAREFUL: the repo already has a contract NAMED `BlastRadius`
- * (contracts/brief.ts:39, exported from the barrel, with a client copy) and it
- * is a DIFFERENT shape - `{ changed_symbols, downstream, summary }`, the
- * higher-level PR Brief view of later lessons. Do not merge the two, and do not
- * let the exercise create a third.
+ * `index_status` replaces the old `degraded: boolean` at the same token cost and
+ * carries strictly more: `partial` is precisely the case a boolean could not
+ * name, and the case where an empty `callers` array must NOT be read as "nothing
+ * calls this".
+ *
+ * The truncation counters (`caller_total`) are deliberately NOT here. A schema
+ * is loaded into the system prompt of every session; a sentence in the result
+ * text costs nothing until the tool is actually called.
+ *
+ * Every numeric field carries an explicit `.max()`: `z.number().int()` alone
+ * emits `"maximum": 9007199254740991` into the advertised schema, which is
+ * visible noise in every session's prompt (see mcp/INSIGHTS.md).
  */
 const OUTPUT_SCHEMA = z.object({
-  changed_symbols: z.array(z.string()).describe('Symbols the PR adds, removes or edits.'),
-  callers: z
+  changed_symbols: z
     .array(
       z.object({
-        file: z.string().describe('File containing the caller.'),
-        symbol: z.string().describe('The calling symbol.'),
-        via: z.string().describe('Which changed symbol it reaches.'),
-        line: z.number().int().describe('1-based line of the reference.'),
-        rank: z.number().describe('Importance of the caller file, 0 to 1.'),
+        name: z.string().describe('Symbol declared in a changed file.'),
+        file: z.string().describe('File that declares it.'),
+        kind: z.string().describe('function, class, method, …'),
       }),
     )
-    .describe('Files that reference a changed symbol, highest-ranked first.'),
-  impacted_endpoints: z
-    .array(z.string())
-    .describe('HTTP endpoints as "METHOD /path" reachable from the callers.'),
-  degraded: z.boolean().describe('True when the answer came from the ripgrep fallback.'),
+    .describe('Symbols this PR changes, most-called first.'),
+  downstream: z
+    .array(
+      z.object({
+        symbol: z.string().describe('Which changed symbol this row is about.'),
+        callers: z
+          .array(
+            z.object({
+              name: z.string().describe('The calling symbol.'),
+              file: z.string().describe('File containing the caller.'),
+              line: z.number().int().min(0).max(MAX_LINE).describe('1-based line of the call.'),
+              rank: z.number().min(0).max(1).describe('Importance of the caller file.'),
+            }),
+          )
+          .describe('Files that call it, highest-ranked first.'),
+        endpoints_affected: z
+          .array(z.string())
+          .describe('HTTP endpoints as "METHOD /path" reachable from those callers.'),
+        crons_affected: z.array(z.string()).describe('Scheduled jobs reachable from them.'),
+      }),
+    )
+    .describe('One entry per changed symbol. An empty callers list is a real answer.'),
+  summary: z.string().describe('One-paragraph impact summary, or empty if none was generated.'),
+  index_status: z
+    .enum(['ok', 'partial', 'degraded'])
+    .describe('partial means callers or endpoints may be missing; degraded means no index.'),
 });
 
-/**
- * The homework. Written against the `onion-architecture` skill rather than as
- * "do it all in the route": step 1 is a SERVICE method, step 2 leaves the route
- * as pure transport.
- */
-export const BLAST_RADIUS_HOMEWORK = [
-  'get_blast_radius is not implemented yet - it is the L04 exercise. The input and output',
-  'schemas advertised above are the contract; only the body is missing.',
-  '',
-  'Build it in this order:',
-  '',
-  '1. server/src/modules/repo-intel/service.ts - add',
-  '   RepoIntelService.blastRadiusForPull(workspaceId, repoId, prNumber). It resolves the',
-  "   PR's changed files through PullsService.detailByNumber(...).files (PrDetail.files:",
-  '   PrFile[], contracts/platform.ts:223) and delegates to the existing',
-  '   getBlastRadius(repoId, changedFiles) at server/src/modules/repo-intel/service.ts:220.',
-  "   Constructing another module's SERVICE is the documented composition seam the",
-  '   no-cross-module-imports rule allows (the same one polling -> pulls already uses).',
-  '   PullsRepository is not an option: it is not in the container.',
-  '',
-  '2. server/src/modules/repo-intel/routes.ts - add GET /repos/:id/blast?pr=<number>. It stays',
-  '   transport only: zod schemas for params, querystring and response, ONE service call,',
-  '   status mapping. Nothing to register - repo-intel is already in modules/index.ts.',
-  '',
-  '3. The response zod schema is a CONTRACT, so it goes under vendor/shared/contracts/ and',
-  '   into BOTH physical copies (server/src/vendor/shared and client/src/vendor/shared).',
-  '   Do NOT reuse the existing BlastRadius in contracts/brief.ts:39 - that is a different,',
-  '   higher-level PR Brief shape ({ changed_symbols, downstream, summary }). This tool',
-  "   mirrors the engine's BlastResult (server/src/modules/repo-intel/types.ts:57-87):",
-  '   changedSymbols, callers[].viaSymbol -> via, impactedEndpoints; factsByFile and reason',
-  '   are dropped as noise.',
-  '',
-  '4. mcp/src/tools/get-blast-radius.ts - replace this body with a call to that route,',
-  '   honour max_callers, min_rank and include_endpoints, and return BOTH `content` and',
-  '   `structuredContent` matching the outputSchema already declared here.',
-  '',
-  '5. mcp/test/get-blast-radius.test.ts - replace the stub assertion with a real test over a',
-  '   fixture, the way the other tool tests are written.',
-  '',
-  '6. cd server && pnpm arch:check must pass, and so must cd mcp && pnpm test && pnpm budget.',
-].join('\n');
-
-export function registerGetBlastRadius(server: McpServer, _deps: ToolDeps): void {
+export function registerGetBlastRadius(server: McpServer, deps: ToolDeps): void {
   server.registerTool(
     'get_blast_radius',
     {
@@ -103,16 +91,49 @@ export function registerGetBlastRadius(server: McpServer, _deps: ToolDeps): void
       inputSchema: z.object({
         repo: repoParam,
         pr_number: prNumberParam,
-        max_callers: z.number().int().min(1).max(100).default(25).describe(MAX_CALLERS_DESC),
+        max_callers: z
+          .number()
+          .int()
+          .min(1)
+          .max(MAX_CALLERS_LIMIT)
+          .default(25)
+          .describe(MAX_CALLERS_DESC),
         min_rank: z.number().min(0).max(1).default(0).describe(MIN_RANK_DESC),
         include_endpoints: z.boolean().default(true).describe(INCLUDE_ENDPOINTS_DESC),
       }),
       outputSchema: OUTPUT_SCHEMA,
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    // The tool STAYS in tools/list. A schema with no body is the exercise: it
-    // shows the shape to build against, and it makes the gap discoverable
-    // instead of invisible.
-    async () => fail(BLAST_RADIUS_HOMEWORK),
+    async ({ repo, pr_number, max_callers, min_rank, include_endpoints }) => {
+      try {
+        const resolved = await deps.resolvers.repo(repo);
+        if (!resolved.ok) return fail(unknownRepoMessage(repo, resolved.known));
+
+        const pull = await deps.api.pullByNumber(resolved.repo.id, pr_number);
+        if (!pull.id) {
+          return fail(
+            `DevDigest knows PR #${pr_number} of ${resolved.repo.full_name} but has no internal id ` +
+              `for it, so its blast radius cannot be read. Re-import the pull request and retry.`,
+          );
+        }
+
+        const opts: ShapeOptions = {
+          maxCallers: max_callers,
+          minRank: min_rank,
+          includeEndpoints: include_endpoints,
+        };
+        const page = await deps.api.blastRadius(pull.id);
+        const shaped = shape(page, opts);
+        const text = renderBlast(page, shaped, {
+          ...opts,
+          repo: resolved.repo.full_name,
+          prNumber: pr_number,
+        });
+
+        return { ...ok(text), structuredContent: shaped };
+      } catch (err) {
+        return fail(describeApiError(err));
+      }
+    },
   );
 }

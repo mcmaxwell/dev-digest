@@ -13,7 +13,7 @@
  * raw-SQL probes below MUST swallow `undefined_table` (Postgres 42P01) so the
  * facade keeps returning degraded — never throws.
  */
-import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import { clampIndexedName } from '../../db/schema/context.js';
@@ -509,22 +509,43 @@ export class RepoIntelRepository {
       .where(and(eq(t.symbols.repoId, repoId), inArray(t.symbols.path, paths)));
   }
 
-  /** Resolved cross-file callers of symbols declared in `declFiles`. */
-  async getResolvedCallers(
+  /**
+   * Resolved cross-file callers, at most `perSymbol` of them PER SYMBOL.
+   *
+   * Two deliberate differences from the naive query this replaced:
+   *
+   *  - `LEFT JOIN file_rank`, not `INNER`. An index that stopped before the rank
+   *    step (soft budget, or a `partial` status) has an empty `file_rank`, and
+   *    an inner join then returns ZERO callers while the response still claims
+   *    not to be degraded. Unranked callers with `rank = 0`, ordered by path, are
+   *    the honest answer; `BlastIndexState.reason = 'no_rank'` says why.
+   *  - `row_number() OVER (PARTITION BY to_symbol ...)`, not a global
+   *    `ORDER BY rank DESC LIMIT n`. A global limit gives every slot to the one
+   *    hot symbol and reports "no callers" for the rest.
+   *
+   * Ordering inside a symbol is `rank DESC, from_path, line` - the two tiebreaks
+   * make the truncated set deterministic, which is what makes it testable.
+   */
+  async getResolvedCallersTopN(
     repoId: string,
     declFiles: string[],
     names: string[],
+    perSymbol: number,
   ): Promise<ResolvedCallerRow[]> {
-    if (declFiles.length === 0 || names.length === 0) return [];
-    return this.db
+    if (declFiles.length === 0 || names.length === 0 || perSymbol <= 0) return [];
+    const ranked = this.db
       .select({
         fromPath: t.references.fromPath,
         toSymbol: t.references.toSymbol,
         line: t.references.line,
-        rank: t.fileRank.rank,
+        rank: sql<number>`coalesce(${t.fileRank.rank}, 0)`.as('rank'),
+        rn: sql<number>`row_number() over (
+          partition by ${t.references.toSymbol}
+          order by coalesce(${t.fileRank.rank}, 0) desc, ${t.references.fromPath} asc, ${t.references.line} asc
+        )`.as('rn'),
       })
       .from(t.references)
-      .innerJoin(
+      .leftJoin(
         t.fileRank,
         and(
           eq(t.fileRank.repoId, t.references.repoId),
@@ -537,7 +558,94 @@ export class RepoIntelRepository {
           inArray(t.references.declFile, declFiles),
           inArray(t.references.toSymbol, names),
         ),
-      );
+      )
+      .as('ranked');
+
+    return this.db
+      .select({
+        fromPath: ranked.fromPath,
+        toSymbol: ranked.toSymbol,
+        line: ranked.line,
+        rank: ranked.rank,
+      })
+      .from(ranked)
+      .where(lte(ranked.rn, perSymbol));
+  }
+
+  /**
+   * Reverse edge lookup: which files import any of `toFiles`.
+   *
+   * Rides `file_edges_repo_to_idx (repo_id, to_file)`. `getEdges` stays for the
+   * rank pipeline, which genuinely needs every edge; using it here would pull
+   * the whole graph to answer a question about a handful of files.
+   */
+  async getImporters(
+    repoId: string,
+    toFiles: string[],
+    limit: number,
+  ): Promise<IndexerEdgeRow[]> {
+    if (toFiles.length === 0 || limit <= 0) return [];
+    return this.db
+      .selectDistinct({ fromFile: t.fileEdges.fromFile, toFile: t.fileEdges.toFile })
+      .from(t.fileEdges)
+      .where(and(eq(t.fileEdges.repoId, repoId), inArray(t.fileEdges.toFile, toFiles)))
+      .orderBy(asc(t.fileEdges.toFile), asc(t.fileEdges.fromFile))
+      .limit(limit);
+  }
+
+  /**
+   * Rows in `file_rank` / `file_edges` / `file_facts` for a repo.
+   *
+   * Counted rather than read from `repo_index_state.stats` on purpose: the
+   * incremental pipeline rebuilds rank and facts without re-recording their
+   * counts, so the stats blob under-reports them after every refresh. Three
+   * indexed counts over ≤ MAX_INDEXED_FILES rows each.
+   */
+  async countIndexArtifacts(
+    repoId: string,
+  ): Promise<{ ranked: number; edges: number; facts: number }> {
+    const [ranked, edges, facts] = await Promise.all([
+      this.db.select({ n: count() }).from(t.fileRank).where(eq(t.fileRank.repoId, repoId)),
+      this.db.select({ n: count() }).from(t.fileEdges).where(eq(t.fileEdges.repoId, repoId)),
+      this.db.select({ n: count() }).from(t.fileFacts).where(eq(t.fileFacts.repoId, repoId)),
+    ]);
+    return {
+      ranked: ranked[0]?.n ?? 0,
+      edges: edges[0]?.n ?? 0,
+      facts: facts[0]?.n ?? 0,
+    };
+  }
+
+  /**
+   * The raw `repo_index_state` row plus its untyped `stats` blob, for the health
+   * projection. Tolerant of a missing table, exactly like `tryGetIndexState`.
+   */
+  async tryGetIndexStateRow(repoId: string): Promise<
+    | {
+        status: IndexStatus;
+        indexerVersion: number;
+        lastIndexedSha: string;
+        updatedAt: Date;
+        stats: Record<string, unknown>;
+      }
+    | null
+  > {
+    try {
+      const [row] = await this.db
+        .select()
+        .from(t.repoIndexState)
+        .where(eq(t.repoIndexState.repoId, repoId));
+      if (!row) return null;
+      return {
+        status: row.status as IndexStatus,
+        indexerVersion: row.indexerVersion,
+        lastIndexedSha: row.lastIndexedSha,
+        updatedAt: row.updatedAt,
+        stats: (row.stats ?? {}) as Record<string, unknown>,
+      };
+    } catch {
+      return null;
+    }
   }
 
   /** Per-file facts (endpoints/crons) for the given files. */

@@ -29,7 +29,7 @@ const PLAN_TOOL_DESCRIPTIONS: Record<string, string> = {
   get_conventions:
     'Return the coding conventions DevDigest extracted from a repository: house rules a human has accepted, each with a measured adherence rate. Read these before writing or reviewing code in that repo so the change matches the existing style.',
   get_blast_radius:
-    'Map the impact of a pull request: which symbols it changes, which files call them, and which HTTP endpoints sit behind those callers. NOT IMPLEMENTED YET - this is the L04 exercise; calling it returns an error that spells out exactly what to build.',
+    'Map the impact of a pull request: which symbols it changes, which files call them, and which HTTP endpoints and cron jobs sit behind those callers. Reads a prebuilt index, costs nothing, and reports when that index is partial so missing callers are never mistaken for none.',
 };
 
 const PLAN_PARAM_DESCRIPTIONS: Record<string, string> = {
@@ -45,9 +45,9 @@ const PLAN_PARAM_DESCRIPTIONS: Record<string, string> = {
   category: 'Only rules in this category.',
   status: 'accepted means a human confirmed the rule; all adds unreviewed candidates.',
   evidence: 'Include one file:line pointer proving each rule.',
-  max_callers: 'Maximum caller rows, highest-ranked first.',
-  min_rank: 'Drop callers whose file rank is below this.',
-  include_endpoints: 'Include the HTTP endpoints the callers sit behind.',
+  max_callers: 'Maximum callers listed per changed symbol, highest-ranked first.',
+  min_rank: 'Drop callers whose file rank is below this. Ignored on an unranked index.',
+  include_endpoints: 'Include the endpoints and scheduled jobs the callers sit behind.',
 };
 
 /** Two parameters carry tool-specific wording. `repo` is optional in
@@ -444,25 +444,25 @@ describe('tools/list', () => {
             "openWorldHint": false,
             "readOnlyHint": true,
           },
-          "description": "Map the impact of a pull request: which symbols it changes, which files call them, and which HTTP endpoints sit behind those callers. NOT IMPLEMENTED YET - this is the L04 exercise; calling it returns an error that spells out exactly what to build.",
+          "description": "Map the impact of a pull request: which symbols it changes, which files call them, and which HTTP endpoints and cron jobs sit behind those callers. Reads a prebuilt index, costs nothing, and reports when that index is partial so missing callers are never mistaken for none.",
           "inputSchema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "properties": {
               "include_endpoints": {
                 "default": true,
-                "description": "Include the HTTP endpoints the callers sit behind.",
+                "description": "Include the endpoints and scheduled jobs the callers sit behind.",
                 "type": "boolean",
               },
               "max_callers": {
                 "default": 25,
-                "description": "Maximum caller rows, highest-ranked first.",
+                "description": "Maximum callers listed per changed symbol, highest-ranked first.",
                 "maximum": 100,
                 "minimum": 1,
                 "type": "integer",
               },
               "min_rank": {
                 "default": 0,
-                "description": "Drop callers whose file rank is below this.",
+                "description": "Drop callers whose file rank is below this. Ignored on an unranked index.",
                 "maximum": 1,
                 "minimum": 0,
                 "type": "number",
@@ -490,69 +490,122 @@ describe('tools/list', () => {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "additionalProperties": false,
             "properties": {
-              "callers": {
-                "description": "Files that reference a changed symbol, highest-ranked first.",
+              "changed_symbols": {
+                "description": "Symbols this PR changes, most-called first.",
                 "items": {
                   "additionalProperties": false,
                   "properties": {
                     "file": {
-                      "description": "File containing the caller.",
+                      "description": "File that declares it.",
                       "type": "string",
                     },
-                    "line": {
-                      "description": "1-based line of the reference.",
-                      "maximum": 9007199254740991,
-                      "minimum": -9007199254740991,
-                      "type": "integer",
-                    },
-                    "rank": {
-                      "description": "Importance of the caller file, 0 to 1.",
-                      "type": "number",
-                    },
-                    "symbol": {
-                      "description": "The calling symbol.",
+                    "kind": {
+                      "description": "function, class, method, …",
                       "type": "string",
                     },
-                    "via": {
-                      "description": "Which changed symbol it reaches.",
+                    "name": {
+                      "description": "Symbol declared in a changed file.",
                       "type": "string",
                     },
                   },
                   "required": [
+                    "name",
                     "file",
-                    "symbol",
-                    "via",
-                    "line",
-                    "rank",
+                    "kind",
                   ],
                   "type": "object",
                 },
                 "type": "array",
               },
-              "changed_symbols": {
-                "description": "Symbols the PR adds, removes or edits.",
+              "downstream": {
+                "description": "One entry per changed symbol. An empty callers list is a real answer.",
                 "items": {
-                  "type": "string",
+                  "additionalProperties": false,
+                  "properties": {
+                    "callers": {
+                      "description": "Files that call it, highest-ranked first.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "file": {
+                            "description": "File containing the caller.",
+                            "type": "string",
+                          },
+                          "line": {
+                            "description": "1-based line of the call.",
+                            "maximum": 1000000,
+                            "minimum": 0,
+                            "type": "integer",
+                          },
+                          "name": {
+                            "description": "The calling symbol.",
+                            "type": "string",
+                          },
+                          "rank": {
+                            "description": "Importance of the caller file.",
+                            "maximum": 1,
+                            "minimum": 0,
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "file",
+                          "line",
+                          "rank",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "crons_affected": {
+                      "description": "Scheduled jobs reachable from them.",
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "endpoints_affected": {
+                      "description": "HTTP endpoints as "METHOD /path" reachable from those callers.",
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "symbol": {
+                      "description": "Which changed symbol this row is about.",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "symbol",
+                    "callers",
+                    "endpoints_affected",
+                    "crons_affected",
+                  ],
+                  "type": "object",
                 },
                 "type": "array",
               },
-              "degraded": {
-                "description": "True when the answer came from the ripgrep fallback.",
-                "type": "boolean",
+              "index_status": {
+                "description": "partial means callers or endpoints may be missing; degraded means no index.",
+                "enum": [
+                  "ok",
+                  "partial",
+                  "degraded",
+                ],
+                "type": "string",
               },
-              "impacted_endpoints": {
-                "description": "HTTP endpoints as "METHOD /path" reachable from the callers.",
-                "items": {
-                  "type": "string",
-                },
-                "type": "array",
+              "summary": {
+                "description": "One-paragraph impact summary, or empty if none was generated.",
+                "type": "string",
               },
             },
             "required": [
               "changed_symbols",
-              "callers",
-              "impacted_endpoints",
-              "degraded",
+              "downstream",
+              "summary",
+              "index_status",
             ],
             "type": "object",
           },

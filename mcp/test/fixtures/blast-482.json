@@ -1,0 +1,62 @@
+{
+  "blast": {
+    "changed_symbols": [
+      { "name": "createCharge", "file": "src/charges/create.ts", "kind": "function" },
+      { "name": "idempotencyKey", "file": "src/charges/idempotency.ts", "kind": "function" },
+      { "name": "ChargeDraft", "file": "src/charges/create.ts", "kind": "interface" }
+    ],
+    "downstream": [
+      {
+        "symbol": "createCharge",
+        "callers": [
+          { "name": "postCharges", "file": "src/api/routes/charges.ts", "line": 42, "rank": 0.81 },
+          { "name": "retryWorker", "file": "src/workers/retry.ts", "line": 17, "rank": 0.34 }
+        ],
+        "caller_total": 9,
+        "endpoints_affected": ["POST /charges", "POST /charges/:id/retry"],
+        "endpoints_total": 2,
+        "crons_affected": ["retry-failed-charges"],
+        "crons_total": 1
+      },
+      {
+        "symbol": "idempotencyKey",
+        "callers": [
+          { "name": "createCharge", "file": "src/charges/create.ts", "line": 8, "rank": 0.55 }
+        ],
+        "caller_total": 1,
+        "endpoints_affected": ["POST /charges"],
+        "endpoints_total": 1,
+        "crons_affected": [],
+        "crons_total": 0
+      },
+      {
+        "symbol": "ChargeDraft",
+        "callers": [],
+        "caller_total": 0,
+        "endpoints_affected": [],
+        "endpoints_total": 0,
+        "crons_affected": [],
+        "crons_total": 0
+      }
+    ],
+    "summary": "Touches the charge write path and the retry worker behind it."
+  },
+  "summary": {
+    "text": "Touches the charge write path and the retry worker behind it.",
+    "provider": "openai",
+    "model": "gpt-4.1",
+    "generated_at": "2026-08-09T09:00:00.000Z",
+    "stale": false
+  },
+  "index": {
+    "status": "ok",
+    "reason": "none",
+    "ranked": true,
+    "facts": true,
+    "graph": true,
+    "last_indexed_sha": "b7c1d9e3f4a5062718293a4b5c6d7e8f90a1b2c3",
+    "indexed_at": "2026-08-09T08:00:00.000Z"
+  },
+  "changed_files": 3,
+  "computed_at": "2026-08-09T09:00:00.000Z"
+}
