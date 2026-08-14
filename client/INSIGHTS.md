@@ -255,3 +255,21 @@ the root INSIGHTS.md. Format and quality gates:
   cheapest first step.
 
 ## Open Questions
+
+- [2026-08-14] An `sr-only`/visually-hidden element styled `position: absolute`
+  needs a POSITIONED ancestor of its own, or it resolves against the initial
+  containing block - the document - and lands at whatever document offset it
+  happens to occupy. `CopyButton` rendered its `aria-live` region as a Fragment
+  sibling of the button, so three of them sat at document tops 1684/1748/1813
+  and stretched `documentElement.scrollHeight` to 1814px against a 577px
+  viewport. The page grew an OUTER scrollbar on top of the app shell's internal
+  one, so the whole frame scrolled away. Every sibling route keeps
+  `docH === winH`; that comparison is the cheap diagnostic.
+  jsdom computes no layout, so no component test can see the symptom - assert
+  the cause instead (the live region's own parent is positioned).
+  Two traps when writing that assertion, both hit here:
+  walking up to "some positioned ancestor" passes against the unfixed markup
+  because the shell already has positioned ancestors; and jsdom's
+  `getComputedStyle().position` returns `""`, not `"static"`, for a property
+  never set, so `not.toBe("static")` also passes. Assert an explicit value from
+  `["relative","absolute","fixed","sticky"]`, and prove it by reverting the fix.

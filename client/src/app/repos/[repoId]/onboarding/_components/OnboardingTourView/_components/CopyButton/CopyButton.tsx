@@ -53,13 +53,21 @@ export function CopyButton({
   };
 
   return (
-    <>
+    // The wrapper is positioned on purpose. `s.srOnly` is `position: absolute`,
+    // so without a positioned ancestor it resolves against the initial
+    // containing block - i.e. the document - and lands at whatever document
+    // offset the button happens to sit at. Inside a scroll container that is
+    // invisible until you measure: the spans stretched
+    // `documentElement.scrollHeight` to 1814px against a 577px viewport and gave
+    // the page an OUTER scrollbar on top of the shell's own, so the whole app
+    // frame scrolled away. Every sibling page keeps `docH === winH`.
+    <span style={s.copyWrap}>
       <Button kind={kind} size={size} icon={copied ? "Check" : icon} onClick={() => void copy()}>
         {copied ? copiedLabel : label}
       </Button>
       <span aria-live="polite" style={s.srOnly}>
         {copied ? copiedLabel : ""}
       </span>
-    </>
+    </span>
   );
 }

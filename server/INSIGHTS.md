@@ -182,6 +182,26 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   (`adapters/mocks.ts:195`), a shape its own scrubber ignores. Red test:
   `modules/onboarding/onboarding.it.test.ts`, "scrubs an example API key of any
   common vendor shape".
+  **[2026-08-14] FIXED** - Stripe, GitLab and Slack patterns added, test green.
+  The durable lesson is not the three patterns, it is that a denylist of secret
+  SHAPES is only as good as its last update, and nothing fails when it falls
+  behind. When you add a provider anywhere in this codebase, add its key shape
+  here in the same change.
+
+- [2026-08-14] A token budget measured with OUR tokenizer does not bound what a
+  provider BILLS, and the gap is not a rounding error. A live onboarding
+  generation against `openai/gpt-5.6-luna-pro` on OpenRouter measured 11,376
+  prompt tokens and was billed 57,243 - 5.0x, reproduced on two runs. It is not
+  a fixed additive overhead either: a deliberately tiny 21-token prompt to the
+  same model was billed 1,718. The system prompt (748) and the structured-output
+  JSON schema (1,817, measured via `toJsonSchema`) account for almost none of
+  it, and the remainder could not be attributed from the client side.
+  Consequence: `PROMPT_TOKEN_CEILING` is an ASSEMBLY control, not a cost
+  control, and lowering it will not reliably lower an invoice. Do not reason
+  about spend from a locally measured token count - read `usage.tokens_in` and
+  `usage.cost_usd` off the provider result, which is what
+  `OnboardingService.logTokenAccounting` now emits alongside the measured figure
+  and their ratio, warning past 2x.
 
 - [2026-08-13] A check/claim pair with NO `await` between them
   (`if (map.has(id)) throw; map.set(id, slot)`) is ALREADY mutually exclusive on

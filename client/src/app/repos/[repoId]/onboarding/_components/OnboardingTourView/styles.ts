@@ -185,6 +185,13 @@ export const s = {
     flexWrap: "wrap",
     fontSize: 12.5,
   } satisfies CSSProperties,
+  /** Containing block for `srOnly`, which would otherwise resolve against the
+      document and give the page an outer scrollbar. See CopyButton. */
+  copyWrap: {
+    position: "relative",
+    display: "inline-flex",
+    alignItems: "center",
+  } satisfies CSSProperties,
   srOnly: {
     position: "absolute",
     width: 1,

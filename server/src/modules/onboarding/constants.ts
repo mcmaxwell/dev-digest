@@ -51,8 +51,26 @@ export const MODEL_TIMEOUT_MS = 90_000;
  */
 export const MAX_SCHEMA_REPAIRS = 2;
 
-/** Assembled-prompt input ceiling. */
+/**
+ * Assembled-prompt input ceiling, measured with OUR tokenizer over the user
+ * text we build (AC-11).
+ *
+ * It bounds what we ASSEMBLE. It does NOT bound what a provider BILLS, and the
+ * two are not close: a live generation against `openai/gpt-5.6-luna-pro` on
+ * OpenRouter measured 11,376 tokens and was billed 57,243. Lowering this number
+ * shrinks the prompt; it does not reliably shrink the invoice. The service logs
+ * both figures and their ratio every generation so the difference is visible
+ * rather than assumed away - see `OnboardingService.logTokenAccounting`.
+ */
 export const PROMPT_TOKEN_CEILING = 30_000;
+
+/**
+ * Ratio of billed to measured input tokens past which the token-accounting log
+ * line is raised from `info` to `warn`. 2.0 is deliberately forgiving: a
+ * provider's system overhead, its JSON-schema framing and a tokenizer that is
+ * not ours all cost something, and none of that is a defect. Five times is.
+ */
+export const TOKEN_ACCOUNTING_WARN_RATIO = 2;
 
 export const MAX_EXCERPT_FILES = 15;
 export const MAX_EXCERPT_LINES = 120;

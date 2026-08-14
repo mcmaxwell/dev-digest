@@ -31,6 +31,29 @@ The read list is the module constant `FACT_FILES`; every other path comes from
 Neither route schema carries anything path-shaped, which removes the
 path-traversal class by construction instead of defending against it.
 
+## The prompt ceiling bounds assembly, not spend
+
+`PROMPT_TOKEN_CEILING = 30_000` is measured with **our** tokenizer over the user
+text **we** build, and the budget ladder drops excerpts and then walks the
+repo-map budget down until it fits (AC-11).
+
+It does not bound the invoice, and the difference is large enough to matter.
+A live generation against `openai/gpt-5.6-luna-pro` on OpenRouter measured
+11,376 tokens here and was billed **57,243** - 5.0x, on two consecutive runs.
+The system prompt is 748 tokens and the structured-output JSON schema is 1,817,
+so they explain almost none of it; a deliberately tiny 21-token prompt to the
+same model was billed 1,718, so it is not a fixed overhead either.
+The remainder is the provider's accounting and could not be attributed from the
+client side.
+
+So: **lowering the ceiling shrinks the prompt, not reliably the bill.**
+`logTokenAccounting` emits the measured figure, the billed figure and their
+ratio on every generation, and raises the line to `warn` past
+`TOKEN_ACCOUNTING_WARN_RATIO`.
+When you need to reason about spend, read `usage.tokens_in` and `usage.cost_usd`
+from the provider result - which is also what the page shows - never a locally
+measured count.
+
 ## Files
 
 | File | What it is |

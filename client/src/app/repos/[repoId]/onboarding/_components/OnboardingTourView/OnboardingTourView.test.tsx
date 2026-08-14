@@ -484,6 +484,39 @@ describe("L06 OnboardingTourView — rows and links (AC-24, AC-26, AC-35, AC-36)
     expect(live).not.toBeNull();
     expect(document.body).toHaveTextContent("Copied");
   });
+
+  // Regression, found by measuring the real page rather than by a test: the
+  // visually-hidden live region is `position: absolute`, and it used to be a
+  // Fragment sibling of the button with NO positioned ancestor. It therefore
+  // resolved against the initial containing block and sat at whatever DOCUMENT
+  // offset its button happened to occupy, stretching
+  // `documentElement.scrollHeight` to 1814px against a 577px viewport. The page
+  // got an outer scrollbar on top of the shell's internal one and the whole app
+  // frame scrolled away; every sibling route keeps `docH === winH`.
+  //
+  // jsdom computes no layout, so the symptom itself is untestable here. What is
+  // testable is its cause: the live region must have a positioned ancestor.
+  it("keeps the visually-hidden live region inside a positioned ancestor, so it cannot escape the scroll container", () => {
+    renderView();
+
+    const live = document.querySelector('[aria-live="polite"]');
+    expect(live).not.toBeNull();
+    expect(getComputedStyle(live as Element).position).toBe("absolute");
+
+    // Its OWN wrapper must establish the containing block. Walking up to "some
+    // positioned ancestor somewhere" is not enough to pin this: the shell
+    // already has positioned ancestors, so that assertion passes against the
+    // unfixed code and proves nothing.
+    const parent = (live as HTMLElement).parentElement;
+    expect(parent).not.toBeNull();
+    // Assert an EXPLICIT positioning value. jsdom returns "" for a property it
+    // was never given, not "static", so \ passes against the
+    // unfixed markup and proves nothing - checked by reverting the wrapper.
+    expect(
+      ["relative", "absolute", "fixed", "sticky"],
+      "the sr-only region's own wrapper must be the containing block, or it resolves against the document",
+    ).toContain(getComputedStyle(parent as Element).position);
+  });
 });
 
 describe("L06 OnboardingTourView — on-page navigation (AC-43, AC-44)", () => {

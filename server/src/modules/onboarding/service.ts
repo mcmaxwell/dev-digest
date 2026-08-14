@@ -40,6 +40,7 @@ import {
   MODEL_TIMEOUT_MS,
   PROMPT_TOKEN_CEILING,
   REPO_MAP_BUDGETS,
+  TOKEN_ACCOUNTING_WARN_RATIO,
 } from './constants.js';
 import { extractFacts, isPresent } from './facts.js';
 import {
@@ -400,6 +401,9 @@ export class OnboardingService {
         model,
         attempts: usage?.attempts ?? 0,
         promptTokens: assembled?.tokens ?? 0,
+        // What the PROVIDER billed, next to what WE measured. They are not the
+        // same number and the gap is not small: see `logTokenAccounting`.
+        providerPromptTokens: usage?.tokens_in ?? null,
         excerptsUsed: document.excerpts_used,
         sections: sections.map((s) => ({ kind: s.kind, status: s.status })),
         reasons: deduped,
@@ -410,6 +414,59 @@ export class OnboardingService {
       },
       'onboarding: tour generated',
     );
+
+    this.logTokenAccounting(correlationId, provider, model, assembled?.tokens ?? 0, usage);
+  }
+
+  /**
+   * `PROMPT_TOKEN_CEILING` bounds what we ASSEMBLE, measured with our own
+   * tokenizer. It does not bound what the provider BILLS, and the two can
+   * diverge by a lot: a live generation against `openai/gpt-5.6-luna-pro` on
+   * OpenRouter measured 11,376 tokens here and was billed 57,243 — 5.0x. A
+   * deliberately tiny 21-token prompt to the same model was billed 1,718, so
+   * the gap is the provider's accounting, not our counting, and it is not a
+   * fixed additive overhead either.
+   *
+   * We cannot control that number, but silence about it is what makes the
+   * ceiling look like a cost control when it is only an assembly control. So
+   * the ratio is emitted every time, and a divergence past
+   * `TOKEN_ACCOUNTING_WARN_RATIO` is raised to `warn` — that is the signal that
+   * a budget change will not move the bill.
+   */
+  private logTokenAccounting(
+    correlationId: string,
+    provider: string,
+    model: string,
+    measured: number,
+    usage: OnboardingUsage | null,
+  ): void {
+    const billed = usage?.tokens_in ?? null;
+    if (!this.logger || billed === null || measured <= 0) return;
+    const ratio = Number((billed / measured).toFixed(2));
+    const line = {
+      correlationId,
+      feature: 'onboarding',
+      provider,
+      model,
+      measuredPromptTokens: measured,
+      billedPromptTokens: billed,
+      ratio,
+      ceiling: PROMPT_TOKEN_CEILING,
+      // The honest statement of what the ceiling did and did not do.
+      ceilingBounds: 'assembled facts, not billed input',
+    };
+    if (ratio >= TOKEN_ACCOUNTING_WARN_RATIO) {
+      // `warn` is optional on StructuredLogger, so fall back rather than
+      // assuming pino is on the other end.
+      const emit = this.logger.warn ?? this.logger.info;
+      emit.call(
+        this.logger,
+        line,
+        'onboarding: provider billed far more input than we assembled - the prompt ceiling is not bounding cost',
+      );
+    } else {
+      this.logger.info(line, 'onboarding: token accounting');
+    }
   }
 
   // ---- deterministic fact collection --------------------------------------

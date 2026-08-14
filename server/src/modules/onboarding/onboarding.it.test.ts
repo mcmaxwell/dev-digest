@@ -1264,4 +1264,71 @@ d('L06 onboarding tour (Testcontainers pg)', () => {
       await writeAt(root, 'README.md', CLONE_FILES['README.md']!);
     }
   });
+
+  // Not from an acceptance criterion: from the live demo. A real generation
+  // against openai/gpt-5.6-luna-pro measured 11,376 tokens on our tokenizer and
+  // was billed 57,243 - 5.0x - so PROMPT_TOKEN_CEILING bounds what we assemble
+  // and not what anyone pays. The ceiling looking like a cost control while
+  // being an assembly control is the defect; these tests pin the disclosure.
+  it('reports what we measured next to what the provider billed, every generation', async () => {
+    const app = await makeApp();
+    const logger = new CapturingLogger();
+    await generateWithLogger(app, logger);
+
+    const line = logger.lines.find((l) => typeof l.obj.ratio === 'number');
+    expect(line, 'a token-accounting line is emitted for every generation').toBeDefined();
+
+    const obj = line!.obj;
+    // The stub bills 24,110 against a fixture prompt of a few hundred tokens.
+    expect(obj.billedPromptTokens).toBe(24_110);
+    expect(obj.measuredPromptTokens).toBeGreaterThan(0);
+    expect(obj.measuredPromptTokens).toBeLessThan(obj.billedPromptTokens as number);
+    expect(obj.ratio).toBeCloseTo(
+      (obj.billedPromptTokens as number) / (obj.measuredPromptTokens as number),
+      1,
+    );
+    // The line says plainly what the ceiling did and did not do.
+    expect(obj.ceiling).toBe(30_000);
+    expect(obj.ceilingBounds).toBe('assembled facts, not billed input');
+
+    await app.close();
+  });
+
+  it('says the ceiling is not bounding cost when the provider bills multiples of what we assembled', async () => {
+    const app = await makeApp();
+    const logger = new CapturingLogger();
+    await generateWithLogger(app, logger);
+
+    const line = logger.lines.find((l) => typeof l.obj.ratio === 'number')!;
+    expect(line.obj.ratio as number).toBeGreaterThanOrEqual(2);
+    expect(line.msg).toContain('not bounding cost');
+
+    await app.close();
+  });
+
+  it('keeps the accounting line free of file content and model output', async () => {
+    const app = await makeApp();
+    const logger = new CapturingLogger();
+    await generateWithLogger(app, logger);
+
+    const line = logger.lines.find((l) => typeof l.obj.ratio === 'number')!;
+    const serialised = JSON.stringify(line);
+    expect(serialised).not.toContain('ONBOARDING-TOUR-MARKER');
+    // Ids, counts and measurements only.
+    expect(Object.keys(line.obj).sort()).toEqual(
+      [
+        'billedPromptTokens',
+        'ceiling',
+        'ceilingBounds',
+        'correlationId',
+        'feature',
+        'measuredPromptTokens',
+        'model',
+        'provider',
+        'ratio',
+      ].sort(),
+    );
+
+    await app.close();
+  });
 });

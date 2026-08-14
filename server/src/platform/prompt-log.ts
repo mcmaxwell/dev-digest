@@ -185,8 +185,18 @@ export function buildPromptLogRecord(
   };
 }
 
-/** Minimal structured logger, pino-compatible. */
-export type StructuredLogger = { info: (obj: unknown, msg?: string) => void };
+/**
+ * Minimal structured logger, pino-compatible.
+ *
+ * `warn` is optional so every existing implementer stays valid under
+ * structural typing, and so a caller that only needs one level can keep
+ * passing a bare `{ info }`. A caller that wants `warn` must fall back to
+ * `info` when it is absent, rather than assuming pino is on the other end.
+ */
+export type StructuredLogger = {
+  info: (obj: unknown, msg?: string) => void;
+  warn?: (obj: unknown, msg?: string) => void;
+};
 
 /** Build and emit, unless the mode is `off`. */
 export function logPromptAssembly(

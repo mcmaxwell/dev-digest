@@ -181,6 +181,40 @@ done
 [ "$web_up" -eq 1 ] || { echo "web never became reachable on :$WEB_PORT"; exit 1; }
 log "web up"
 
+# --- warm every route the flows visit ----------------------------------------
+# `next dev` compiles a route on its FIRST request, and the loop above only
+# proves `/` compiled. Every other route paid its compile inside the first flow
+# that opened it, racing `agent-browser`'s own timeout — so on a loaded machine
+# a different flow failed each run with `Command failed: agent-browser open …`
+# or `wait --url …`, which reads like flakiness and is not. Warming here moves
+# that cost off the assertion path and makes the suite deterministic under load.
+#
+# Dynamic segments compile per PATTERN, not per value, so a placeholder id
+# compiles `/repos/[repoId]/…` for every repo. The page may render a not-found
+# state for it; that is fine, we are buying the compile, not the content.
+log "warming routes (next dev compiles on first request)"
+WARM_ID="00000000-0000-0000-0000-000000000000"
+for path in \
+  "/" \
+  "/agents" \
+  "/skills" \
+  "/conventions" \
+  "/repos/new" \
+  "/settings/api-keys" \
+  "/settings/models" \
+  "/repos/${WARM_ID}/pulls" \
+  "/repos/${WARM_ID}/pulls/1" \
+  "/repos/${WARM_ID}/context" \
+  "/repos/${WARM_ID}/onboarding" \
+; do
+  # -m 180: a cold compile of a heavy route can genuinely take minutes on a
+  # loaded machine. Failure is not fatal — a route that will not compile fails
+  # its own flow with a real message, which is more useful than aborting here.
+  curl -fsS -m 180 -o /dev/null "http://localhost:${WEB_PORT}${path}" \
+    || log "  warm miss: ${path} (its flow will report the real error)"
+done
+log "routes warm"
+
 # --- run the flows; propagate the exit code through the trap -----------------
 log "running e2e flows against $E2E_BASE_URL"
 set +e

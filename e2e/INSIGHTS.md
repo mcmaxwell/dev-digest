@@ -92,6 +92,34 @@ the root INSIGHTS.md. Format and quality gates:
   sidebar entry and passed in both runs, so it is the click, not the route.
   Re-run once before investigating a change; treat it as real only if it
   reproduces twice for the same flow.
+- [2026-08-14] **Root cause of the entry above, and it was not the click.**
+  Repeating the suite under load reproduced it as 7/12, with a DIFFERENT flow
+  failing each run and `Project Context` passing on the run where
+  `Onboarding Tour` failed. The failures were all `agent-browser open …` or
+  `wait --url …` on routes nobody had visited yet: `/skills`,
+  `/settings/api-keys`, `/conventions`, `/repos/new`, `/repos/:id/onboarding`.
+  `scripts/e2e.sh` waited only for `/` to answer before starting the flows, and
+  `next dev` compiles a route on its FIRST request - so every other route paid
+  its compile inside the first flow that opened it, racing that command's own
+  timeout. On an idle machine the compile wins and the suite is green; under
+  load it loses. That is the whole "flake".
+  Fixed by warming every route the specs visit after the readiness loop, with a
+  180 s per-route budget. Dynamic segments compile per PATTERN, so a placeholder
+  uuid compiles `/repos/[repoId]/…` for every repo. 12/12 restored.
+  The general lesson: a readiness check that proves ONE route serves proves
+  nothing about the others under a lazily-compiling dev server, and the symptom
+  it produces looks exactly like a selector or timing bug in whichever flow drew
+  the short straw.
+- [2026-08-14] **Killing an e2e run poisons the next one's baseline.**
+  `scripts/e2e.sh` snapshots `client/next-env.d.ts` and `client/tsconfig.json`
+  before `next dev` rewrites them for `.next-e2e`, and `cleanup()` restores them
+  on exit. Kill the run hard enough that the trap does not complete and both
+  files stay pointing at `.next-e2e` - and the NEXT run snapshots that dirty
+  state as its "original", so no later run can ever restore the committed
+  version. It looks like the script stopped cleaning up.
+  After an interrupted run, check `git status` for those two files and
+  `git checkout --` them before doing anything else. They are the only tracked
+  files the suite writes to.
 
 ## Session Notes
 
