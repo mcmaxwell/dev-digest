@@ -182,6 +182,18 @@ describe("PrBriefCard states", () => {
     expect((cta as HTMLButtonElement).disabled).toBe(true);
   });
 
+  // Without this the empty state re-renders identically after a failed POST and
+  // the click looks like it did nothing. A degraded 200 is a different path.
+  it("says so when the generate request itself fails", () => {
+    usePrBrief.mockReturnValue({ data: { brief: null }, isLoading: false, isError: false, refetch: vi.fn() });
+    useGenerateBrief.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: true });
+    renderCard();
+
+    expect(screen.getByText(brief.pr.generateFailed)).toBeTruthy();
+    // Still the empty state, not an error page: the CTA survives.
+    expect(screen.getByRole("button", { name: brief.pr.generate })).toBeTruthy();
+  });
+
   it("renders a degraded brief with its reason and a retry, never an error page", () => {
     const mutate = vi.fn();
     useGenerateBrief.mockReturnValue({ mutate, isPending: false, isError: false });

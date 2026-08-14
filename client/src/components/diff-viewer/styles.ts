@@ -17,6 +17,15 @@ export const s = {
     gap: 10,
     padding: "10px 12px",
     cursor: "pointer",
+    /**
+     * Anything that scrolls a file card into view must clear the page's sticky
+     * chrome, or the header it just scrolled to sits behind it. The PR detail
+     * page is the case that matters: `PrDetailHeader` is `position: sticky,
+     * top: 0` and carries the title row plus the Tabs bar. Read through a CSS
+     * variable so a page with different chrome sets its own offset instead of
+     * this shared component knowing any page's dimensions.
+     */
+    scrollMarginTop: "var(--sticky-header-offset, 132px)",
   } satisfies CSSProperties,
   fileIcon: { color: "var(--text-muted)" } satisfies CSSProperties,
   filePath: {

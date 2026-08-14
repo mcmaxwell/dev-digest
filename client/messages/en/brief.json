@@ -45,6 +45,7 @@
     "emptyTitle": "No brief yet",
     "emptyBody": "Read this PR’s intent, what it can reach and its changed files, then say where to start reading.",
     "errorTitle": "Could not load the brief",
+    "generateFailed": "Could not generate the brief. Check the connection and try again.",
     "stale": "Head moved",
     "staleHint": "Written for an earlier commit or an earlier index. Regenerate to bring it up to date.",
     "by": "{provider} · {model}",

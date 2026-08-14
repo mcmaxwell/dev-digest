@@ -80,7 +80,11 @@ export function FileCard({
     if (!focused) return;
     setOpen(true);
     const id = requestAnimationFrame(() =>
-      headerRef.current?.scrollIntoView({ block: "start" }),
+      // `behavior: "smooth"` matches every other jump in this app
+      // (FindingsPanel, ReviewRunAccordion, PageNav); an instant jump here
+      // would be the odd one out. The clearance for the page's sticky header
+      // is `scrollMarginTop` on the header itself - see styles.ts.
+      headerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
     return () => cancelAnimationFrame(id);
   }, [focused]);

@@ -202,4 +202,12 @@ export const s = {
     fontSize: 11.5,
     color: "var(--text-muted)",
   } satisfies CSSProperties,
+  /** The POST failed outright. Distinct from a degraded 200, which the brief
+      itself carries as `degraded_reason` and renders in `notice`. */
+  generateFailed: {
+    margin: 0,
+    marginTop: 10,
+    fontSize: 12.5,
+    color: "var(--sev-critical, #f87171)",
+  } satisfies CSSProperties,
 } as const;

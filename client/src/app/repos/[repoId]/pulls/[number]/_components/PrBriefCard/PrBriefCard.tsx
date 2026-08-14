@@ -93,6 +93,11 @@ export function PrBriefCard({ prId, commits, fileHref, onOpenFile }: PrBriefCard
             onCta={() => generate.mutate()}
             ctaLoading={generate.isPending}
           />
+          {/* A degraded 200 is a different path, rendered from `pr.degraded.*`
+              on the brief itself. This is the transport failure, which would
+              otherwise re-render the empty state identically and make the click
+              look like it did nothing. Same shape as SummaryBlock's `failed`. */}
+          {generate.isError && <p style={s.generateFailed}>{t("pr.generateFailed")}</p>}
         </Card>
       </Section>
     );
@@ -103,6 +108,7 @@ export function PrBriefCard({ prId, commits, fileHref, onOpenFile }: PrBriefCard
       brief={brief}
       commits={commits}
       generating={generate.isPending}
+      regenerateFailed={generate.isError}
       onRegenerate={() => generate.mutate()}
       fileHref={fileHref}
       onOpenFile={onOpenFile}
@@ -134,6 +140,7 @@ function BriefBody({
   brief,
   commits,
   generating,
+  regenerateFailed,
   onRegenerate,
   fileHref,
   onOpenFile,
@@ -141,6 +148,7 @@ function BriefBody({
   brief: BriefView;
   commits: PrCommit[];
   generating: boolean;
+  regenerateFailed: boolean;
   onRegenerate: () => void;
   fileHref: (path: string) => string;
   onOpenFile: (path: string) => void;
@@ -183,6 +191,7 @@ function BriefBody({
           >
             {generating ? t("pr.generating") : t("pr.regenerate")}
           </Button>
+          {regenerateFailed && <span style={s.generateFailed}>{t("pr.generateFailed")}</span>}
         </div>
       }
     >
