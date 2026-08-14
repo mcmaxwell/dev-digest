@@ -82,6 +82,17 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   `zod` from the client's own `node_modules` - both packages are on the same
   zod 3. That turns the two-copies rule from a review checklist item into a
   failing test, which is the only enforcement that has ever worked here.
+  - [2026-08-14] The "typecheck never sees the test file" half of that is only
+    true for tests under `server/test/`. `server/tsconfig.json` is
+    `include: ['src/**/*.ts']` with NO exclude, so an `*.it.test.ts` placed
+    under `src/modules/<name>/` (as L05 and L06 both do) IS typechecked. Put the
+    client-copy import in such a file and `pnpm typecheck` passes locally and
+    fails in CI: locally `client/node_modules` resolves the client copy's `zod`,
+    and the server CI job installs only server deps, so it is
+    `TS2307: Cannot find module 'zod'` - followed by a cascade of `TS7006`
+    implicit-any errors as everything derived from the now-`any` schema loses
+    its type. A test that reaches into the other package's tree belongs in
+    `server/test/`, next to `blast.it.test.ts`.
 - [2026-08-02] The Drizzle schema is a DIRECTORY (`server/src/db/schema/*.ts`:
   core, pulls, reviews, runs), not the single `server/src/db/schema.ts` that
   CLAUDE.md's do-not-touch note implies — path checks/greps must match

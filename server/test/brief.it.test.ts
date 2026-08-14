@@ -36,19 +36,19 @@ import type {
   StructuredRequest,
   StructuredResult,
 } from '@devdigest/shared';
-import { startPg, dockerAvailable, type PgFixture } from '../../../test/helpers/pg.js';
-import { buildApp } from '../../app.js';
-import { loadConfig } from '../../platform/config.js';
-import { seed } from '../../db/seed.js';
-import * as t from '../../db/schema.js';
-import { MockGitClient, MockSecretsProvider } from '../../adapters/mocks.js';
-import { INDEXER_VERSION } from '../repo-intel/constants.js';
-import { BRIEF_SCHEMA_NAME } from './schemas.js';
-import { BriefService } from './service.js';
+import { startPg, dockerAvailable, type PgFixture } from './helpers/pg.js';
+import { buildApp } from '../src/app.js';
+import { loadConfig } from '../src/platform/config.js';
+import { seed } from '../src/db/seed.js';
+import * as t from '../src/db/schema.js';
+import { MockGitClient, MockSecretsProvider } from '../src/adapters/mocks.js';
+import { INDEXER_VERSION } from '../src/modules/repo-intel/constants.js';
+import { BRIEF_SCHEMA_NAME } from '../src/modules/brief/schemas.js';
+import { BriefService } from '../src/modules/brief/service.js';
 // The CLIENT's copy of the contract, on purpose: parsing the server's response
 // with it is what turns a silent drift between the two vendored copies into a
 // failing test.
-import { PrBriefResponse } from '../../../../client/src/vendor/shared/contracts/pr-brief.js';
+import { PrBriefResponse } from '../../client/src/vendor/shared/contracts/pr-brief.js';
 
 const hasDocker = await dockerAvailable();
 const d = hasDocker ? describe : describe.skip;
