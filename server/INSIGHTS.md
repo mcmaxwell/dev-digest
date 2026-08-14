@@ -98,7 +98,14 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   migration. Cheaper than the two-pass split noted below, and it works when the
   two-pass trick cannot (a rename is not an add-then-drop you can sequence).
 
-<<<<<<< HEAD
+- [2026-08-13] To count "distinct enabled agents that reach X, directly OR
+  through an enabled linked skill" in ONE query, `union()` the two reach paths
+  as `(agent_id, path)` pairs and group the result — `UNION` (not `UNION ALL`)
+  dedupes the pairs, so a plain `count()` already means "count distinct agents".
+  Drizzle 0.38 supports `union(a, b).as('reach')` as a subquery you can
+  `.select().from()` — smoke-tested with `pnpm exec tsx` against the dev DB
+  before writing the test, which is much faster than discovering it in a
+  testcontainers run (`modules/project-context/repository.ts::usageCounts`).
 - [2026-08-10] When a read must NOT fall into a facade's expensive fallback
   branch, gate it at the CALLER on a separate, honest health read - do not rely
   on the branch not being reached. `RepoIntelService.getBlastRadius` degrades to
@@ -108,16 +115,6 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   (`modules/blast/service.ts`). The guarantee is then structural, and
   `blast.it.test.ts` proves it with a spy on `container.codeIndex` rather than
   by asserting a shape.
-=======
-- [2026-08-13] To count "distinct enabled agents that reach X, directly OR
-  through an enabled linked skill" in ONE query, `union()` the two reach paths
-  as `(agent_id, path)` pairs and group the result — `UNION` (not `UNION ALL`)
-  dedupes the pairs, so a plain `count()` already means "count distinct agents".
-  Drizzle 0.38 supports `union(a, b).as('reach')` as a subquery you can
-  `.select().from()` — smoke-tested with `pnpm exec tsx` against the dev DB
-  before writing the test, which is much faster than discovering it in a
-  testcontainers run (`modules/project-context/repository.ts::usageCounts`).
->>>>>>> fd9de1b (feat(project-context): L05 project documents end to end)
 
 - [2026-08-13] To prove a `jobs.register(kind, h, { retries: 0 })` is
   load-bearing without editing the code under test, register a THROWAWAY kind
