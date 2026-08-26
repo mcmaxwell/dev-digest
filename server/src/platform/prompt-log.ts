@@ -84,9 +84,10 @@ export interface PromptLogMeta {
   correlationId: string;
   /**
    * Which call this is. Two per review: the cheap classifier, then the
-   * reviewer. `onboarding` is the one structured call of a tour generation.
+   * reviewer. `onboarding` is the one structured call of a tour generation,
+   * `brief` the one structured call of a PR brief.
    */
-  call: 'intent' | 'review' | 'onboarding';
+  call: 'intent' | 'review' | 'onboarding' | 'brief';
   provider: string;
   model: string;
   prId?: string;
@@ -108,7 +109,7 @@ export interface PromptSectionLog {
 export interface PromptLogRecord {
   event: 'prompt.assembled';
   correlation_id: string;
-  call: 'intent' | 'review' | 'onboarding';
+  call: 'intent' | 'review' | 'onboarding' | 'brief';
   provider: string;
   model: string;
   pr_id?: string;

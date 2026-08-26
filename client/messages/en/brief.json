@@ -37,6 +37,48 @@
       "low": "Low"
     }
   },
+  "pr": {
+    "title": "PR brief",
+    "generate": "Generate brief",
+    "regenerate": "Regenerate",
+    "generating": "Generating…",
+    "emptyTitle": "No brief yet",
+    "emptyBody": "Read this PR’s intent, what it can reach and its changed files, then say where to start reading.",
+    "errorTitle": "Could not load the brief",
+    "generateFailed": "Could not generate the brief. Check the connection and try again.",
+    "stale": "Head moved",
+    "staleHint": "Written for an earlier commit or an earlier index. Regenerate to bring it up to date.",
+    "by": "{provider} · {model}",
+    "riskLevel": "{level} risk",
+    "level": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "severity": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "focusTitle": "Review focus — read these first",
+    "noFocus": "Nothing in particular to read first.",
+    "openFile": "Open {file} in Files changed",
+    "openFileLine": "Open {file} line {line} in Files changed",
+    "droppedTitle": "Dropped as ungrounded",
+    "dropped": "{count, plural, =1 {# statement named something this pull request does not contain, and was dropped.} other {# statements named things this pull request does not contain, and were dropped.}}",
+    "historyTitle": "Brief history",
+    "historyToggle": "{count, plural, =1 {1 entry} other {# entries}}",
+    "historyNone": "No brief for this commit",
+    "historyEntry": "{level} risk",
+    "degradedTitle": "Written without a model",
+    "retry": "Try again",
+    "degraded": {
+      "index_degraded": "This repository has no usable index, so there were no reach facts to ground a brief against. Re-analyze the repository, then generate again.",
+      "clone_unavailable": "The repository’s local clone was not available when the brief was requested.",
+      "model_failed": "The model call failed, timed out, or could not be repaired into the expected shape.",
+      "no_files": "This pull request has no changed files, so there is nothing to brief."
+    }
+  },
   "why": {
     "title": "git-why",
     "blame": "blame",

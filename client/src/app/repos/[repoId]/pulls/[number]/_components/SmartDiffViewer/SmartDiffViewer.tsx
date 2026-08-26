@@ -21,6 +21,7 @@ export function SmartDiffViewer({
   commenting,
   onUnavailable,
   onOpenFinding,
+  focusFile,
 }: {
   prId: string | null;
   files: PrFile[];
@@ -29,6 +30,8 @@ export function SmartDiffViewer({
   onUnavailable?: React.ReactNode;
   /** Opens a flagged line's finding on the Findings tab. */
   onOpenFinding?: (findingId: string) => void;
+  /** A path to open expanded and scroll to, from the `?file=` param. */
+  focusFile?: string | null;
 }) {
   const t = useTranslations("prReview.smartDiff");
   const { data, isLoading, isError } = useSmartDiff(prId);
@@ -64,10 +67,14 @@ export function SmartDiffViewer({
                 commenting={commenting}
                 flags={flagsFor(entry, severities)}
                 onOpenFinding={onOpenFinding}
+                focusPath={focusFile}
                 // A flagged file opens whatever its role: a finding in a lock
-                // file is exactly the one boilerplate change worth reading.
+                // file is exactly the one boilerplate change worth reading. So
+                // does the file a review-focus click asked for.
                 defaultOpen={
-                  entry.finding_lines.length > 0 || AUTO_OPEN_ROLES.includes(group.role)
+                  entry.path === focusFile ||
+                  entry.finding_lines.length > 0 ||
+                  AUTO_OPEN_ROLES.includes(group.role)
                 }
               />
             ))}

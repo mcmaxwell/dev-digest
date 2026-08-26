@@ -28,6 +28,28 @@ export function PrDetailHeader({
   onRunStart,
   onRunsStarted,
 }: PrDetailHeaderProps) {
+  // Anything that scrolls something into view under this header needs to know
+  // how tall it currently is - and it is not a constant: the title wraps, and
+  // merged/closed PRs gain a stale banner. Publish the measured height as
+  // `--sticky-header-offset`; `scrollMarginTop` in the diff viewer reads it.
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const publish = () =>
+      document.documentElement.style.setProperty(
+        "--sticky-header-offset",
+        `${Math.round(el.getBoundingClientRect().height)}px`,
+      );
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty("--sticky-header-offset");
+    };
+  }, []);
+
   const statusColor =
     pr.status === "merged"
       ? "var(--ok)"
@@ -36,7 +58,7 @@ export function PrDetailHeader({
         : "var(--warn)";
 
   return (
-    <div style={s.root}>
+    <div ref={rootRef} style={s.root}>
       <div style={s.titleRow}>
         <div style={s.titleCol}>
           <h1 style={s.h1}>

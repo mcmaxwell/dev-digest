@@ -18,5 +18,7 @@ export type PullRow = typeof t.pullRequests.$inferSelect;
 export type AgentRunRow = typeof t.agentRuns.$inferSelect;
 export type PrIntentRow = typeof t.prIntent.$inferSelect;
 export type PrBlastSummaryRow = typeof t.prBlastSummary.$inferSelect;
+export type PrBriefRow = typeof t.prBrief.$inferSelect;
+export type PrBriefHistoryRow = typeof t.prBriefHistory.$inferSelect;
 export type ConventionRow = typeof t.conventions.$inferSelect;
 export type ConventionScanRow = typeof t.conventionScans.$inferSelect;

@@ -4,13 +4,12 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Card, EmptyState, ErrorState, SectionLabel, Skeleton } from "@devdigest/ui";
 import type { PrBlastResponse } from "@devdigest/shared";
-import { usePrBlast, useBlastSummary } from "@/lib/hooks/blast";
+import { usePrBlast } from "@/lib/hooks/blast";
 import { useResyncRepoIntel } from "@/lib/hooks/repo-intel";
 import { BlastGraph } from "./BlastGraph";
 import { BlastStats } from "./BlastStats";
 import { BlastTree } from "./BlastTree";
 import { IndexNotice } from "./IndexNotice";
-import { SummaryBlock } from "./SummaryBlock";
 import { ViewToggle } from "./ViewToggle";
 import type { BlastView } from "./constants";
 import { s } from "./styles";
@@ -44,7 +43,6 @@ export function BlastRadiusCard({
   const tBrief = useTranslations("brief");
   const [view, setView] = React.useState<BlastView>("tree");
   const { data, isLoading, isError, refetch } = usePrBlast(prId);
-  const summarize = useBlastSummary(prId);
   const resync = useResyncRepoIntel(repoId);
 
   if (!prId) return null;
@@ -105,7 +103,7 @@ export function BlastRadiusCard({
     );
   }
 
-  return <BlastBody data={data} view={view} onView={setView} repoFullName={repoFullName} headSha={headSha} summarize={summarize} />;
+  return <BlastBody data={data} view={view} onView={setView} repoFullName={repoFullName} headSha={headSha} />;
 }
 
 /** The card's chrome, shared by every state so the heading never jumps. */
@@ -134,14 +132,12 @@ function BlastBody({
   onView,
   repoFullName,
   headSha,
-  summarize,
 }: {
   data: PrBlastResponse;
   view: BlastView;
   onView: (next: BlastView) => void;
   repoFullName: string | null;
   headSha: string;
-  summarize: ReturnType<typeof useBlastSummary>;
 }) {
   const t = useTranslations("blast");
   const tBrief = useTranslations("brief");
@@ -169,12 +165,12 @@ function BlastBody({
           <BlastGraph blast={data.blast} />
         )}
 
-        <SummaryBlock
-          summary={data.summary}
-          pending={summarize.isPending}
-          failed={summarize.isError}
-          onGenerate={() => summarize.mutate()}
-        />
+        {/* The impact summary used to render here. L07 absorbed it into the PR
+            Brief card, so the Overview tab carries exactly one paragraph of
+            generated prose. `SummaryBlock.tsx`, `useBlastSummary`, the
+            `summary.*` strings, `POST /pulls/:id/blast/summary` and
+            `pr_blast_summary` all still exist and still work — the client simply
+            stopped calling them, and `data.summary` is still served. */}
 
         {/* Both caveats are stated on every populated card. They are the two
             things that make this list honest, and hiding them behind a tooltip

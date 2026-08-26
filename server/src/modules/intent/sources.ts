@@ -11,7 +11,7 @@ import {
   SPEC_FILE_CANDIDATES,
   URL_RE,
 } from './constants.js';
-import { buildFileMap } from './hunk-map.js';
+import { buildFileMap } from '../_shared/hunk-map.js';
 import { makeSource, type ResolvedSource } from './types.js';
 
 /**

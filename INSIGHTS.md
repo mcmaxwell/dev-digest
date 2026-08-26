@@ -32,6 +32,17 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## Codebase Patterns
 
+- [2026-08-14] A criterion of the form "the persisted prompt contains no line
+  beginning with `+` or `-` outside a reconstructed `@@` header" is defeated by
+  the PROMPT'S OWN markdown bullets, not by a diff body. Every `- path` list
+  item this codebase writes into a prompt sits at column 0 and trips the check,
+  which makes the check useless rather than red — it was written to catch a diff
+  leak and instead catches us. Indent every list marker two spaces
+  (`modules/brief/prompt.ts`), leaving only `buildFileMap`'s own output at column
+  0 where `safePath` already handles a file literally named `-rf`. The general
+  rule: when a mechanical honesty check is a substring/prefix property of the
+  whole artifact, the artifact's own formatting is part of the invariant.
+
 - [2026-08-13] `implementer` only ever executes a plan file, so review findings
   cannot be handed to it as prose — a fix round writes
   `docs/plans/<slug>.fixes-R<N>.md` (one step per finding: file, the claim, the
@@ -71,6 +82,17 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   `zod` from the client's own `node_modules` - both packages are on the same
   zod 3. That turns the two-copies rule from a review checklist item into a
   failing test, which is the only enforcement that has ever worked here.
+  - [2026-08-14] The "typecheck never sees the test file" half of that is only
+    true for tests under `server/test/`. `server/tsconfig.json` is
+    `include: ['src/**/*.ts']` with NO exclude, so an `*.it.test.ts` placed
+    under `src/modules/<name>/` (as L05 and L06 both do) IS typechecked. Put the
+    client-copy import in such a file and `pnpm typecheck` passes locally and
+    fails in CI: locally `client/node_modules` resolves the client copy's `zod`,
+    and the server CI job installs only server deps, so it is
+    `TS2307: Cannot find module 'zod'` - followed by a cascade of `TS7006`
+    implicit-any errors as everything derived from the now-`any` schema loses
+    its type. A test that reaches into the other package's tree belongs in
+    `server/test/`, next to `blast.it.test.ts`.
 - [2026-08-02] The Drizzle schema is a DIRECTORY (`server/src/db/schema/*.ts`:
   core, pulls, reviews, runs), not the single `server/src/db/schema.ts` that
   CLAUDE.md's do-not-touch note implies — path checks/greps must match
@@ -160,6 +182,16 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   (`x="gh pr"" create"`) when a command needs to talk about it.
 
 ## Session Notes
+
+- [2026-08-14] L07 PR Brief implemented end-to-end on `feat/l07-pr-brief`:
+  `contracts/pr-brief.ts` (both vendored copies, byte-identical) → additive
+  migration `0019_confused_micromacro` (`pr_brief` columns + append-only
+  `pr_brief_history`) → `modules/_shared/hunk-map.ts` (moved out of
+  `modules/intent`, plus a new `buildHunkRanges`) → `modules/brief`
+  (candidates/ground/history/prompt pure files, repository, service, two routes)
+  → `lib/hooks/brief.ts` + `PrBriefCard`, with the intent card's risk chips and
+  the blast card's impact summary both stopping rendering (neither deleted).
+  Spec: `docs/specs/L07-pr-brief.md`, plan: `docs/plans/l07-pr-brief.md`.
 
 - [2026-08-13] L05 project context implemented end-to-end on
   `feat/l05-project-context`: `contracts/project-context.ts` +

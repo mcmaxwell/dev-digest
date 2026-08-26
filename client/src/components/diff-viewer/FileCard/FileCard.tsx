@@ -44,6 +44,7 @@ export function FileCard({
   commenting,
   flags,
   defaultOpen,
+  focusPath,
   onOpenFinding,
 }: {
   file: PrFile;
@@ -52,14 +53,41 @@ export function FileCard({
   flags?: ReadonlyMap<number, FindingFlag>;
   /** Overrides the size heuristic below — Smart Diff decides per role. */
   defaultOpen?: boolean;
+  /**
+   * The path the tab was asked to open, from `?file=`. When it matches this
+   * card, the card opens whatever the size heuristic says and scrolls itself
+   * into view — how a review-focus click on the Overview tab lands on a file.
+   * Optional and null everywhere else, so every existing call site renders
+   * identically.
+   */
+  focusPath?: string | null;
   /** Opens a flagged line’s finding on the Findings tab. */
   onOpenFinding?: (findingId: string) => void;
 }) {
   const t = useTranslations("shell");
+  const focused = focusPath != null && focusPath === file.path;
   const [open, setOpen] = React.useState(
-    defaultOpen ?? (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
+    focused ||
+      (defaultOpen ?? (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES)
   );
   const bodyRef = React.useRef<HTMLDivElement>(null);
+  const headerRef = React.useRef<HTMLDivElement>(null);
+
+  // Scroll the focused file into view once its body has mounted — the same
+  // wait-a-frame technique `jumpToFirstFinding` below uses, and for the same
+  // reason: the card may have been collapsed the moment before.
+  React.useEffect(() => {
+    if (!focused) return;
+    setOpen(true);
+    const id = requestAnimationFrame(() =>
+      // `behavior: "smooth"` matches every other jump in this app
+      // (FindingsPanel, ReviewRunAccordion, PageNav); an instant jump here
+      // would be the odd one out. The clearance for the page's sticky header
+      // is `scrollMarginTop` on the header itself - see styles.ts.
+      headerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [focused]);
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
   const findingCount = flags?.size ?? 0;
 
@@ -101,7 +129,7 @@ export function FileCard({
 
   return (
     <div style={s.fileCard}>
-      <div onClick={() => setOpen((o) => !o)} style={s.fileHeader}>
+      <div ref={headerRef} onClick={() => setOpen((o) => !o)} style={s.fileHeader}>
         <Icon.ChevronRight size={13} style={chevronFor(open)} />
         <Icon.FileText size={14} style={s.fileIcon} />
         <span className="mono" style={s.filePath}>

@@ -77,6 +77,9 @@ docs/           agent-prompts/ (built-in reviewer prompts) · specs/ (lesson spe
 - …touching the onboarding tour — its one model call, its candidate-set
   grounding, its degraded matrix or the `/repos/:id/onboarding` page →
   `server/src/modules/onboarding/README.md`
+- …touching the PR brief — its one model call, its candidate-set grounding, its
+  degraded matrix, the two histories, or the PR Brief card →
+  `server/src/modules/brief/README.md`
 - …working on UI routes, hooks, or components → `client/README.md`
 - …changing the MCP tools, their descriptions, or the token budget →
   `mcp/README.md`, then `mcp/AGENTS.md` (tool descriptions are taxed in every
