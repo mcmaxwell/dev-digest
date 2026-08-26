@@ -1,7 +1,7 @@
 ---
 name: onion-architecture
 description: Onion Architecture rules for the DevDigest backend (server/ + reviewer-core/). Use when adding or changing a server module (routes, service, repository), adding an adapter or port, integrating an external tool (API, CLI, LLM, queue), touching platform/container.ts, or deciding which layer new backend code belongs to. Covers the dependency rule, layer mapping to this repo, ports & adapters via the DI container, transaction boundaries, and mechanical enforcement with dependency-cruiser. Architecture only — NOT Fastify API details (fastify-best-practices), Drizzle query syntax (drizzle-orm-patterns), or schema design (postgresql-table-design).
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Onion Architecture (backend)
@@ -70,9 +70,23 @@ Details and known legacy debt: `references/layers.md`
    (fastify-type-provider-zod; adapter responses for external APIs). Inner
    layers receive typed data — no re-`parse`, no hand-parsing `req.body`.
    ("Parse, don't validate" — Nygren)
-6. **Transactions belong to the service.** The service owns the business
-   operation's scope and passes `tx` down; repositories accept it, never
-   open one. (Silva) → `references/drizzle-persistence.md`
+6. **Transactions belong to the service, with one named exception.**
+   The service owns the business operation's scope and passes `tx` down;
+   repositories accept it and do not open one.
+   The exception is an *indivisible persistence primitive*: two or more writes
+   with no business decision between them, where a half-applied state would
+   break the tables' own invariants.
+   `repo-intel/repository.ts` `deleteAllForRepo` is the in-repo precedent -
+   symbols and their references must die together, and no caller ever wants
+   one without the other.
+
+   **Decision test - is there a decision between the writes?**
+   A branch, a port call, a value the next write depends on, or a caller who
+   might reasonably want only one of them: the service owns the boundary.
+   None of those, and the writes are meaningless apart: the repository may own
+   it, and must carry a comment saying why.
+   When in doubt the service owns it - that direction is always composable.
+   (Silva) → `references/drizzle-persistence.md`
 7. **reviewer-core stays pure.** No DB, no fs, no GitHub, no server imports;
    LLM only via injected `LLMProvider`. It is the domain — everything else
    plugs into it.
