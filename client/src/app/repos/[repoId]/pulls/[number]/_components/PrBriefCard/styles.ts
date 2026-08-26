@@ -210,4 +210,12 @@ export const s = {
     fontSize: 12.5,
     color: "var(--sev-critical, #f87171)",
   } satisfies CSSProperties,
+  /** Same message beside the Regenerate button, inside `badgeRow`. That row is
+      `align-items: center`, so the block variant's `marginTop` would push this
+      below the badges it sits next to - no vertical margin here. */
+  generateFailedInline: {
+    margin: 0,
+    fontSize: 12.5,
+    color: "var(--sev-critical, #f87171)",
+  } satisfies CSSProperties,
 } as const;

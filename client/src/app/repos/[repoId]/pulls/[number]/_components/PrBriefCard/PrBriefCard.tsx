@@ -97,7 +97,11 @@ export function PrBriefCard({ prId, commits, fileHref, onOpenFile }: PrBriefCard
               on the brief itself. This is the transport failure, which would
               otherwise re-render the empty state identically and make the click
               look like it did nothing. Same shape as SummaryBlock's `failed`. */}
-          {generate.isError && <p style={s.generateFailed}>{t("pr.generateFailed")}</p>}
+          {generate.isError && (
+            <p role="alert" style={s.generateFailed}>
+              {t("pr.generateFailed")}
+            </p>
+          )}
         </Card>
       </Section>
     );
@@ -191,7 +195,11 @@ function BriefBody({
           >
             {generating ? t("pr.generating") : t("pr.regenerate")}
           </Button>
-          {regenerateFailed && <span style={s.generateFailed}>{t("pr.generateFailed")}</span>}
+          {regenerateFailed && (
+            <span role="alert" style={s.generateFailedInline}>
+              {t("pr.generateFailed")}
+            </span>
+          )}
         </div>
       }
     >
