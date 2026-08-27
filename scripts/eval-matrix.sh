@@ -97,6 +97,16 @@ for e in d.get("evals",[]):
     fi
   fi
 
+  # the LLM lane reads this file nightly; a broken one should fail here, on a
+  # PR, for free - not at 04:17 on a paid run
+  if [[ -f "$dir/evals/trigger.json" ]]; then
+    if python3 scripts/eval-trigger.py --skill "$name" --dry-run >/dev/null 2>&1; then
+      ok "trigger.json is valid"
+    else
+      bad "trigger.json is malformed - $(python3 scripts/eval-trigger.py --skill "$name" --dry-run 2>&1 | tail -1)"
+    fi
+  fi
+
   while IFS= read -r py; do
     [[ -z "$py" ]] && continue
     python3 -m py_compile "$py" 2>/dev/null && ok "compiles: ${py#"$dir/"}" || bad "syntax error: $py"
