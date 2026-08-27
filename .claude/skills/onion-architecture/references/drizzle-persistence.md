@@ -35,9 +35,23 @@ export class RepoRepository {
 3. **Repositories take `Db` (or `Tx`), not `Container`.** They are leaf
    adapters — giving them the container would let persistence reach ports
    and invert the onion.
-4. **Return rows or narrow projections, not DTOs.** `$inferSelect` types
-   (`RepoRow`) cross into the service; the service maps to wire DTOs via
-   `helpers.ts` (`toRepoDto`). Wire format is not persistence's business.
+4. **Return rows or narrow projections, not DTOs, with one named exception.**
+   `$inferSelect` types (`RepoRow`) cross into the service; the service maps to
+   wire DTOs via `helpers.ts` (`toRepoDto`).
+   Wire format is not persistence's business.
+
+   The exception is a *read model*: a joined or aggregated projection that has
+   no row form of its own and exists only to be read.
+   `reviews/repository/run.repo.ts` `listRunsForPull` is the in-repo precedent -
+   it joins `agent_runs` with `agents.name` and returns the shared `RunSummary`
+   contract, because no `$inferSelect` row describes that shape.
+
+   **Decision test - does a `$inferSelect` row already describe this shape?**
+   If yes, return the row and let the service map it; a repository that mixes
+   rows and DTOs makes the service guess which it is holding.
+   If no, and the shape only exists because of the join or the aggregate, the
+   projection IS the return type, and naming it with the shared contract beats
+   inventing a duplicate type that has to be kept in step by hand.
 5. **Methods are named after intent**, not SQL: `findByFullName`,
    `updateClonePath` — a use-case vocabulary, so the service reads as
    business language (Muyiwa; repository-pattern-with-Drizzle write-ups).
@@ -59,7 +73,8 @@ await this.container.db.transaction(async (tx) => {
 async insertMany(db: Db | Tx, runId: string, rows: NewFinding[]) { … }
 ```
 
-Never open a transaction inside a repository, and never let a transaction
+Open a transaction inside a repository only for an indivisible persistence
+primitive (SKILL.md rule 6's decision test), and never let a transaction
 span an LLM/network call — ports are slow and failable; keep tx scopes to
 DB writes only.
 

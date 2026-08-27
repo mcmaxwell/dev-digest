@@ -1,0 +1,54 @@
+{
+  "skill": "dependency-audit",
+  "note": "negatives are adjacent package work that needs no audit",
+  "queries": [
+    {
+      "q": "client/node_modules is 664M and CI install takes forever. what's actually in there and can we cut it",
+      "should_trigger": true
+    },
+    {
+      "q": "can you check whether we have anything in package.json that nothing imports anymore",
+      "should_trigger": true
+    },
+    {
+      "q": "mcp is on zod 4 and everything else is on zod 3. is that a problem?",
+      "should_trigger": true
+    },
+    {
+      "q": "before i bump drizzle-orm i want to know what else it drags in",
+      "should_trigger": true
+    },
+    {
+      "q": "e2e has both a package-lock.json and a pnpm-lock.yaml committed. which one wins and does it matter",
+      "should_trigger": true
+    },
+    {
+      "q": "give me a picture of what our five packages actually depend on, i'm onboarding someone tomorrow",
+      "should_trigger": true
+    },
+    {
+      "q": "what are we actually depending on and what should we fix first",
+      "should_trigger": true
+    },
+    {
+      "q": "install pino-pretty in the server and wire it as the logger transport",
+      "should_trigger": false
+    },
+    {
+      "q": "pnpm install fails with ERR_PNPM_PEER_DEP_ISSUES on the client, how do i get past it",
+      "should_trigger": false
+    },
+    {
+      "q": "import { cruise } from 'dependency-cruiser' throws ERR_MODULE_NOT_FOUND at boot. what's wrong",
+      "should_trigger": false
+    },
+    {
+      "q": "add a no-circular rule to the server dependency-cruiser config",
+      "should_trigger": false
+    },
+    {
+      "q": "our next build got 40 seconds slower this week, where do i start looking",
+      "should_trigger": false
+    }
+  ]
+}

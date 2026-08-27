@@ -495,7 +495,7 @@ export class ProjectContextService {
         throw new NotFoundError('Document not found');
       }
 
-      const key = `${doc.repo_id} ${rel}`;
+      const key = `${doc.repo_id}\u0000${rel}`;
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({ repoId: doc.repo_id, path: rel });

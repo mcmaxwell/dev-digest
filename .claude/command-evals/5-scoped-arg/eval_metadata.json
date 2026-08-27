@@ -1,0 +1,8 @@
+{
+  "case": "5-scoped-arg",
+  "setup": "argument names one package",
+  "expected": "Summary must state the narrow scope so it is not mistaken for a full audit",
+  "runs": 2,
+  "scope": "mcp only - the command's bookkeeping is what varies, the audit itself is identical and is the expensive part",
+  "isolation": "each run gets its OWN copy of the audits directory. Sharing one directory let two runs of a case overwrite each other's report and, worse, let the second run see the first run's output as state - which silently destroyed the premise of case 1."
+}

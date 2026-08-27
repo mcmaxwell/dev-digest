@@ -1,0 +1,8 @@
+{
+  "case": "4-legacy-report",
+  "setup": "prior audit has NO machine block (old format)",
+  "expected": "must degrade gracefully - say the baseline is unreadable rather than crash or fabricate a diff",
+  "runs": 2,
+  "scope": "mcp only - the command's bookkeeping is what varies, the audit itself is identical and is the expensive part",
+  "isolation": "each run gets its OWN copy of the audits directory. Sharing one directory let two runs of a case overwrite each other's report and, worse, let the second run see the first run's output as state - which silently destroyed the premise of case 1."
+}

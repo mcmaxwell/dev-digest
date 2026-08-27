@@ -1,6 +1,11 @@
 {
   "name": "@devdigest/api",
   "version": "0.0.0",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
   "private": true,
   "type": "module",
   "scripts": {

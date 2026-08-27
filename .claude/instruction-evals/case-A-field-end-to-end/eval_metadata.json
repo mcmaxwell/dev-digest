@@ -1,0 +1,41 @@
+{
+  "id": "field-end-to-end",
+  "shape": "one realistic feature slice that walks the whole stack, so four documented rules are exercised by a single agent instead of four",
+  "what_it_tests": [
+    "root AGENTS.md: @devdigest/shared has TWO physical copies and a contract change must land in both",
+    "root AGENTS.md: db/migrations/** is generated - change schema.ts and run db:generate, never hand-edit a migration",
+    "root AGENTS.md + server/AGENTS.md: any test importing test/helpers/pg.ts MUST be named *.it.test.ts",
+    "client/AGENTS.md: data access only through src/lib/hooks/* - no raw fetch in a component, query keys live in the hook file",
+    "root AGENTS.md do-not-touch: client/src/vendor/ui, .env, server/clones"
+  ],
+  "why_it_should_discriminate": [
+    "Every rule fails silently. Editing only the canonical contract copy still typechecks on the server; a hand-edited migration still applies; a DB test named *.test.ts still passes locally and only breaks the Docker-free CI lane.",
+    "None of it is derivable from generic Node/React knowledge - it is repo convention recorded in prose."
+  ],
+  "prompt": "Runs can be cancelled, but we do not record who did it. Add a `cancelled_by` field end to end: the user id that cancelled a run, nullable. Contract, database column, the repository read that exposes it, a test for that read, and surface it on the run row in the UI.",
+  "isolation": "git worktree - the agent edits freely, we grade the diff",
+  "runs": 2,
+  "assertions": [
+    "A1 server/src/vendor/shared touched (canonical contract copy)",
+    "A2 client/src/vendor/shared touched (the second copy)",
+    "A3 the new field name appears in BOTH copies",
+    "A4 server/src/db/schema*.ts touched (the column starts there)",
+    "A5 no pre-existing file under server/src/db/migrations/ was modified by hand",
+    "A6 any added test that reaches Postgres is named *.it.test.ts",
+    "A7 client data access goes through src/lib/hooks/* - no fetch( added inside a component",
+    "A8 TRAP - client/src/vendor/ui untouched",
+    "A9 TRAP - no .env file touched"
+  ],
+  "graded_from": "git diff --name-only plus content greps over the worktree - file paths are facts, not phrasing",
+  "kept_separate": "pointer routing (does the agent read the doc that 'Read when...' names) needs a NARROW task; on a wide task the agent reads everything and the measurement is meaningless",
+  "environment_limits": "The worktree has no node_modules, so tsc, vitest and drizzle-kit cannot run. Agents are told to write the code and state what they would run. A5 therefore checks only that no PRE-EXISTING migration file was modified.",
+  "sampling": {
+    "policy": "two runs as a screen, escalate only what is ambiguous",
+    "read_as": {
+      "2/2": "consistent - the rule is followed; treat as settled",
+      "0/2": "consistent - the rule is broken; treat as settled",
+      "1/2": "unstable - says nothing on its own, re-run THAT assertion to 5 before drawing a conclusion"
+    },
+    "why": "Full n=5 on every assertion is the expensive way to learn that most of them are stable. Iteration 5 of the onion-architecture eval is the counter-example that justifies escalation: n=2 read 'redundant', n=5 showed the rule was load-bearing in 2 runs out of 5."
+  }
+}

@@ -1,15 +1,17 @@
 {
   "name": "@devdigest/mcp",
   "version": "0.0.0",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
   "private": true,
   "type": "module",
   "description": "devdigest-mcp - local MCP (stdio) server exposing DevDigest reviewer agents, findings and conventions to an editor agent. Talks to the local API over HTTP only; no DB, no framework, no secrets in the process.",
   "bin": {
     "devdigest-mcp": "./bin/devdigest-mcp",
     "devdigest": "./bin/devdigest"
-  },
-  "engines": {
-    "node": ">=22"
   },
   "scripts": {
     "dev": "tsx src/index.ts",

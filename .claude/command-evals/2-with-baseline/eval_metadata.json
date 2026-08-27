@@ -1,0 +1,7 @@
+{
+  "case": "2-with-baseline",
+  "setup": "one prior audit with a valid machine block",
+  "expected": "must add '## Since the last audit' comparing the machine blocks",
+  "runs": 2,
+  "scope": "mcp only - the command's bookkeeping is what varies, the audit itself is identical and is the expensive part"
+}

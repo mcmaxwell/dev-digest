@@ -1,0 +1,87 @@
+# LLM eval lane. Never runs on a pull request.
+#
+# eval-gate.yml is the PR gate and it calls no model. This one does, so it is
+# on demand and on a nightly schedule instead: model runs cost money and they
+# flake - the same assertion has been measured at 3 of 5 across identical runs -
+# and a required check that red-lights on a coin flip trains people to ignore
+# every check.
+#
+# WHAT THIS ACTUALLY MEASURES, and what it does not:
+#
+# It measures TRIGGERING - whether a skill's description makes the model reach
+# for it on a realistic request, and whether it stays out of the way on a
+# near-miss that a neighbouring skill owns. One model call per query, exact
+# match against a declared expectation, no agent loop.
+#
+# It does NOT measure skill QUALITY. Those evals drive Claude Code subagents,
+# and no headless runner for that exists in this repo yet (`agent-runner` is
+# referenced in reviewer-core's description but the package is not here). A job
+# that pretended to run them would be green and meaningless, which is worse than
+# absent.
+#
+# A skill with no evals/trigger.json is skipped by name, never failed.
+name: eval run
+
+on:
+  workflow_dispatch:
+    inputs:
+      skill:
+        description: 'one skill name, or "all"'
+        default: 'all'
+      model:
+        description: 'OpenRouter model for the cheap lane'
+        default: 'deepseek/deepseek-v4-flash'
+      runs:
+        description: 'repetitions per query - 1 screens, 5 measures'
+        default: '1'
+      threshold:
+        description: 'minimum accuracy before the job fails'
+        default: '0.8'
+  schedule:
+    - cron: '17 4 * * *'      # nightly, off the hour to dodge the rush
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-run-${{ github.ref }}
+  cancel-in-progress: false   # never cancel a paid run half-way
+
+jobs:
+  trigger:
+    name: trigger accuracy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Without the key the job still validates every eval file and says so,
+      # rather than reporting an accuracy it never measured.
+      - name: run
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          skill='${{ inputs.skill || 'all' }}'
+          [ "$skill" = "all" ] && sel="--all" || sel="--skill $skill"
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "::warning::OPENROUTER_API_KEY is not set - validating eval files only"
+            python3 scripts/eval-trigger.py $sel --dry-run | tee /tmp/out
+          else
+            python3 scripts/eval-trigger.py $sel \
+              --model '${{ inputs.model || 'deepseek/deepseek-v4-flash' }}' \
+              --runs '${{ inputs.runs || 1 }}' \
+              --threshold '${{ inputs.threshold || 0.8 }}' | tee /tmp/out
+          fi
+
+      - name: summary
+        if: always()
+        run: |
+          {
+            echo "### trigger accuracy"
+            echo
+            echo '```'
+            cat /tmp/out 2>/dev/null || echo "(no output)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

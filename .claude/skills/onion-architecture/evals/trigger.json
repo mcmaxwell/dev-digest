@@ -1,0 +1,62 @@
+{
+  "skill": "onion-architecture",
+  "note": "negatives are near-misses on purpose: each one is backend work that a neighbouring skill owns",
+  "queries": [
+    {
+      "q": "i'm adding an alerts module to the server - routes, service, repository. where does the dedupe check go, the handler or the service?",
+      "should_trigger": true
+    },
+    {
+      "q": "we need to call the Linear API from a job. do i just new up their client in the service or is there a pattern here",
+      "should_trigger": true
+    },
+    {
+      "q": "reviewing this before i open the PR: digest/service.ts imports ReviewRepository from ../reviews/repository.js. is that ok in this repo?",
+      "should_trigger": true
+    },
+    {
+      "q": "i want to add a slack notifier to platform/container.ts - what else do i have to touch so tests can still mock it",
+      "should_trigger": true
+    },
+    {
+      "q": "my repository method opens its own db.transaction for two inserts. should the service own that instead?",
+      "should_trigger": true
+    },
+    {
+      "q": "can reviewer-core read a config file off disk if i only do it once at startup",
+      "should_trigger": true
+    },
+    {
+      "q": "where should the keep-window calculation live - repository, service or helpers?",
+      "should_trigger": true
+    },
+    {
+      "q": "arch:check passes but i'm not sure the module graph is actually clean. what does it not cover?",
+      "should_trigger": true
+    },
+    {
+      "q": "what's the syntax for a left join with a groupBy count in drizzle, i keep getting the type wrong",
+      "should_trigger": false
+    },
+    {
+      "q": "i need to add rate limiting to POST /pulls/:id/review, tighter than the global one. how do fastify plugins register for that",
+      "should_trigger": false
+    },
+    {
+      "q": "should agent_runs.cancelled_by be a uuid with a foreign key or just text? and does it need an index",
+      "should_trigger": false
+    },
+    {
+      "q": "the RunHistory component re-renders on every poll. how do i stop that",
+      "should_trigger": false
+    },
+    {
+      "q": "write me an it.test.ts that checks the repository actually filters by workspaceId",
+      "should_trigger": false
+    },
+    {
+      "q": "our zod schema rejects a valid payload and the error message is useless. how do i get a better one out of safeParse",
+      "should_trigger": false
+    }
+  ]
+}

@@ -27,6 +27,24 @@ Your findings are only as good as the source you can cite for each one, so a rul
   - `cd client && pnpm lint`
 
   They read and print; none of them mutates a tracked file.
+
+  **A green `arch:check` is necessary, never sufficient - say what it did not cover.**
+  Four blind spots are measured facts about the configs as they stand today:
+  `server/.dependency-cruiser.cjs` has no `no-circular` rule and its
+  `no-cross-module-imports` whitelists `service.ts` in BOTH directions, so a
+  cycle between two modules through their services passes green;
+  every config sets `dependencyTypesNot: ['type-only']`, so a type-only edge is
+  invisible;
+  `mcp`'s `mcp-has-no-db-or-framework` regex is anchored at
+  `^(node_modules/)?<pkg>` and `mcp` installs with pnpm's isolated layout, which
+  resolves to `node_modules/.pnpm/<pkg>@<ver>/node_modules/<pkg>/...` - so the
+  rule fires on a package that was imported but never installed, and stays
+  silent once the package is properly declared and installed;
+  and `client/` and `e2e/` ship no config at all, so their graphs are unchecked
+  rather than clean.
+  When a finding depends on one of these, verify it by reading, and report the
+  gap rather than the green tick.
+
   **`server/` has no `lint` script** (`typecheck`, `test`, `arch:check`, `db:*` only) and neither does `reviewer-core/`.
   Do not invent `cd server && pnpm lint`.
   Never run `pnpm test`, `pnpm build`, `pnpm db:migrate`, or `./scripts/e2e.sh`: verification is the implementer's job and running a suite is `test-writer`'s.

@@ -38,3 +38,19 @@ test-results/
 # outranks core.excludesFile, so these two lines make that impossible.
 !server/src/vendor/
 !client/src/vendor/
+
+# Python bytecode from the skills' helper scripts. Running collect.py or
+# check_report.py leaves these behind, and they are build output.
+__pycache__/
+*.pyc
+
+# Skill eval RUN OUTPUTS. An iteration is one measurement of one skill version:
+# reproducible from the fixtures plus the snapshot it names, and large. The
+# sources - evals.json, fixtures/, the notes - are tracked; these are not.
+.claude/skills/*/evals/iteration-*/
+.claude/skills/*/evals/skill-snapshot*/
+# Harness eval outputs only. The audits/ directories are INPUT - the baseline
+# report a case is measured against - so they stay tracked; without them the
+# case cannot be reproduced from a clean checkout.
+.claude/*-evals/*/run-*/outputs/
+.claude/worktrees/

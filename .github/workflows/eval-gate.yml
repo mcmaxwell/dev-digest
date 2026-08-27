@@ -1,0 +1,89 @@
+# Deterministic eval gate.
+#
+# Runs on every PR that touches the agent harness - skills, agents, commands,
+# or an AGENTS.md / CLAUDE.md. It never calls a model: everything here is the
+# class of failure that does not need one, and that a model run would hide
+# behind its own noise. An evals.json that stopped parsing, a fixture path that
+# moved, a "Read when..." pointer aimed at a deleted file, a command naming a
+# skill that no longer exists - all cheap, all deterministic, all worth
+# blocking a merge on.
+#
+# LLM eval runs are deliberately NOT here. They cost money and they flake: the
+# same assertion has been observed at 3/5 across identical runs, and a PR gate
+# that red-lights on a coin flip trains people to ignore it. Those live in
+# eval-run.yml behind workflow_dispatch and a nightly schedule, with the model
+# chosen by input (deepseek/deepseek-v4-flash for the cheap lane,
+# google/gemini-2.5-pro for workflow checks, deepseek/deepseek-v4-pro to
+# arbitrate a split result).
+#
+# A skill with no evals/ directory is SKIPPED, not failed - it never enters the
+# matrix, and the plan job's summary says so by name.
+name: eval gate
+
+on:
+  # manual runs matter for this gate: after editing eval-matrix.sh itself you
+  # want to exercise it without opening a throwaway PR
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'ref to diff against when run by hand'
+        default: 'main'
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - '.claude/agents/**'
+      - '.claude/commands/**'
+      - '**/AGENTS.md'
+      - '**/CLAUDE.md'
+      - 'scripts/eval-matrix.sh'
+      - '.github/workflows/eval-gate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.matrix.outputs.targets }}
+      any: ${{ steps.matrix.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the matrix is computed from a real diff
+
+      - id: matrix
+        run: |
+          base="origin/${{ github.base_ref }}"
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          targets=$(scripts/eval-matrix.sh matrix "$base" 2> >(tee /tmp/skips >&2))
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          [ "$targets" = "[]" ] && echo "any=false" >> "$GITHUB_OUTPUT" || echo "any=true" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### eval gate plan"
+            echo
+            echo "**will run:** \`$targets\`"
+            if [ -s /tmp/skips ]; then echo; echo "**skipped:**"; sed 's/^/- /' /tmp/skips; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  check:
+    name: ${{ matrix.target }}
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # one broken skill must not hide the others
+      matrix:
+        target: ${{ fromJSON(needs.plan.outputs.targets) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: scripts/eval-matrix.sh check "${{ matrix.target }}"
