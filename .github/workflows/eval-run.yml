@@ -66,8 +66,17 @@ jobs:
           skill='${{ inputs.skill || 'all' }}'
           [ "$skill" = "all" ] && sel="--all" || sel="--skill $skill"
           if [ -z "$OPENROUTER_API_KEY" ]; then
-            echo "::warning::OPENROUTER_API_KEY is not set - validating eval files only"
             python3 scripts/eval-trigger.py $sel --dry-run | tee /tmp/out
+            # A dispatch run is somebody asking for a measurement. Reporting
+            # success without one is the false green this harness exists to
+            # catch - the first run of this workflow did exactly that, went
+            # green in 12s, and measured nothing. A scheduled run only warns,
+            # so a fork without the secret does not sit permanently red.
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "::error::OPENROUTER_API_KEY is not set - nothing was measured"
+              exit 1
+            fi
+            echo "::warning::OPENROUTER_API_KEY is not set - validated eval files only, measured nothing"
           else
             python3 scripts/eval-trigger.py $sel \
               --model '${{ inputs.model || 'deepseek/deepseek-v4-flash' }}' \
