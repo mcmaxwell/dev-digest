@@ -1,7 +1,7 @@
 ---
 name: dependency-audit
-description: Audits every dependency in the DevDigest repo - the five packages' npm dependencies and the internal component graph - and produces one structured report with a Mermaid map, per-package weight tables (disk size AND whether the package ships), findings across hygiene, size, supply chain and architectural boundaries, and a ranked action list. Use whenever someone asks about dependencies, package sizes, node_modules bloat, what can be removed, version drift between packages, unused or duplicated packages, lockfile problems, bundle weight, upgrade planning, or "what are we actually depending on". Also use before a dependency bump, when adding a new package, and when CI install time or image size grows.
-version: 1.2.0
+description: Produces a dependency AUDIT of this repo - a written report over all five packages and the internal component graph, with a Mermaid map, per-package weight (disk size and whether the package ships), findings across hygiene, supply chain and architectural boundaries, and a ranked action list. Use when the question is about the dependency SET as a whole and the answer is a report: node_modules bloat, what could be removed, version drift between packages, duplicated or unused packages, two lockfiles in one package, or "what are we actually depending on and what should we fix first". Do NOT use it to carry out package work: installing, removing or upgrading a package, debugging a failing install or an unresolved import, editing a dependency-cruiser config, or chasing a slow build - those are the work itself, not an audit of it.
+version: 1.3.0
 ---
 
 # Dependency audit
