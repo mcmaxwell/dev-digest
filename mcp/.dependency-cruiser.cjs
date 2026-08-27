@@ -76,6 +76,15 @@ module.exports = {
     },
   ],
   options: {
+    // mcp installs with pnpm's ISOLATED layout, so node_modules/<pkg> is a
+    // symlink and the resolver rewrites it to
+    // node_modules/.pnpm/<pkg>@<ver>/node_modules/<pkg>/... . Every `to.path`
+    // below is anchored at ^(node_modules/)?<pkg>, which that shape never
+    // matches - so the forbidden-package rules fired only on a package that
+    // was imported but NOT installed, and went silent the moment somebody
+    // declared it properly. Verified: banning `zod` (installed, imported in 9
+    // files) produced "no dependency violations" until this line was added.
+    preserveSymlinks: true,
     doNotFollow: { path: 'node_modules' },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: 'tsconfig.json' },

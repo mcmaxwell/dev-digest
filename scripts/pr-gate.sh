@@ -8,10 +8,24 @@
 set -uo pipefail
 
 input=$(cat)
-case "$input" in
-  *"gh pr create"* | *"gh pr merge"*) ;;
-  *) exit 0 ;;
-esac
+
+# Match the COMMAND, not the whole payload. Substring-matching the raw JSON
+# blocked any command that merely MENTIONED the phrase - an echo explaining the
+# gate, a grep over this file, a commit message - which is a false positive on
+# exactly the tooling somebody needs while working on the gate itself.
+# Pull the command out and require the phrase in a command position: at the
+# start, or right after && || ; or a newline.
+verb=$(printf '%s' "$input" |
+  sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/p' | head -1)
+[[ -n "$verb" ]] || verb="$input"
+
+blocked=0
+while IFS= read -r seg; do
+  case "${seg#"${seg%%[![:space:]]*}"}" in
+    gh\ pr\ create* | gh\ pr\ merge* ) blocked=1 ;;
+  esac
+done < <(printf '%s\n' "$verb" | sed 's/&&/\n/g; s/||/\n/g; s/;/\n/g')
+[[ $blocked -eq 1 ]] || exit 0
 
 fail() {
   echo "pr-self-review gate: $1" >&2
