@@ -37,6 +37,7 @@ on:
       - '**/CLAUDE.md'
       - 'scripts/eval-matrix.sh'
       - '.github/workflows/eval-gate.yml'
+      - '.github/workflows/eval-run.yml'
 
 permissions:
   contents: read
