@@ -21,6 +21,13 @@
 name: eval gate
 
 on:
+  # manual runs matter for this gate: after editing eval-matrix.sh itself you
+  # want to exercise it without opening a throwaway PR
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'ref to diff against when run by hand'
+        default: 'main'
   pull_request:
     paths:
       - '.claude/skills/**'

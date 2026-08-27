@@ -1,0 +1,55 @@
+{
+  "skill_name": "onion-architecture",
+  "skill_path": ".claude/skills/onion-architecture",
+  "iteration": 2,
+  "evals": [
+    {
+      "id": 0,
+      "name": "review-new-alerts-module",
+      "type": "review",
+      "fixture": "fixtures/case-a-alerts-module",
+      "prompt": "I've written a new alerts module for the server - it's in .claude/skills/onion-architecture/evals/fixtures/case-a-alerts-module/, paths mirror the repo. Before I wire it into modules/index.ts, go through it and tell me whether it fits our backend architecture and what I need to change. The alert_rules / alert_deliveries tables and their migration are already done (min_severity is a pgEnum over Severity), and registering the plugin is the last step - so skip those and focus on the code.",
+      "planted": [
+        "A1 routes.ts imports drizzle-orm + db/schema and runs a dedupe SELECT with a business branch in the handler",
+        "A2 service.ts constructs OctokitGitHubClient directly instead of resolving the port via container.github()",
+        "A3 repository.ts opens its own db.transaction() in recordDelivery"
+      ],
+      "traps": [
+        "helpers.ts imports db/schema for $inferSelect row types - permitted",
+        "service.ts imports rollupSeverities from modules/_shared - permitted",
+        "service.ts reads container.reviewRepo for a cross-module read - the correct pattern"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "review-cross-package-digest-change",
+      "type": "review",
+      "fixture": "fixtures/case-b-cross-package",
+      "prompt": "Can you review this change before I open the PR? It's in .claude/skills/onion-architecture/evals/fixtures/case-b-cross-package/ - the paths mirror the repo, so reviewer-core/src/review/severity-tuner.ts and server/src/modules/digest/. It adds per-repo severity overrides and a per-PR review digest. The shared contracts are in the fixture; assume they're already copied into client/src/vendor/shared too, and that tuneSeverities is exported from reviewer-core's index.ts.",
+      "planted": [
+        "B1 reviewer-core/src/review/severity-tuner.ts imports node:fs and reads a config file",
+        "B2 digest/service.ts imports ReviewRepository from ../reviews/repository.js instead of container.reviewRepo",
+        "B3 digest/routes.ts hand-parses with DigestQuery.parse(req.query) instead of schema.querystring"
+      ],
+      "traps": [
+        "service.ts uses container.reposRepo.getById - the correct pattern",
+        "service.ts imports rollupSeverities from modules/_shared - permitted"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "review-health-subsystem",
+      "type": "review",
+      "fixture": "fixtures/case-d-health-subsystem",
+      "prompt": "New subsystem for review: .claude/skills/onion-architecture/evals/fixtures/case-d-health-subsystem/, paths mirror the repo. It adds a repo-health signal - reviews/ will call recompute() when a run closes, pulls/ will read the score and the trend for the PR list, and onboarding/ will ask the policy whether auto-approve is allowed. The container file is an excerpt showing only what this change adds. The health_scores / health_samples tables and migration are done. Does this fit our backend architecture?",
+      "planted": [
+        "D1 HealthRepository's constructor takes Container instead of Db - a leaf adapter reaching the composition root",
+        "D2 HealthRepository returns wire DTOs (HealthScore, HealthTrendPoint) instead of rows, so persistence owns the wire format",
+        "D3 the subsystem exposes four separate Container getters (healthRepo/healthScorer/healthTrend/healthPolicy) to three consuming modules instead of one facade port"
+      ],
+      "traps": [
+        "service.ts imports parseUnifiedDiff from adapters/git/diff-parser.js - a pure helper modules MAY import, and absent from the modules-use-ports-not-clients forbidden list"
+      ]
+    }
+  ]
+}

@@ -38,3 +38,10 @@ test-results/
 # outranks core.excludesFile, so these two lines make that impossible.
 !server/src/vendor/
 !client/src/vendor/
+
+# Skill eval RUN OUTPUTS. An iteration is one measurement of one skill version:
+# reproducible from the fixtures plus the snapshot it names, and large. The
+# sources - evals.json, fixtures/, the notes - are tracked; these are not.
+.claude/skills/*/evals/iteration-*/
+.claude/skills/*/evals/skill-snapshot*/
+.claude/worktrees/

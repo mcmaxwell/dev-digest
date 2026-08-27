@@ -71,7 +71,13 @@ check_skill() {
       ok "evals.json parses"
       while IFS= read -r f; do
         [[ -z "$f" ]] && continue
-        [[ -e "$f" || -e "$dir/$f" ]] && ok "fixture exists: $f" || bad "fixture missing: $f"
+        # a fixture path may be written relative to the repo root, the skill
+        # root, or the evals/ directory it sits next to - all three are in use
+        if [[ -e "$f" || -e "$dir/$f" || -e "$dir/evals/$f" ]]; then
+          ok "fixture exists: $f"
+        else
+          bad "fixture missing: $f (tried repo root, $dir/, $dir/evals/)"
+        fi
       done < <(python3 -c '
 import json,sys
 d=json.load(open(sys.argv[1]))
