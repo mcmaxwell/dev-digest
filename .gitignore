@@ -49,4 +49,8 @@ __pycache__/
 # sources - evals.json, fixtures/, the notes - are tracked; these are not.
 .claude/skills/*/evals/iteration-*/
 .claude/skills/*/evals/skill-snapshot*/
+# Harness eval outputs only. The audits/ directories are INPUT - the baseline
+# report a case is measured against - so they stay tracked; without them the
+# case cannot be reproduced from a clean checkout.
+.claude/*-evals/*/run-*/outputs/
 .claude/worktrees/

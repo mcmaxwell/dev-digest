@@ -1,0 +1,7 @@
+{
+  "case": "1-no-baseline",
+  "setup": "audits dir is empty",
+  "expected": "must write 'first audit, no baseline' and skip the comparison section, not invent one",
+  "runs": 2,
+  "scope": "mcp only - the command's bookkeeping is what varies, the audit itself is identical and is the expensive part"
+}
