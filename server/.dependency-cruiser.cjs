@@ -16,6 +16,20 @@ module.exports = {
       to: { path: '^(node_modules/)?drizzle-orm|^src/db' },
     },
     {
+      name: 'eval-scoring-is-pure',
+      comment:
+        'L06: the eval scorer decides whether a finding matches an expectation ' +
+        'by comparing a file and two line numbers. The claim that scoring makes ' +
+        'no model call is the point of the whole harness, so it is enforced ' +
+        'mechanically rather than trusted: scoring.ts may not reach the ' +
+        'container, an adapter, the database, or the review engine. If a metric ' +
+        'genuinely needs one of those, it is not a scoring rule - it belongs in ' +
+        'the service, which already has them.',
+      severity: 'error',
+      from: { path: '^src/modules/eval/scoring\\.ts$' },
+      to: { path: '^src/(platform|adapters|db)/|^\\.\\./reviewer-core|^(node_modules/)?drizzle-orm' },
+    },
+    {
       name: 'queries-live-in-repositories',
       comment:
         'Only a repository builds queries. Any other module file importing the ' +

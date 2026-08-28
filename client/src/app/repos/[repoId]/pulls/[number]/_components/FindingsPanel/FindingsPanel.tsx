@@ -8,8 +8,10 @@ import { Toggle, EmptyState } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "@/lib/hooks/reviews";
+import { usePullDetail } from "@/lib/hooks";
+import { EvalCaseModal } from "@/components/eval-case-modal";
 import { KEY_TO_ACTION } from "./constants";
-import { visibleFindings } from "./helpers";
+import { evalCaseFromFinding, visibleFindings } from "./helpers";
 import { s } from "./styles";
 
 export function FindingsPanel({
@@ -18,6 +20,7 @@ export function FindingsPanel({
   repoFullName,
   headSha,
   focusFindingId,
+  agentId,
 }: {
   findings: FindingRecord[];
   prId: string;
@@ -25,9 +28,16 @@ export function FindingsPanel({
   headSha?: string | null;
   /** Reveal this finding: focus it, expand it, scroll it into view. */
   focusFindingId?: string | null;
+  /** The agent whose run produced these findings — the owner of a minted eval
+      case (L06). Absent for a review with no agent, which hides the button. */
+  agentId?: string | null;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
+  // The file patches a minted eval case is cut from. Already in the cache from
+  // the PR page, so this is a read, not a second round trip.
+  const { data: pull } = usePullDetail(prId);
+  const [minting, setMinting] = React.useState<ReturnType<typeof evalCaseFromFinding>>(null);
   const [hideLow, setHideLow] = React.useState(false);
   const [focusIdx, setFocusIdx] = React.useState(0);
 
@@ -110,10 +120,30 @@ export function FindingsPanel({
               repoFullName={repoFullName}
               headSha={headSha}
               onAction={(act) => action.mutate({ findingId: f.id, action: act, prId })}
+              {...(agentId
+                ? {
+                    onCreateEvalCase: () =>
+                      setMinting(
+                        evalCaseFromFinding(
+                          f,
+                          pull?.files.find((file) => file.path === f.file)?.patch,
+                        ),
+                      ),
+                  }
+                : {})}
             />
           ))
         )}
       </div>
+
+      {minting && agentId && (
+        <EvalCaseModal
+          agentId={agentId}
+          evalCase={null}
+          initial={minting}
+          onClose={() => setMinting(null)}
+        />
+      )}
     </div>
   );
 }

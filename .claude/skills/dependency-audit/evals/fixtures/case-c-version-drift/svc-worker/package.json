@@ -1,0 +1,6 @@
+{
+  "name": "@acme/svc-worker",
+  "private": true,
+  "dependencies": { "zod": "^3.24.1", "drizzle-orm": "^0.31.0" },
+  "devDependencies": { "typescript": "^5.4.5" }
+}

@@ -14,7 +14,7 @@ lockfile; cross-package code is shared only through tsconfig path aliases.
 
 | Package | Name | Scripts |
 |---|---|---|
-| `server/` | `@devdigest/api` | `dev` · `build` · `start` · `typecheck` · `test` · `verify:l03` · `arch:check` · `db:generate` · `db:migrate` · `db:seed` |
+| `server/` | `@devdigest/api` | `dev` · `build` · `start` · `typecheck` · `test` · `verify:l03` · `verify:l06` · `arch:check` · `db:generate` · `db:migrate` · `db:seed` |
 | `client/` | `@devdigest/web` | `dev` · `build` · `start` · `typecheck` · `lint` · `test` |
 | `reviewer-core/` | `@devdigest/reviewer-core` | `typecheck` · `build` · `arch:check` · `test` |
 | `mcp/` | `@devdigest/mcp` | `dev` · `typecheck` · `arch:check` · `budget` · `test` · `test:it` · `inspect` |
@@ -44,10 +44,10 @@ so must an mcp test that needs a live API.
 
 ## Server modules
 
-`server/src/modules/`: _shared, agents, blast, brief, conventions, intent, onboarding, polling, project-context, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
+`server/src/modules/`: _shared, agents, blast, brief, conventions, eval, intent, onboarding, polling, project-context, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
 
 Registered statically in `server/src/modules/index.ts` (one import + one entry).
-Shared helpers live in `modules/_shared/`: context.ts, diff-loader.ts, hunk-map.ts, logger.ts, schemas.ts, severity.ts
+Shared helpers live in `modules/_shared/`: context.ts, diff-loader.ts, hunk-map.ts, logger.ts, schemas.ts, severity.ts, skills.ts
 
 ## Mechanical boundary rules
 
@@ -70,7 +70,7 @@ or add an allowlist entry to fix a violation - fix the placement.
 client's own copy. A contract change lands in BOTH in the same step, or the two
 sides drift silently. There is no sync script.
 
-Files under `contracts/`: blast.ts, brief.ts, eval-ci.ts, findings.ts, intent.ts, knowledge.ts, observability.ts, platform.ts, pr-brief.ts, productionize.ts, project-context.ts, review-api.ts, review-diff.ts, trace.ts, why.ts
+Files under `contracts/`: blast.ts, brief.ts, eval-ci.ts, eval-math.ts, eval-suite.ts, findings.ts, intent.ts, knowledge.ts, observability.ts, platform.ts, pr-brief.ts, productionize.ts, project-context.ts, review-api.ts, review-diff.ts, trace.ts, why.ts
 
 
 Already drifted, pre-existing, do not "fix" as a side quest: `adapters.ts` `contracts/eval-ci.ts` `contracts/productionize.ts` 

@@ -1,0 +1,60 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for AgentEvalView. */
+export const s = {
+  wrap: { padding: "28px 32px", maxWidth: 1180 } satisfies CSSProperties,
+  back: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 13,
+    color: "var(--text-muted)",
+    textDecoration: "none",
+    marginBottom: 14,
+  } satisfies CSSProperties,
+  head: { display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20 } satisfies CSSProperties,
+  h1: { fontSize: 26, fontWeight: 700, letterSpacing: "-0.01em" } satisfies CSSProperties,
+  sub: { fontSize: 13.5, color: "var(--text-muted)", marginTop: 6 } satisfies CSSProperties,
+  headActions: { marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" } satisfies CSSProperties,
+  tiles: { display: "flex", gap: 12, marginBottom: 8 } satisfies CSSProperties,
+  interval: { fontSize: 12, color: "var(--text-muted)", marginBottom: 22 } satisfies CSSProperties,
+  panel: {
+    border: "1px solid var(--border)",
+    borderRadius: 11,
+    background: "var(--bg-elevated)",
+    padding: 18,
+    marginBottom: 22,
+  } satisfies CSSProperties,
+  panelHead: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } satisfies CSSProperties,
+  sectionLabel: {
+    fontSize: 11.5,
+    fontWeight: 700,
+    letterSpacing: "0.06em",
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  legend: { marginLeft: "auto", display: "flex", gap: 14, fontSize: 12 } satisfies CSSProperties,
+  legendItem: (color: string): CSSProperties => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    color: "var(--text-secondary)",
+  }),
+  swatch: (color: string): CSSProperties => ({
+    width: 14,
+    height: 2,
+    borderRadius: 2,
+    background: color,
+  }),
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13 } satisfies CSSProperties,
+  th: {
+    textAlign: "left",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.05em",
+    color: "var(--text-muted)",
+    padding: "10px 12px",
+  } satisfies CSSProperties,
+  td: { padding: "11px 12px", borderTop: "1px solid var(--border)" } satisfies CSSProperties,
+  mono: { fontFamily: "var(--font-mono, monospace)", fontSize: 12.5 } satisfies CSSProperties,
+  hint: { fontSize: 12, color: "var(--text-muted)", marginTop: 10 } satisfies CSSProperties,
+} as const;

@@ -28,6 +28,7 @@ export function FindingCard({
   focused,
   defaultExpanded,
   onAction,
+  onCreateEvalCase,
   pending,
   repoFullName,
   headSha,
@@ -36,6 +37,12 @@ export function FindingCard({
   focused?: boolean;
   defaultExpanded?: boolean;
   onAction?: (action: FindingActionKind, reply?: string) => void;
+  /**
+   * Mint an eval case from this finding (L06). Optional: the card also renders
+   * where there is no agent to file a case against, and an absent handler hides
+   * the button rather than showing a dead control.
+   */
+  onCreateEvalCase?: () => void;
   pending?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
@@ -109,6 +116,17 @@ export function FindingCard({
             >
               {t("finding.dismiss")}
             </Button>
+            {onCreateEvalCase && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon="FlaskConical"
+                disabled={pending}
+                onClick={onCreateEvalCase}
+              >
+                {t("finding.turnIntoEvalCase")}
+              </Button>
+            )}
           </div>
         </div>
       )}

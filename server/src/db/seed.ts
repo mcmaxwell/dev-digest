@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { createDb, type Db } from './client.js';
 import * as t from './schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
@@ -11,6 +11,7 @@ import {
 } from './seed-prompts.js';
 import { SEED_SKILLS, SEED_AGENT_SKILLS } from './seed-skills.js';
 import { SEED_CONVENTIONS, SEED_SCAN_SHA } from './seed-conventions.js';
+import { SEED_EVAL_CASES } from './seed-eval-cases.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -332,6 +333,42 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     if (!existing) await db.insert(t.agents).values(a);
   }
 
+  // ---- eval gold set for the Security Reviewer (L06) ----
+  // Seeded so the harness has something to measure on a fresh machine, and so
+  // `pnpm verify:l06` is deterministic. Idempotent by (owner, name): a re-seed
+  // never stomps a case the user has since edited.
+  const [securityAgent] = await db
+    .select()
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'Security Reviewer')));
+  if (securityAgent) {
+    for (const c of SEED_EVAL_CASES) {
+      // Matched on the name OR the diff: keying on the name alone meant that
+      // renaming a seeded case made the next re-seed insert a second copy under
+      // the old name, next to the user's renamed one. The diff is what actually
+      // identifies a case, and it survives a rename.
+      const [existing] = await db
+        .select({ id: t.evalCases.id })
+        .from(t.evalCases)
+        .where(
+          and(
+            eq(t.evalCases.ownerId, securityAgent.id),
+            or(eq(t.evalCases.name, c.name), eq(t.evalCases.inputDiff, c.inputDiff)),
+          ),
+        );
+      if (existing) continue;
+      await db.insert(t.evalCases).values({
+        workspaceId,
+        ownerKind: 'agent',
+        ownerId: securityAgent.id,
+        name: c.name,
+        inputDiff: c.inputDiff,
+        expectedOutput: { expectations: c.expectations },
+        notes: c.notes,
+      });
+    }
+  }
+
   // ---- built-in skills + agent links (L02) ----
   // Skill bodies live in ./seed-skills.ts. Links use onConflictDoNothing so a
   // re-seed never stomps a user's reordering of an existing link.
@@ -377,6 +414,44 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
         .values({ agentId: agent.id, skillId, order: i })
         .onConflictDoNothing();
     }
+  }
+
+  // ---- v1 config snapshots for the seeded agents ----
+  // `AgentsRepository.insert` records an `agent_versions` row for every agent
+  // it creates, but the seed inserts agent rows directly, so a seeded agent
+  // used to claim `version: 1` with no snapshot behind it. Anything that reads
+  // an agent's config AS IT WAS - the eval compare view (L06) reads the system
+  // prompt of the version a run executed - then found nothing and had to
+  // degrade. Written after the skill links so the snapshot pins the skills the
+  // agent actually has.
+  for (const a of seedAgents) {
+    const [agent] = await db
+      .select()
+      .from(t.agents)
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name!)));
+    if (!agent) continue;
+    const linked = await db
+      .select({ skillId: t.agentSkills.skillId })
+      .from(t.agentSkills)
+      .where(eq(t.agentSkills.agentId, agent.id))
+      .orderBy(t.agentSkills.order);
+    await db
+      .insert(t.agentVersions)
+      .values({
+        agentId: agent.id,
+        version: agent.version,
+        configJson: {
+          provider: agent.provider,
+          model: agent.model,
+          system_prompt: agent.systemPrompt,
+          output_schema: agent.outputSchema,
+          strategy: agent.strategy,
+          ci_fail_on: agent.ciFailOn,
+          repo_intel: agent.repoIntel,
+          skills: linked.map((l) => l.skillId),
+        },
+      })
+      .onConflictDoNothing();
   }
 
   // ---- demo conventions + their scan (L02 conventions extractor) ----

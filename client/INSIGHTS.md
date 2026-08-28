@@ -290,6 +290,19 @@ the root INSIGHTS.md. Format and quality gates:
   `useCallback` at its source (`page.tsx`'s `handleRunDone`). Either alone is a
   partial fix; both together close it for good.
 
+- [2026-08-28] `client/src/vendor/shared` is a TYPES-ONLY copy in practice: all
+  88 existing imports of `@devdigest/shared` are `import type`, which the
+  compiler erases. The first RUNTIME value imported from the barrel breaks
+  `pnpm build` with a wall of `Module not found: Can't resolve
+  './contracts/brief.js'` - Next's webpack does not follow the NodeNext `.js`
+  specifiers tsc understands. `pnpm typecheck`, `pnpm lint` and `pnpm test` all
+  stay GREEN; only `pnpm build` (and therefore `./scripts/e2e.sh`, which builds)
+  catches it, and it surfaces as a 500 on unrelated routes. Cure that needs no
+  build-config change: put the runtime values in a contract file that imports
+  NOTHING (`contracts/eval-math.ts`) and deep import it -
+  `@devdigest/shared/contracts/eval-math` - so webpack resolves exactly one
+  module and never enters the barrel.
+
 ## Session Notes
 
 - [2026-08-10] L04 Blast Radius card shipped under the Intent card on the PR

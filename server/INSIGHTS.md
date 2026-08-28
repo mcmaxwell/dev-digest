@@ -567,7 +567,44 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
     `docker volume ls --format '{{.Name}}' | grep -E '^[0-9a-f]{64}$' | xargs -n1 docker volume rm`.
     Also `docker rm -f` any leftover `testcontainers-ryuk-*` container.
 
+- [2026-08-28] The seeded agents were `version: 1` with NO `agent_versions` row
+  behind them. `AgentsRepository.insert` writes that snapshot, but `seed.ts`
+  inserts agent rows directly with the drizzle builder and never did - so
+  anything reading an agent's config AS IT WAS silently degraded on exactly the
+  five agents every fresh machine has. L06's run comparison ("old prompt vs new
+  prompt") reads the snapshot for the version a run executed, and got null. The
+  seed now writes the v1 snapshot after the skill links, so the pinned `skills`
+  array matches what the agent actually has. Lesson: when a repository method
+  maintains an invariant (`insert` also snapshots), a seed that bypasses it
+  bypasses the invariant too - the tables agree, the history does not.
+
+- [2026-08-28] An eval expectation that sits outside its own diff can never be
+  matched: the citation-grounding gate drops any finding citing it, so the case
+  scores zero forever and reads as an agent failure rather than the authoring
+  mistake it is. `test/eval-fixtures.test.ts` asserts this by pushing a probe
+  finding at each seeded expectation through the REAL `groundFindings`, not by
+  re-deriving a line index - the property worth testing is "a correct finding
+  here survives the gate", and only the gate can answer that.
+
+- [2026-08-28] `buildLineIndex` is exported from `reviewer-core/src/grounding.ts`
+  but NOT from its `src/index.ts`, so it is not public API even though
+  `groundFindings`/`groundingSummary` next to it are. The server's
+  `platform/grounding.ts` re-export shim carries only the public three. Check
+  `reviewer-core/src/index.ts`, not the defining file, before importing from the
+  engine.
+
 ## Session Notes
+
+- [2026-08-28] L06 Eval pipeline shipped server-side: `modules/eval`
+  (routes/service/repository + a PURE `scoring.ts`), `eval_suite_runs` +
+  `eval_runs.suite_run_id` (migration 0020, additive), twelve seeded gold-set
+  cases in `db/seed-eval-cases.ts`, and `verify:l06`. The central claim - that
+  scoring makes no model call - is enforced two ways rather than asserted once:
+  a new `eval-scoring-is-pure` depcruise rule forbids `scoring.ts` from
+  importing `platform/`, `adapters/`, `db/` or the review engine, and the
+  integration test counts `completeStructured` calls per case off
+  `MockLLMProvider.calls`. The rule was watched go red (temporarily importing
+  `Container`) before being trusted.
 
 - [2026-08-10] L04 Blast Radius shipped server-side: `modules/blast`
   (status.ts + build.ts are pure and carry the whole derivation table),

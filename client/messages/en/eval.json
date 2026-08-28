@@ -25,10 +25,21 @@
       "precision": "Precision",
       "citation": "Citation",
       "pass": "Pass",
-      "cost": "Cost"
+      "cost": "Cost",
+      "version": "Version"
     },
     "pass": "pass",
-    "fail": "fail"
+    "fail": "fail",
+    "subtitle": "Regression harness across all reviewer agents · pick an agent to see its runs",
+    "agents": "AGENTS",
+    "recentAll": "RECENT EVAL RUNS · ALL AGENTS",
+    "lastRun": "Last run v{version} · {ranAt} · {passed}/{total} pass",
+    "neverRun": "Never run",
+    "casesCount": "{count, plural, one {# case} other {# cases}}",
+    "backToAgents": "All agents",
+    "noAgents": "No agents yet.",
+    "passRate": "PASS RATE",
+    "interval": "95% CI {lo}–{hi}"
   },
   "caseEditor": {
     "newCase": "New eval case",
@@ -55,7 +66,25 @@
     "invalidJson": "invalid JSON",
     "lastRunPassed": "Last run passed",
     "lastRunFailed": "Last run failed",
-    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s"
+    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s",
+    "editTitle": "Edit eval case",
+    "expectations": "Expectations",
+    "addExpectation": "Add expectation",
+    "removeExpectation": "Remove",
+    "kindLabel": "Kind",
+    "kindMustFind": "must_find",
+    "kindMustNotFlag": "must_not_flag",
+    "fileLabel": "File",
+    "startLineLabel": "From line",
+    "endLineLabel": "To line",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "floor · hardcoded credential",
+    "noExpectations": "No expectations - any finding on this diff counts as a false positive.",
+    "mustFindHint": "The agent must report a finding overlapping these lines.",
+    "mustNotFlagHint": "The agent must NOT report a finding overlapping these lines.",
+    "cancel": "Cancel",
+    "diffRequired": "Paste a unified diff - a case whose diff does not parse scores zero whatever the agent does.",
+    "unknownFile": "(unknown file)"
   },
   "evalsTab": {
     "metricsTitle": "Eval metrics",
@@ -71,7 +100,16 @@
     "run": "Run",
     "running": "Running…",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "viewDashboard": "View full dashboard →",
+    "runAll": "Run all evals",
+    "passingCount": "{passed} / {total} passing",
+    "tracesPassed": "TRACES PASSED",
+    "f1": "F1",
+    "noRunYet": "Not run yet - run the set to see metrics.",
+    "expectationSummary": "{find, plural, =0 {no must-find} one {# must-find} other {# must-find}} · {avoid, plural, =0 {no must-not-flag} one {# must-not-flag} other {# must-not-flag}}",
+    "runFailed": "Run failed",
+    "bucketOther": "other"
   },
   "page": {
     "crumbSkillsLab": "Skills Lab",
@@ -80,5 +118,28 @@
     "crumbEvals": "Evals",
     "crumbNewCase": "New case",
     "crumbEvalCase": "Eval case"
+  },
+  "compare": {
+    "title": "Compare runs · {left} → {right}",
+    "subtitle": "Old prompt vs new - metric deltas, the per-case pairing, and the prompt diff",
+    "close": "Close",
+    "perCase": "Per-case pairing",
+    "caseColumn": "Case",
+    "leftColumn": "Left",
+    "rightColumn": "Right",
+    "changeColumn": "Change",
+    "gained": "gained",
+    "lost": "lost",
+    "unchanged": "unchanged",
+    "missing_left": "new case",
+    "missing_right": "removed",
+    "promptDiff": "System prompt",
+    "promptUnchanged": "The system prompt is identical in both runs.",
+    "promptMissing": "No prompt snapshot was recorded for this run.",
+    "selectTwo": "Select exactly two runs to compare.",
+    "compare": "Compare",
+    "pass": "pass",
+    "fail": "fail",
+    "noteSmallSet": "On {total, plural, one {# case} other {# cases}} one flipped case moves a ratio by {points} points - read the pairing, not the deltas."
   }
 }

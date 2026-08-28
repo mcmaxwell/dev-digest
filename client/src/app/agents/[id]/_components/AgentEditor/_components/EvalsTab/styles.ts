@@ -1,0 +1,75 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for EvalsTab. */
+export const s = {
+  wrap: { maxWidth: 900 } satisfies CSSProperties,
+  sectionHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  } satisfies CSSProperties,
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  dashLink: {
+    marginLeft: "auto",
+    fontSize: 12.5,
+    color: "var(--accent)",
+    textDecoration: "none",
+    fontFamily: "var(--font-mono, monospace)",
+  } satisfies CSSProperties,
+  tiles: { display: "flex", gap: 12, marginBottom: 24 } satisfies CSSProperties,
+  noRun: {
+    fontSize: 13,
+    color: "var(--text-muted)",
+    padding: "18px 0 24px",
+  } satisfies CSSProperties,
+  casesHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  } satisfies CSSProperties,
+  h2: { fontSize: 17, fontWeight: 700 } satisfies CSSProperties,
+  actions: { marginLeft: "auto", display: "flex", gap: 8 } satisfies CSSProperties,
+  list: { display: "flex", flexDirection: "column", gap: 8 } satisfies CSSProperties,
+  groupLabel: {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+    marginTop: 12,
+    marginBottom: 2,
+  } satisfies CSSProperties,
+  row: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "11px 14px",
+    borderRadius: 9,
+    border: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+  } satisfies CSSProperties,
+  rowMain: { minWidth: 0, flex: 1 } satisfies CSSProperties,
+  name: {
+    fontSize: 13.5,
+    fontWeight: 600,
+    fontFamily: "var(--font-mono, monospace)",
+    color: "var(--text-primary)",
+  } satisfies CSSProperties,
+  sub: { fontSize: 12, color: "var(--text-muted)", marginTop: 3 } satisfies CSSProperties,
+  rowActions: { display: "flex", gap: 4, alignItems: "center" } satisfies CSSProperties,
+  empty: {
+    fontSize: 13,
+    color: "var(--text-muted)",
+    padding: "22px 14px",
+    border: "1px dashed var(--border)",
+    borderRadius: 9,
+  } satisfies CSSProperties,
+  interval: { fontSize: 11.5, color: "var(--text-muted)", marginTop: 6 } satisfies CSSProperties,
+} as const;
