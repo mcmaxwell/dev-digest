@@ -3,7 +3,7 @@
  * `buildApp` + `app.inject`.
  *
  * Every case here comes from an acceptance criterion in
- * `docs/specs/L06-onboarding-tour.md`; the criterion is named on the test.
+ * `docs/specs/L05-onboarding-tour.md`; the criterion is named on the test.
  *
  * The clone is a `mkdtemp` fixture tree and `overrides.git` reads from it, so
  * "does this path exist at head_sha" is answered by a real filesystem without

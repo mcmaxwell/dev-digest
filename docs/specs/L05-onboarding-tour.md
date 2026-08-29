@@ -1,6 +1,6 @@
 # Spec: Onboarding Tour
 
-Spec ID: L06
+Spec ID: L05
 Status: draft
 Supersedes: none
 
@@ -22,7 +22,7 @@ Because DevDigest already computed it.
 The system prompt for this feature exists at `server/src/prompts/onboarding.system.md`, the `Onboarding` and `OnboardingSection` contracts exist in both copies of `contracts/knowledge.ts`, the `onboarding` table exists in the schema, the `onboarding` entry exists in `FEATURE_MODELS` with its own selectable provider and model, and the nav label "Onboarding Tour" exists in `client/messages/en/shell.json`.
 There is no module, no route and no page.
 
-L06 fills that seam: one page per imported repository that turns facts DevDigest already holds, plus one structured model call, into a five-part guided tour.
+This spec fills that seam: one page per imported repository that turns facts DevDigest already holds, plus one structured model call, into a five-part guided tour.
 
 ## Goals and non-goals
 
@@ -42,7 +42,7 @@ L06 fills that seam: one page per imported repository that turns facts DevDigest
   Repository facts already reach the review prompt through the repo map, which is deterministic.
 - **An in-product source-code viewer.**
   File links leave for GitHub.
-  L05's document viewer is Markdown-only and restricted to four documentation roots; extending it into a general code browser is a feature of its own size.
+  `L05-project-context`'s document viewer is Markdown-only and restricted to four documentation roots; extending it into a general code browser is a feature of its own size.
 - **Model-chosen sections.**
   The five sections are fixed in kind and order.
   A variable section set makes the page nav, the empty states and the tests unwritable.
@@ -50,7 +50,7 @@ L06 fills that seam: one page per imported repository that turns facts DevDigest
   The whole tour regenerates as one call, or not at all.
 - **Writing the tour into the repository.**
   `contracts/platform.ts` carries a `sync_to_folder` setting whose UI copy promises that "onboarding tours and digests are written to the repo folder"; it is wired to nothing and stays that way.
-  `server/clones/**` is do-not-touch, the `GitClient` port has no write method, and `sync()` fast-forwards over local changes - the same reasoning that removed document editing in L05.
+  `server/clones/**` is do-not-touch, the `GitClient` port has no write method, and `sync()` fast-forwards over local changes - the same reasoning that removed document editing in `L05-project-context`.
 - **Sharing a tour outside the product.**
   DevDigest is local-first, with no authentication, no public URLs and no sharing model.
   The mockup's "Share link" is cut; "Copy as Markdown" replaces it.
@@ -59,13 +59,13 @@ L06 fills that seam: one page per imported repository that turns facts DevDigest
   The reading path is therefore ordered by PageRank-derived rank alone.
   Deepening every clone to recover churn is a repository-wide cost decision, out of scope here.
 - **A sixth MCP tool.**
-  The five shipped tools are untouched, on the same reasoning as L05: tool descriptions are taxed in every editor session, and this is a human-facing surface.
+  The five shipped tools are untouched, on the same reasoning as `L05-project-context`: tool descriptions are taxed in every editor session, and this is a human-facing surface.
 - **Localisation of the tour.**
   English only.
   The `{{language}}` placeholder in the starter prompt is filled with English and no language control ships.
-- **Consuming L05's attachment set.**
+- **Consuming `L05-project-context`'s attachment set.**
   The tour reads its own fixed set of repository files.
-  It never reads the documents a user attached to an agent or a skill, which keeps L05's non-goal 6 intact and keeps the two features' token budgets separate.
+  It never reads the documents a user attached to an agent or a skill, which keeps `L05-project-context`'s non-goal 6 intact and keeps the two features' token budgets separate.
 - **Automatic generation or automatic regeneration.**
   Nothing spends a model call without the user asking.
 
@@ -95,7 +95,7 @@ L06 fills that seam: one page per imported repository that turns facts DevDigest
 | **`LLMProvider` port** | One structured request carrying the assembled facts and the section schema | `data`, `model`, `tokensIn`, `tokensOut`, `costUsd`, `attempts` | Failure, timeout or unrepairable output produces the deterministic skeleton |
 | **`platform/jobs`** | A generation request | Job lifecycle for a unit of work longer than a request | A generation whose job dies is recorded as failed, and the page offers Retry |
 | **`platform/prompt-log`** | Section name, source label, token count | Metadata-only log lines | No file content and no model output ever reach this path |
-| **`project-context`** (L05) | Nothing | Nothing | Named only to fence the two features apart: L05 owns Markdown documents and the review prompt's `## Project context`; L06 owns the tour and reads its own inputs |
+| **`project-context`** (`L05-project-context`) | Nothing | Nothing | Named only to fence the two features apart: `L05-project-context` owns Markdown documents and the review prompt's `## Project context`; this spec owns the tour and reads its own inputs |
 | **Client** | The stored tour and its provenance | The Onboarding Tour page, its five sections, its states and its cost record | Each state is enumerated under Design review and pinned by an acceptance criterion |
 
 ### Data crossing the boundaries
@@ -515,7 +515,7 @@ That makes this feature a full round trip across the trust boundary in both dire
 | Failure state | accepted | The model call is the least reliable step in the chain; the mockup has no failure design. Deterministic skeleton, status line, Retry - never a bare error |
 | Degraded-index state | accepted | Two of the five sections are graph-dependent and the graph may not exist. Per-section "computed without the import graph" marker plus one header status line |
 | Stale state | accepted | "last refreshed 2h ago" cannot tell you whether the code moved. Replaced by "generated at `abc1234` · N commits behind" |
-| "Open" had no destination | accepted | The product has no source viewer and L05's viewer is Markdown-only under four roots. Resolved as a GitHub blob permalink pinned to the generation sha, reusing `client/src/lib/github-urls.ts`, the same mechanism convention evidence already uses |
+| "Open" had no destination | accepted | The product has no source viewer and `L05-project-context`'s viewer is Markdown-only under four roots. Resolved as a GitHub blob permalink pinned to the generation sha, reusing `client/src/lib/github-urls.ts`, the same mechanism convention evidence already uses |
 | "Share link" removed | accepted | No authentication, no public URLs, local-first. A link that works only on the author's laptop is a broken promise in a header. Replaced by Copy as Markdown |
 | "12,450 files" defined | accepted | The only number DevDigest holds is `filesIndexed`; the header now says indexed files, and shows `filesSkipped` when it is non-zero |
 | "First tasks" never rendered in the mockup | accepted | A fifth of the feature and the most hallucination-prone section. Grounded rows citing path and line or an issue number, with a real empty state |
@@ -525,7 +525,7 @@ That makes this feature a full round trip across the trust boundary in both dire
 | Narrow viewport | accepted | "ON THIS PAGE" plus content does not fit below 900 px; the page nav collapses to a jump control |
 | Mermaid render failure at the client | accepted | The model writes the diagram and the client renders it; failure falls back to prose rather than a blank card |
 | Card collapse state | accepted | The chevrons in the mockup imply collapsible cards. Collapsible, all expanded by default, state not persisted |
-| Model-emitted HTML in section bodies | accepted | Bodies come from a model that read attacker-influenceable files; rendered through the same sanitising path L05 uses |
+| Model-emitted HTML in section bodies | accepted | Bodies come from a model that read attacker-influenceable files; rendered through the same sanitising path `L05-project-context` uses |
 | Model-emitted paths that do not exist | accepted | The starter prompt forbids inventing paths and nothing enforced it. Now verified against the clone before persisting |
 | Cost and call count on the page | accepted | `StructuredResult` already returns tokens, cost and attempts. Putting them on the page makes "exactly one call" falsifiable without grepping a log, matching the L01 cost-badge precedent |
 | Five sections fixed, and the starter's copy corrected | accepted | `client/messages/en/onboarding.json` promises a different five and `server/src/prompts/onboarding.system.md` asks for a `routes_and_apis` section. Both are updated by this feature; shipping either unchanged contradicts the page |
@@ -567,5 +567,5 @@ That makes this feature a full round trip across the trust boundary in both dire
    The spec is written assuming it stays dead and unreferenced.
    Its UI copy promises this feature writes tours into the repository folder, which is now explicitly false, so the copy is wrong until someone either implements it or removes it.
 7. **Should the tour be exposed to editor agents later?**
-   The spec is written assuming no MCP tool ships in L06.
+   The spec is written assuming no MCP tool ships in L05.
    If it later does, the tour becomes model-readable, and the "human-only" fence in the non-goals is the thing that would have to be re-argued.

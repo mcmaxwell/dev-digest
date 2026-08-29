@@ -3,7 +3,7 @@
 The AC to task to test to commit matrix, produced by `plan-verifier` over the whole chain before
 merge.
 
-Spec: `docs/specs/L06-onboarding-tour.md` (70 EARS criteria).
+Spec: `docs/specs/L05-onboarding-tour.md` (70 EARS criteria).
 Plan: `docs/plans/l06-onboarding-tour.md` (14 steps).
 Fixes: `docs/plans/l06-onboarding-tour.fixes-R1.md` (6 findings).
 

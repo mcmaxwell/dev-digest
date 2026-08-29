@@ -4,7 +4,7 @@ One tour per imported repository: five fixed sections built from facts DevDigest
 already holds plus **exactly one** structured model call, with every path the
 model emitted checked against the clone before anything is stored.
 
-Spec: `docs/specs/L06-onboarding-tour.md`.
+Spec: `docs/specs/L05-onboarding-tour.md`.
 
 ## The three properties this module exists to hold
 
