@@ -3,7 +3,7 @@ import { buildHunkRanges } from '../_shared/hunk-map.js';
 import type { CandidateSets } from './types.js';
 
 /**
- * L07 — the candidate set every model claim is grounded against. PURE: no I/O,
+ * L05 — the candidate set every model claim is grounded against. PURE: no I/O,
  * no Container, no drizzle.
  *
  * It exists because "no invented path, endpoint, job or line ever renders" is a

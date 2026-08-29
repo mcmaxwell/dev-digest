@@ -192,6 +192,20 @@ the root INSIGHTS.md. Format and quality gates:
   button does nothing. Caught by the client test, not by typecheck
   (`repos/[repoId]/context/.../DocViewer.tsx`).
 
+- [2026-08-26] A `var(--token, 42px)` read with NO definition anywhere is a
+  hard-coded value wearing a contract's clothes, and it reads as configurable
+  in review, so grep for the definition before believing the comment above it.
+  `components/diff-viewer/styles.ts` documented "a page with different chrome
+  sets its own offset" via `scrollMarginTop: var(--sticky-header-offset, 132px)`
+  and nothing in `client/` ever set that variable - every page silently got the
+  PR detail header's height of the day. The rule for sticky chrome: the
+  component that OWNS the sticky element publishes its measured height
+  (`PrDetailHeader` does this now with a `ResizeObserver` writing the var onto
+  `document.documentElement`, cleared on unmount), because the height is never
+  a constant - the title wraps, and merged/closed PRs grow a stale banner. A
+  shared component must never encode any page's pixel dimensions; the fallback
+  is for the no-chrome case only.
+
 ## Tool & Library Notes
 
 - [2026-08-10] When testing that untrusted text cannot inject into a generated
@@ -289,6 +303,19 @@ the root INSIGHTS.md. Format and quality gates:
   = false` right before calling `onDone()`), AND wrap the callback in
   `useCallback` at its source (`page.tsx`'s `handleRunDone`). Either alone is a
   partial fix; both together close it for good.
+
+- [2026-08-28] `client/src/vendor/shared` is a TYPES-ONLY copy in practice: all
+  88 existing imports of `@devdigest/shared` are `import type`, which the
+  compiler erases. The first RUNTIME value imported from the barrel breaks
+  `pnpm build` with a wall of `Module not found: Can't resolve
+  './contracts/brief.js'` - Next's webpack does not follow the NodeNext `.js`
+  specifiers tsc understands. `pnpm typecheck`, `pnpm lint` and `pnpm test` all
+  stay GREEN; only `pnpm build` (and therefore `./scripts/e2e.sh`, which builds)
+  catches it, and it surfaces as a 500 on unrelated routes. Cure that needs no
+  build-config change: put the runtime values in a contract file that imports
+  NOTHING (`contracts/eval-math.ts`) and deep import it -
+  `@devdigest/shared/contracts/eval-math` - so webpack resolves exactly one
+  module and never enters the barrel.
 
 ## Session Notes
 

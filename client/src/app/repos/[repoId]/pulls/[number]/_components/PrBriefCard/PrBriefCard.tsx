@@ -39,7 +39,7 @@ interface PrBriefCardProps {
 }
 
 /**
- * L07 — where to start reading this PR.
+ * L05 — where to start reading this PR.
  *
  * Sits BELOW the Intent + Blast grid rather than inside it: its review-focus
  * list is a full-width reading order, and the two cards above are the facts it

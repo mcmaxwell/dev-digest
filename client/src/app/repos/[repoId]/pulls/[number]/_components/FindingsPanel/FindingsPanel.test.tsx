@@ -8,6 +8,30 @@ vi.mock("../../../../../../../lib/hooks/reviews", () => ({
   useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+// The panel reads the PR's file patches to cut an eval case from a finding
+// (L06). Mocked rather than served from a real QueryClient so this file stays
+// what it is: a render test with no network and no provider tree.
+vi.mock("@/lib/hooks", () => ({
+  usePullDetail: () => ({
+    data: {
+      files: [
+        {
+          path: "src/config.ts",
+          additions: 1,
+          deletions: 0,
+          patch: '@@ -9,3 +9,4 @@\n const a = 1;\n+const key = "sk_live_x";\n const b = 2;',
+        },
+      ],
+    },
+  }),
+}));
+
+vi.mock("@/components/eval-case-modal", () => ({
+  EvalCaseModal: ({ initial }: { initial?: { name: string } }) => (
+    <div data-testid="eval-case-modal">{initial?.name}</div>
+  ),
+}));
+
 import { FindingsPanel } from "./FindingsPanel";
 
 afterEach(cleanup);
@@ -111,5 +135,48 @@ describe("FindingsPanel reveal", () => {
     renderPanel("not-in-this-panel");
     expect(screen.getByText("High confidence finding")).toBeInTheDocument();
     expect(screen.getByText("Low confidence finding")).toBeInTheDocument();
+  });
+});
+
+describe("turn a finding into an eval case (L06)", () => {
+  const decided = (patch: Partial<FindingRecord>): FindingRecord[] => [
+    { ...FINDINGS[0]!, ...patch },
+  ];
+
+  it("offers the button only when there is an agent to file the case against", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
+    expect(screen.queryByText("Turn into eval case")).not.toBeInTheDocument();
+
+    cleanup();
+    renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" agentId="a1" />);
+    expect(screen.getByText("Turn into eval case")).toBeInTheDocument();
+  });
+
+  it("derives must_find from an accepted finding", () => {
+    renderWithIntl(
+      <FindingsPanel
+        findings={decided({ accepted_at: "2026-08-27T10:00:00Z" })}
+        prId="pr1"
+        agentId="a1"
+      />,
+    );
+    fireEvent.click(screen.getByText("Turn into eval case"));
+    // The modal is stubbed; what matters is that a prefill was built at all,
+    // named after the finding it came from.
+    expect(screen.getByTestId("eval-case-modal")).toHaveTextContent("hardcoded-secret");
+  });
+
+  it("builds no case when the finding's file is not in the PR's files", () => {
+    renderWithIntl(
+      <FindingsPanel
+        findings={decided({ file: "src/absent.ts" })}
+        prId="pr1"
+        agentId="a1"
+      />,
+    );
+    fireEvent.click(screen.getByText("Turn into eval case"));
+    // No patch to cut a diff from, so nothing opens rather than a case whose
+    // diff would score zero whatever the agent does.
+    expect(screen.queryByTestId("eval-case-modal")).not.toBeInTheDocument();
   });
 });

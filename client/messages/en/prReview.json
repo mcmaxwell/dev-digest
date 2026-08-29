@@ -9,7 +9,11 @@
     "replyToAuthor": "Reply to author",
     "replyPlaceholder": "Reply to the author about this finding…",
     "sendReply": "Send reply",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "turnIntoEvalCase": "Turn into eval case",
+    "evalCaseFromAccepted": "Accepted → the agent must keep finding this",
+    "evalCaseFromDismissed": "Dismissed → the agent must stop flagging this",
+    "evalCaseUndecided": "Not decided yet → defaults to must_find; change the kind below"
   },
   "trifecta": {
     "lethal": "LETHAL TRIFECTA — ALL 3 PRESENT",

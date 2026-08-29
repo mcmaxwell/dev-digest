@@ -1,6 +1,6 @@
-# Plan: L07 PR Brief - grounded risks, ranked review focus, and an append-only brief history
+# Plan: L05 PR Brief - grounded risks, ranked review focus, and an append-only brief history
 
-Spec: `docs/specs/L07-pr-brief.md` (L07, approved)
+Spec: `docs/specs/L05-pr-brief.md` (L05, approved)
 Rationale: `docs/plans/l07-pr-brief.rationale.md`
 
 ## Understanding

@@ -40,7 +40,7 @@ import {
 import type { BriefTrace } from './types.js';
 
 /**
- * L07 — the PR Brief.
+ * L05 — the PR Brief.
  *
  * An APPLICATION-LAYER COMPOSER. It owns one use case and two tables, and every
  * fact it needs already exists somewhere else: `BlastService` for reach and the

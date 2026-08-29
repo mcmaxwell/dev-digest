@@ -3,12 +3,15 @@
  * their arguments — no DB / network / `this`).
  */
 import type { Finding } from '@devdigest/shared';
-import { wrapUntrusted } from '../../platform/prompt.js';
 import type { FindingRow, PullRow, ReviewRow } from './repository.js';
 
 // reduceReviews + sliceDiff live in @devdigest/reviewer-core (pure engine logic
 // shared with the CI runner); re-exported here for backward-compatible imports.
 export { reduceReviews, sliceDiff } from '@devdigest/reviewer-core';
+
+// skillToBlock moved to modules/_shared/skills.ts when `eval` became a second
+// consumer; re-exported so existing imports from this file keep working.
+export { skillToBlock } from '../_shared/skills.js';
 
 export interface ReviewDtoFinding extends Finding {
   review_id: string;
@@ -87,24 +90,6 @@ export function reviewToDto(
  * quiet — the deterministic filter downstream never drops a CRITICAL, but the
  * model must not learn the habit of hiding defects behind the label either.
  */
-/**
- * One linked skill rendered as a prompt block.
- *
- * The rule that only a `manual` skill is trusted (everything else is somebody
- * else's text and gets delimiter-wrapped) has TWO callers - the PR review run
- * and the PR-less diff review - so it lives here, once. Loading and logging stay
- * with each caller; this is only the rendering rule.
- */
-export function skillToBlock(skill: {
-  name: string;
-  body: string;
-  source: string;
-}): string {
-  const body =
-    skill.source === 'manual' ? skill.body : wrapUntrusted(`skill:${skill.name}`, skill.body);
-  return `### Skill: ${skill.name}\n${body}`;
-}
-
 export function taskLine(pull: PullRow): string {
   return (
     `Review pull request #${pull.number} "${pull.title}" by ${pull.author}. ` +

@@ -1,0 +1,69 @@
+{
+  "skill_name": "dependency-audit",
+  "skill_path": ".claude/skills/dependency-audit",
+  "iteration": 4,
+  "note": "Behavioural cases for the AUDIT itself. Trigger accuracy lives in trigger.json and is a separate lane. Each case is a small package tree with defects the skill should name and adjacent facts it should NOT call defects - a skill that flags everything scores the same as one that flags nothing, so every case carries traps.",
+  "evals": [
+    {
+      "id": 10,
+      "name": "unused-and-phantom-deps",
+      "type": "audit",
+      "fixture": "fixtures/case-a-unused-and-phantom",
+      "prompt": "Audit the dependencies of the package in .claude/skills/dependency-audit/evals/fixtures/case-a-unused-and-phantom/ - it is a single service, paths mirror a normal repo. Tell me what is wrong and what to fix first.",
+      "planted": [
+        "A1 lodash is declared as a dependency and imported nowhere in the package",
+        "A2 nanoid is imported from src/index.ts but is not declared in package.json - it resolves today only by hoisting"
+      ],
+      "traps": [
+        "pino is imported from src/logger.ts, not from the entry point - declared and used, must be cleared",
+        "dayjs is used in src/index.ts AND referenced from config/ - declared and used, must be cleared",
+        "@types/node is a devDependency with no import statement anywhere - that is how @types packages work and is not a finding"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "two-lockfiles-one-package",
+      "type": "audit",
+      "fixture": "fixtures/case-b-two-lockfiles",
+      "prompt": "Audit the dependency hygiene of the two packages in .claude/skills/dependency-audit/evals/fixtures/case-b-two-lockfiles/. Anything I should fix before this goes to CI?",
+      "planted": [
+        "B1 web-portal commits BOTH package-lock.json and pnpm-lock.yaml, so which one CI honours depends on which command runs",
+        "B2 web-portal declares packageManager pnpm@10.14.0 while also carrying an npm lockfile - the manifest and the lockfile disagree"
+      ],
+      "traps": [
+        "cli-tool has exactly one lockfile (package-lock.json) and no packageManager field - a package on npm is not a defect",
+        "react and react-dom are both declared in web-portal - that is the correct pairing, not a duplicate"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "documented-drift-vs-real-drift",
+      "type": "audit",
+      "fixture": "fixtures/case-c-version-drift",
+      "prompt": "Three packages in .claude/skills/dependency-audit/evals/fixtures/case-c-version-drift/. Do we have a version drift problem? Read whatever is in the fixture before you answer.",
+      "planted": [
+        "C1 drizzle-orm drifts across a minor range between svc-api (^0.38.3) and svc-worker (^0.31.0) with nothing documenting it",
+        "C2 typescript drifts between svc-api (^5.7.2) and svc-worker (^5.4.5) with nothing documenting it"
+      ],
+      "traps": [
+        "zod 3 vs zod 4 IS a drift on paper, but AGENTS.md states it is deliberate and says why - a skill that flags it has not read the repo's own rules",
+        "tooling declares no drizzle-orm at all - absence is not drift"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "devdependency-reaches-shipped-code",
+      "type": "audit",
+      "fixture": "fixtures/case-d-devdep-ships",
+      "prompt": "Audit .claude/skills/dependency-audit/evals/fixtures/case-d-devdep-ships/ - it is a package we publish. What is wrong with its dependency set?",
+      "planted": [
+        "D1 faker is a devDependency but is imported from src/sample.ts, which is compiled into dist/ and shipped - the install breaks for consumers",
+        "D2 the package ships (private:false, files:[dist]) so the dev/prod split actually matters here, unlike a private service"
+      ],
+      "traps": [
+        "vitest is a devDependency imported only from test/ - correct, and must not be reported",
+        "pino is a real dependency imported from src/ - correct placement"
+      ]
+    }
+  ]
+}

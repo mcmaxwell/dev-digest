@@ -1,4 +1,4 @@
-/* hooks/brief.ts - React Query hooks for the L07 PR Brief card.
+/* hooks/brief.ts - React Query hooks for the L05 PR Brief card.
    Read the stored brief, or ask for a new one. */
 "use client";
 

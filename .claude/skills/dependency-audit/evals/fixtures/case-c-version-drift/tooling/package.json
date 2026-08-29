@@ -1,0 +1,6 @@
+{
+  "name": "@acme/tooling",
+  "private": true,
+  "dependencies": { "zod": "^4.0.5" },
+  "devDependencies": { "typescript": "^5.7.2" }
+}

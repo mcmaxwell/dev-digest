@@ -148,7 +148,7 @@ function IntentBody({
           <ScopeColumn label={t("intent.outOfScope")} items={intent.out_of_scope} />
         </div>
 
-        {/* The risk-area chips used to render here. L07 absorbed them into the
+        {/* The risk-area chips used to render here. L05 absorbed them into the
             PR Brief card, whose risks each name a file the reader can click —
             a chip that says "Auth surface touched" and nothing else still leaves
             a reviewer searching nine files for the auth surface. The Overview

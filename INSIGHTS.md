@@ -183,7 +183,7 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## Session Notes
 
-- [2026-08-14] L07 PR Brief implemented end-to-end on `feat/l07-pr-brief`:
+- [2026-08-14] L05 PR Brief implemented end-to-end on `feat/l07-pr-brief`:
   `contracts/pr-brief.ts` (both vendored copies, byte-identical) → additive
   migration `0019_confused_micromacro` (`pr_brief` columns + append-only
   `pr_brief_history`) → `modules/_shared/hunk-map.ts` (moved out of
@@ -191,7 +191,7 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   (candidates/ground/history/prompt pure files, repository, service, two routes)
   → `lib/hooks/brief.ts` + `PrBriefCard`, with the intent card's risk chips and
   the blast card's impact summary both stopping rendering (neither deleted).
-  Spec: `docs/specs/L07-pr-brief.md`, plan: `docs/plans/l07-pr-brief.md`.
+  Spec: `docs/specs/L05-pr-brief.md`, plan: `docs/plans/l07-pr-brief.md`.
 
 - [2026-08-13] L05 project context implemented end-to-end on
   `feat/l05-project-context`: `contracts/project-context.ts` +

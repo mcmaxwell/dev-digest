@@ -1,10 +1,10 @@
 # Plan: L06 Onboarding Tour - one generated, grounded, five-section tour per imported repository
 
-Spec: `docs/specs/L06-onboarding-tour.md` (Spec ID L06, 70 EARS criteria, AC-1 … AC-70).
+Spec: `docs/specs/L05-onboarding-tour.md` (Spec ID L05, 70 EARS criteria, AC-1 … AC-70).
 
 ## Understanding
 
-Build the feature `docs/specs/L06-onboarding-tour.md` specifies: a repository-scoped page that turns facts DevDigest already holds (`repo-intel` rank and dependency chains, the clone's manifests and task files, `TODO`/`FIXME` markers, `good first issue` issues) plus **exactly one** structured model call into five fixed sections, verifies every path the model emitted against the clone at the generation commit, persists the result with its provenance and its cost, and never renders an error page.
+Build the feature `docs/specs/L05-onboarding-tour.md` specifies: a repository-scoped page that turns facts DevDigest already holds (`repo-intel` rank and dependency chains, the clone's manifests and task files, `TODO`/`FIXME` markers, `good first issue` issues) plus **exactly one** structured model call into five fixed sections, verifies every path the model emitted against the clone at the generation commit, persists the result with its provenance and its cost, and never renders an error page.
 
 The seam is half-built and unfed: the system prompt, the `Onboarding` contracts, the `onboarding` table, the `onboarding` `FEATURE_MODELS` entry, `client/messages/en/onboarding.json`, the `onboarding-tour` nav label and the `repo-intel` T3 reads (`getTopFilesByRank`, `getCriticalPaths`, zero callers) all exist.
 There is no module, no route, no page, and both the prompt and the client copy describe a **different** five sections from the five this spec fixes.

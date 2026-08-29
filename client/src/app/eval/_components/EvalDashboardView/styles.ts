@@ -1,0 +1,58 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for EvalDashboardView. */
+export const s = {
+  wrap: { padding: "28px 32px", maxWidth: 1180 } satisfies CSSProperties,
+  head: { display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 22 } satisfies CSSProperties,
+  h1: { fontSize: 26, fontWeight: 700, letterSpacing: "-0.01em" } satisfies CSSProperties,
+  sub: { fontSize: 13.5, color: "var(--text-muted)", marginTop: 6 } satisfies CSSProperties,
+  sectionLabel: {
+    fontSize: 11.5,
+    fontWeight: 700,
+    letterSpacing: "0.06em",
+    color: "var(--text-muted)",
+    margin: "22px 0 10px",
+  } satisfies CSSProperties,
+  list: { display: "flex", flexDirection: "column", gap: 10, listStyle: "none", margin: 0, padding: 0 } satisfies CSSProperties,
+  card: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    padding: "16px 18px",
+    borderRadius: 11,
+    border: "1px solid var(--border)",
+    background: "var(--bg-elevated)",
+    textDecoration: "none",
+    color: "inherit",
+  } satisfies CSSProperties,
+  agentMain: { minWidth: 0, flex: 1 } satisfies CSSProperties,
+  agentName: { fontSize: 15, fontWeight: 700 } satisfies CSSProperties,
+  agentSub: { fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 } satisfies CSSProperties,
+  metric: { textAlign: "center", minWidth: 84 } satisfies CSSProperties,
+  metricLabel: {
+    fontSize: 10.5,
+    fontWeight: 700,
+    letterSpacing: "0.06em",
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  metricValue: (color: string): CSSProperties => ({ fontSize: 22, fontWeight: 700, color }),
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: 13,
+    border: "1px solid var(--border)",
+    borderRadius: 11,
+    overflow: "hidden",
+  } satisfies CSSProperties,
+  th: {
+    textAlign: "left",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.05em",
+    color: "var(--text-muted)",
+    padding: "10px 14px",
+    background: "var(--bg-surface)",
+  } satisfies CSSProperties,
+  td: { padding: "11px 14px", borderTop: "1px solid var(--border)" } satisfies CSSProperties,
+  mono: { fontFamily: "var(--font-mono, monospace)", fontSize: 12.5 } satisfies CSSProperties,
+} as const;

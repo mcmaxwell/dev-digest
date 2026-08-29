@@ -566,8 +566,73 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
     dev stack is down: remove only the anonymous ones —
     `docker volume ls --format '{{.Name}}' | grep -E '^[0-9a-f]{64}$' | xargs -n1 docker volume rm`.
     Also `docker rm -f` any leftover `testcontainers-ryuk-*` container.
+  - [2026-08-26] Third signature of the same disk exhaustion, and the one that
+    reads least like a disk problem: `pnpm test` reports 14 test FILES failed
+    while every test inside them shows as SKIPPED, with
+    `(HTTP code 409) container <id> is not running` and one
+    `PostgresError: could not extend file "base/16384/2610": No space left on
+    device` buried among them. Files whose tests all skipped cannot fail on
+    assertions - a failing file with a 100% skipped test count is always
+    infrastructure. `docker system df` is the one-line check; that run showed
+    578MB of BUILD CACHE, which nothing else in this file mentions and which
+    `docker builder prune -f` reclaims with no risk to any volume, named or
+    anonymous. Prefer it over every volume-touching cure above: after it the
+    full suite went 14 failed -> 59 files / 634 tests green with no other change.
+
+- [2026-08-28] The seeded agents were `version: 1` with NO `agent_versions` row
+  behind them. `AgentsRepository.insert` writes that snapshot, but `seed.ts`
+  inserts agent rows directly with the drizzle builder and never did - so
+  anything reading an agent's config AS IT WAS silently degraded on exactly the
+  five agents every fresh machine has. L06's run comparison ("old prompt vs new
+  prompt") reads the snapshot for the version a run executed, and got null. The
+  seed now writes the v1 snapshot after the skill links, so the pinned `skills`
+  array matches what the agent actually has. Lesson: when a repository method
+  maintains an invariant (`insert` also snapshots), a seed that bypasses it
+  bypasses the invariant too - the tables agree, the history does not.
+
+- [2026-08-28] An eval expectation that sits outside its own diff can never be
+  matched: the citation-grounding gate drops any finding citing it, so the case
+  scores zero forever and reads as an agent failure rather than the authoring
+  mistake it is. `test/eval-fixtures.test.ts` asserts this by pushing a probe
+  finding at each seeded expectation through the REAL `groundFindings`, not by
+  re-deriving a line index - the property worth testing is "a correct finding
+  here survives the gate", and only the gate can answer that.
+
+- [2026-08-28] `buildLineIndex` is exported from `reviewer-core/src/grounding.ts`
+  but NOT from its `src/index.ts`, so it is not public API even though
+  `groundFindings`/`groundingSummary` next to it are. The server's
+  `platform/grounding.ts` re-export shim carries only the public three. Check
+  `reviewer-core/src/index.ts`, not the defining file, before importing from the
+  engine.
+
+- [2026-08-29] MEASURED, on the L06 eval harness: running one unchanged prompt
+  twice over the twelve-case seeded set (`gpt-4o-mini`) drifts recall by 8.3pt
+  and precision by 5.8pt at `repeats: 3`, and 4.2pt on precision at
+  `repeats: 1`. A sub-10-point ratio move between two runs of THIS set is
+  therefore not evidence of anything. Two non-obvious consequences. (1) The
+  ratios are noisier than the binary verdicts: averaging three executions per
+  case did NOT shrink the ratio drift, but it took verdict flips from 1/12 to
+  0/12, because one spurious finding moves precision without failing any case -
+  so a metrics UI should lead with the pass rate and demote the ratios to
+  diagnosis. (2) Raising `repeats` therefore buys verdict stability, not ratio
+  resolution; to resolve a smaller effect you add CASES, not repeats.
+  Calibration: a deliberately broadened prompt moved precision -14.4pt while
+  holding recall flat, which is both outside the drift band and a shape noise
+  does not produce - that is what a detectable regression looks like here, and
+  a +8pt "improvement" is not one.
 
 ## Session Notes
+
+- [2026-08-28] L06 Eval pipeline shipped server-side: `modules/eval`
+  (routes/service/repository + a PURE `scoring.ts`), `eval_suite_runs` +
+  `eval_runs.suite_run_id` (migration 0020, additive), twelve seeded gold-set
+  cases in `db/seed-eval-cases.ts`, and `verify:l06`. The central claim - that
+  scoring makes no model call - is enforced two ways rather than asserted once:
+  a new `eval-scoring-is-pure` depcruise rule forbids `scoring.ts` from
+  importing `platform/`, `adapters/`, `db/` or the review engine, and the
+  integration test counts `completeStructured` calls per case off
+  `MockLLMProvider.calls`. The rule was watched go red (temporarily importing
+  `Container`) before being trusted.
 
 - [2026-08-10] L04 Blast Radius shipped server-side: `modules/blast`
   (status.ts + build.ts are pure and carry the whole derivation table),

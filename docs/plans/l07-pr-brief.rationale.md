@@ -1,7 +1,7 @@
-# Rationale: L07 PR Brief - grounded risks, ranked review focus, and an append-only brief history
+# Rationale: L05 PR Brief - grounded risks, ranked review focus, and an append-only brief history
 
 Contract: `docs/plans/l07-pr-brief.md`
-Spec: `docs/specs/L07-pr-brief.md`
+Spec: `docs/specs/L05-pr-brief.md`
 
 The implementer never opens this file. It exists for humans and for `plan-verifier`.
 

@@ -4,7 +4,7 @@ import type { BriefDraft } from './schemas.js';
 import type { CandidateSets } from './types.js';
 
 /**
- * L07 — the rejection gate. PURE: a function of the draft and the candidate set.
+ * L05 — the rejection gate. PURE: a function of the draft and the candidate set.
  *
  * The model is an UNTRUSTED source here, because it was fed untrusted text. That
  * is why this is a gate and not a warning: a hallucinated path rendered as a

@@ -173,6 +173,7 @@ export function ReviewRunAccordion({
             repoFullName={repoFullName}
             headSha={headSha}
             focusFindingId={ownsFocused ? focusFindingId : null}
+            agentId={review.agent_id}
           />
         </div>
       )}

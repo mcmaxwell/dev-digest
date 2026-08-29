@@ -1,0 +1,6 @@
+{
+  "name": "@acme/cli-tool",
+  "private": true,
+  "scripts": { "start": "node bin/cli.js" },
+  "dependencies": { "commander": "^12.1.0" }
+}

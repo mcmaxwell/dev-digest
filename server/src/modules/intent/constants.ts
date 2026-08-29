@@ -18,7 +18,7 @@ export const INTENT_LLM_MAX_RETRIES = 1;
 // --- File map ---------------------------------------------------------------
 //
 // `buildFileMap` and its two caps (`MAX_FILE_MAP_FILES`, `MAX_HUNKS_PER_FILE`)
-// moved to `modules/_shared/hunk-map.ts` when L07's brief needed the same map
+// moved to `modules/_shared/hunk-map.ts` when L05's brief needed the same map
 // and the same `@@` ranges: `no-cross-module-imports` does not exempt a
 // sibling's `hunk-map.ts`, and a second copy would let the rendered map and the
 // grounding ranges drift.
