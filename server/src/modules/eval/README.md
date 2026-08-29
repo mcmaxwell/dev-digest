@@ -59,8 +59,31 @@ unchanged, and reports a case present in only one of the two runs rather than
 dropping it — silently comparing two different sets is how a harness starts
 lying. The pass rate is rendered with a Wilson 95% interval for the same reason.
 
-`repeats` (1–3) runs each case K times, averages the ratios and takes the
+`repeats` (1-3) runs each case K times, averages the ratios and takes the
 majority verdict. Off by default: it multiplies the bill in direct proportion.
+
+### The measured noise floor
+
+Run one prompt twice against the seeded twelve-case set on `gpt-4o-mini`,
+changing nothing:
+
+| | `repeats: 1` | `repeats: 3` |
+| --- | --- | --- |
+| recall drift | 0.0 pt | 8.3 pt |
+| precision drift | 4.2 pt | 5.8 pt |
+| citation drift | 9.1 pt | 0.7 pt |
+| verdicts flipped | 1 of 12 | 0 of 12 |
+
+Read a comparison against that band, not against zero:
+
+- **A ratio move under ~10 points on this set is not evidence.** It is inside
+  what the model does on its own.
+- **The pass rate is the sturdier number.** Averaging three executions did not
+  shrink the ratio drift but it did stop verdicts flipping, because one
+  spurious finding moves precision without failing any case. That is why the
+  tiles lead with `traces_passed` and treat the ratios as diagnosis.
+- **Raising `repeats` buys less than it looks like it should.** It stabilises
+  verdicts, not ratios. To resolve a smaller effect, add cases.
 
 ## Things that will bite
 

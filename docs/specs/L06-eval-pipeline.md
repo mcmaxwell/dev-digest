@@ -549,6 +549,22 @@ Observed at: the case list and run-history responses for a workspace that owns n
 - **Statistical resolution is stated, not implied.**
   An eight-case set resolves nothing finer than 12.5 points of pass rate, so an aggregate delta between two runs cannot on its own be read as signal.
   This is why the compare view is paired and per-case (AC-53) and why the pass rate carries a 95% Wilson interval (AC-56).
+
+  **Amendment, 2026-08-29 - the resolution above is now measured, not reasoned.**
+  Observed on the seeded twelve-case set against `gpt-4o-mini`, running one prompt twice and changing nothing else:
+
+  | | same prompt, `repeats: 1` | same prompt, `repeats: 3` |
+  | --- | --- | --- |
+  | recall drift | 0.0 pt | 8.3 pt |
+  | precision drift | 4.2 pt | 5.8 pt |
+  | citation drift | 9.1 pt | 0.7 pt |
+  | cases whose verdict flipped | 1 of 12 | 0 of 12 |
+
+  Two consequences the spec did not previously state.
+
+  First, **the ratios are noisier than the verdicts.** Averaging three executions per case did not shrink the ratio drift, but it did stabilise the pass rate: zero cases flipped. A single spurious finding moves precision without changing any case's verdict, so the binary `traces_passed` is the more trustworthy signal and the three ratios are the diagnosis underneath it. That is the ordering the metric tiles already use, and this measurement is the reason it is correct rather than merely tidy.
+
+  Second, **a sub-10-point ratio move on a set this size is not evidence.** A prompt edit measured at `repeats: 3` moved recall +12.5 pt and precision +8.3 pt - roughly 1.5x the same-prompt drift, which is not enough to attribute to the prompt. The deliberately broadened prompt moved precision -14.4 pt while holding recall flat, which is both outside the drift band and a signature noise does not produce. So the harness as built resolves a regression of that size and does not resolve an improvement of the size tested here; closing that gap needs more cases, not more repeats.
 - **The dashboard's first paint does not wait on a model.**
   Every number on `/eval` and on an agent's eval page comes from stored runs, so both render with no LLM call.
 - **Accessibility.**

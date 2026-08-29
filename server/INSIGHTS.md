@@ -593,6 +593,22 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   `reviewer-core/src/index.ts`, not the defining file, before importing from the
   engine.
 
+- [2026-08-29] MEASURED, on the L06 eval harness: running one unchanged prompt
+  twice over the twelve-case seeded set (`gpt-4o-mini`) drifts recall by 8.3pt
+  and precision by 5.8pt at `repeats: 3`, and 4.2pt on precision at
+  `repeats: 1`. A sub-10-point ratio move between two runs of THIS set is
+  therefore not evidence of anything. Two non-obvious consequences. (1) The
+  ratios are noisier than the binary verdicts: averaging three executions per
+  case did NOT shrink the ratio drift, but it took verdict flips from 1/12 to
+  0/12, because one spurious finding moves precision without failing any case -
+  so a metrics UI should lead with the pass rate and demote the ratios to
+  diagnosis. (2) Raising `repeats` therefore buys verdict stability, not ratio
+  resolution; to resolve a smaller effect you add CASES, not repeats.
+  Calibration: a deliberately broadened prompt moved precision -14.4pt while
+  holding recall flat, which is both outside the drift band and a shape noise
+  does not produce - that is what a detectable regression looks like here, and
+  a +8pt "improvement" is not one.
+
 ## Session Notes
 
 - [2026-08-28] L06 Eval pipeline shipped server-side: `modules/eval`
