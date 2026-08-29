@@ -18,7 +18,7 @@ const useResyncRepoIntel = vi.hoisted(() => vi.fn());
 
 // The mocks FORWARD prId, so a component that stopped passing it (which would
 // silently disable the query via `enabled: !!prId`) fails here.
-// `useBlastSummary` is deliberately NOT mocked: L07 moved the impact summary
+// `useBlastSummary` is deliberately NOT mocked: L05 moved the impact summary
 // into the PR Brief card, and this card no longer calls it. A mock for a hook
 // the component does not use would pass whether or not the call came back.
 vi.mock("@/lib/hooks/blast", () => ({

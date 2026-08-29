@@ -1,6 +1,6 @@
 # Spec: PR Brief - grounded risks, review focus, and brief history
 
-Spec ID: L07
+Spec ID: L05
 Status: approved
 Supersedes: none
 
@@ -180,7 +180,7 @@ Both physical copies of `@devdigest/shared` move together.
 
 **AC-20** The system shall render exactly two model-written prose blocks on the Overview tab, the intent quote owned by L03 and the brief's own prose, observed as the tab containing the intent summary and the brief's `what`/`why` and no third block of generated prose.
 
-Amended 2026-08-14, during the L07 run, after `plan-verifier` found the original wording unsatisfiable. It read "exactly one model-written paragraph ... across all its cards", which contradicts this spec's own decision to keep L03's intent quote - that quote is model-written too. The decision behind the Q8 absorption was that three prose voices become one voice plus the intent quote, not zero. The count was wrong, not the design. The absorbed block is the blast impact summary, and its removal is AC-32.
+Amended 2026-08-14, during the run that shipped it (then numbered L07), after `plan-verifier` found the original wording unsatisfiable. It read "exactly one model-written paragraph ... across all its cards", which contradicts this spec's own decision to keep L03's intent quote - that quote is model-written too. The decision behind the Q8 absorption was that three prose voices become one voice plus the intent quote, not zero. The count was wrong, not the design. The absorbed block is the blast impact summary, and its removal is AC-32.
 
 **AC-21** The system shall constrain the brief's prose to at most three sentences per field, observed as the stored `what` and `why` each containing at most three sentence-terminating marks.
 

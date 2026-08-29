@@ -14,7 +14,7 @@ import {
 import type { AssembledBriefPrompt, BriefPromptSection } from './types.js';
 
 /**
- * L07 — PURE prompt assembly for the brief's ONE model call. A function of the
+ * L05 — PURE prompt assembly for the brief's ONE model call. A function of the
  * facts it is handed and the token counter it is given; it fetches nothing, takes
  * no `Container`, and never calls the model.
  *

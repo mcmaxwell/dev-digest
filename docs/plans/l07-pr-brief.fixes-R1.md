@@ -12,7 +12,7 @@ Triage decisions carried into this round, for the final report:
 - **AC-20** - not fixed in code. The criterion was amended instead, by decision at
   the gate: the original wording ("exactly one model-written paragraph ... across
   all its cards") contradicted the same spec's decision to keep L03's intent quote,
-  which is also model-written. `docs/specs/L07-pr-brief.md:181` now reads "exactly
+  which is also model-written. `docs/specs/L05-pr-brief.md:181` now reads "exactly
   two model-written prose blocks ... and no third", with the amendment note beneath
   it. No code change follows from this. Do not touch `IntentCard.tsx`.
 - **AC-23** - accepted. Reason recorded: asserting that the persisted `what`

@@ -165,7 +165,7 @@ function BlastBody({
           <BlastGraph blast={data.blast} />
         )}
 
-        {/* The impact summary used to render here. L07 absorbed it into the PR
+        {/* The impact summary used to render here. L05 absorbed it into the PR
             Brief card, so the Overview tab carries exactly one paragraph of
             generated prose. `SummaryBlock.tsx`, `useBlastSummary`, the
             `summary.*` strings, `POST /pulls/:id/blast/summary` and

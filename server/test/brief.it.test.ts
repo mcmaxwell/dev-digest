@@ -1,5 +1,5 @@
 /**
- * L07 PR Brief — generation, grounding, degradation, tenancy and the two
+ * L05 PR Brief — generation, grounding, degradation, tenancy and the two
  * histories, end to end through `buildApp` + `app.inject`.
  *
  * The derivation tables are covered hermetically in `candidates.test.ts`,

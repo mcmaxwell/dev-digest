@@ -6,7 +6,7 @@ import { IdParams } from '../_shared/schemas.js';
 import { BriefService } from './service.js';
 
 /**
- * brief module (L07).
+ * brief module (L05).
  *
  *   GET  /pulls/:id/brief  -> { brief }  (null when the PR has none yet)
  *   POST /pulls/:id/brief  -> { brief }  (one LLM call)

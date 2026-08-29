@@ -3,7 +3,7 @@ import { MAX_PRIOR_PRS } from './constants.js';
 import type { PriorPullInput } from './types.js';
 
 /**
- * L07 — prior pull requests of the same repository whose changed files overlap
+ * L05 — prior pull requests of the same repository whose changed files overlap
  * this one's. PURE, and DETERMINISTIC: no model is involved, so this half of the
  * brief is trustworthy even when the model call fails entirely.
  *

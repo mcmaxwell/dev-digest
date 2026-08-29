@@ -1,10 +1,10 @@
-# modules/brief — the PR Brief (L07)
+# modules/brief — the PR Brief (L05)
 
 One brief per pull request: a single model-written paragraph, a ranked
 "read these first" list, grounded risks that each name a real file, and an
 append-only record of how the brief read at each commit that had one.
 
-Spec: `docs/specs/L07-pr-brief.md`. Plan: `docs/plans/l07-pr-brief.md`.
+Spec: `docs/specs/L05-pr-brief.md`. Plan: `docs/plans/l07-pr-brief.md`.
 
 This module is an **application-layer composer**.
 Every fact it uses already exists somewhere else — `BlastService` for reach and

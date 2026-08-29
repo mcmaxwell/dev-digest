@@ -1,7 +1,7 @@
 /**
  * DiffViewer — the plain (non-smart) Files-changed list.
  *
- * The one behaviour worth a test of its own is the `?file=` jump L07 added: a
+ * The one behaviour worth a test of its own is the `?file=` jump L05 added: a
  * review-focus click on the Overview tab must land on that file expanded,
  * whatever the size heuristic would have decided, and in EITHER diff order.
  * The smart order's half of the same property lives in

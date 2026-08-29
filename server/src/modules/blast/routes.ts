@@ -24,7 +24,7 @@ import { BlastService } from './service.js';
  * seed a complete cache entry with `setQueryData` instead of re-fetching.
  *
  * DEPRECATED: `POST /pulls/:id/blast/summary` is superseded by
- * `POST /pulls/:id/brief` (L07), which absorbs the impact summary into the PR
+ * `POST /pulls/:id/brief` (L05), which absorbs the impact summary into the PR
  * brief. It is still registered and still functional, and it still writes
  * `pr_blast_summary`; it is simply no longer called by the client. Removing a
  * working route in the same change that redirects its only caller would make

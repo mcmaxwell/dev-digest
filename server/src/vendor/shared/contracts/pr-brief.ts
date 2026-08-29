@@ -3,7 +3,7 @@ import { PrHistoryItem, Risk, RiskSeverity } from './brief.js';
 import { BlastIndexState } from './blast.js';
 
 /**
- * L07 - the PR Brief: grounded risks, a ranked review focus, and an append-only
+ * L05 - the PR Brief: grounded risks, a ranked review focus, and an append-only
  * brief history.
  *
  * A NEW file rather than an edit to `brief.ts`, per the barrel rule in

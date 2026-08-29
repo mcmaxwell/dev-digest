@@ -1,5 +1,5 @@
 /**
- * PrBriefCard (L07) — where to start reading this PR.
+ * PrBriefCard (L05) — where to start reading this PR.
  *
  * Four states, plus the four things a reader could be misled by if they were
  * wrong: a stale brief must show its contents rather than an empty state, a

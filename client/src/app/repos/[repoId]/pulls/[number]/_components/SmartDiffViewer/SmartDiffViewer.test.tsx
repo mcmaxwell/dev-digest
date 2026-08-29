@@ -169,7 +169,7 @@ describe("SmartDiffViewer", () => {
   });
 
   it("opens the ?file= target even when its role would leave it collapsed", async () => {
-    // How a review-focus click on the Overview tab lands here (L07): the
+    // How a review-focus click on the Overview tab lands here (L05): the
     // lock file is boilerplate and closed by default, and naming it in the URL
     // must be enough to open it — otherwise the jump silently does nothing.
     renderViewer({ focusFile: "package-lock.json" });

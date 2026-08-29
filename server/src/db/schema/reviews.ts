@@ -133,7 +133,7 @@ export const prBlastSummary = pgTable('pr_blast_summary', {
 });
 
 /**
- * L07 — the PR Brief of one PR (owned by `modules/brief`).
+ * L05 — the PR Brief of one PR (owned by `modules/brief`).
  *
  * `json` is the payload column and stays exactly as it was: the whole
  * `BriefView` envelope, replaced wholesale on every generation. The columns
@@ -174,7 +174,7 @@ export const prBrief = pgTable('pr_brief', {
 });
 
 /**
- * L07 — this PR's own per-generation timeline (owned by `modules/brief`).
+ * L05 — this PR's own per-generation timeline (owned by `modules/brief`).
  *
  * APPEND-ONLY. `BriefRepository` exposes no update and no delete for this
  * table: the guarantee is the absence of the code path, not discipline. One row
