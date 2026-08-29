@@ -192,6 +192,20 @@ the root INSIGHTS.md. Format and quality gates:
   button does nothing. Caught by the client test, not by typecheck
   (`repos/[repoId]/context/.../DocViewer.tsx`).
 
+- [2026-08-26] A `var(--token, 42px)` read with NO definition anywhere is a
+  hard-coded value wearing a contract's clothes, and it reads as configurable
+  in review, so grep for the definition before believing the comment above it.
+  `components/diff-viewer/styles.ts` documented "a page with different chrome
+  sets its own offset" via `scrollMarginTop: var(--sticky-header-offset, 132px)`
+  and nothing in `client/` ever set that variable - every page silently got the
+  PR detail header's height of the day. The rule for sticky chrome: the
+  component that OWNS the sticky element publishes its measured height
+  (`PrDetailHeader` does this now with a `ResizeObserver` writing the var onto
+  `document.documentElement`, cleared on unmount), because the height is never
+  a constant - the title wraps, and merged/closed PRs grow a stale banner. A
+  shared component must never encode any page's pixel dimensions; the fallback
+  is for the no-chrome case only.
+
 ## Tool & Library Notes
 
 - [2026-08-10] When testing that untrusted text cannot inject into a generated

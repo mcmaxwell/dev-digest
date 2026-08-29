@@ -566,6 +566,18 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
     dev stack is down: remove only the anonymous ones —
     `docker volume ls --format '{{.Name}}' | grep -E '^[0-9a-f]{64}$' | xargs -n1 docker volume rm`.
     Also `docker rm -f` any leftover `testcontainers-ryuk-*` container.
+  - [2026-08-26] Third signature of the same disk exhaustion, and the one that
+    reads least like a disk problem: `pnpm test` reports 14 test FILES failed
+    while every test inside them shows as SKIPPED, with
+    `(HTTP code 409) container <id> is not running` and one
+    `PostgresError: could not extend file "base/16384/2610": No space left on
+    device` buried among them. Files whose tests all skipped cannot fail on
+    assertions - a failing file with a 100% skipped test count is always
+    infrastructure. `docker system df` is the one-line check; that run showed
+    578MB of BUILD CACHE, which nothing else in this file mentions and which
+    `docker builder prune -f` reclaims with no risk to any volume, named or
+    anonymous. Prefer it over every volume-touching cure above: after it the
+    full suite went 14 failed -> 59 files / 634 tests green with no other change.
 
 - [2026-08-28] The seeded agents were `version: 1` with NO `agent_versions` row
   behind them. `AgentsRepository.insert` writes that snapshot, but `seed.ts`
