@@ -70,6 +70,19 @@ the root INSIGHTS.md. Format and quality gates:
   from `src/tools/`. Importing them would only prove the code equals itself. The
   duplication is the point: it forces a second, deliberate edit for a text that
   every user pays for on every session.
+- [2026-08-31] A mode whose diff depends on a ref the user names cannot be
+  expressed as `ModeDef.diffArgs`, so `modes.ts` grew
+  `diffArgsFor?: (base: string) => string[]` and `branch` returns
+  [`${base}...HEAD`]. THREE dots, not two: `base..HEAD` includes everything that
+  landed on `base` since the fork, so the CLI would review (and pay for) other
+  people's commits; `base...HEAD` is the merge-base diff, which is exactly what
+  the pull request shows.
+- [2026-08-31] The missing-`--base` error belongs in `main.ts`, NOT in
+  `parseArgs`. `test/cli-args.test.ts` asserts that a mode which cannot run
+  still PARSES cleanly ("they must reach the dispatcher, which answers with a
+  sentence and exit 3"), so making `--mode branch` without `--base` a
+  usage-error at parse time turns that case red for the wrong reason. Parse the
+  flags; let the dispatcher decide whether the combination can run.
 
 ## Tool & Library Notes
 

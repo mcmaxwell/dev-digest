@@ -142,5 +142,34 @@ the root INSIGHTS.md. Format and quality gates:
   there was no reproduction to fix against, and the suite is green. If it
   recurs, suspect the click landing before the router is listening, and try
   `wait --load networkidle` between the click and the `wait --url`.
+  - [2026-08-31] CORRECTION - it was not a race. It is the SAME ambiguous-locator
+    bug recorded above: flow 11 clicked `find text "Security Reviewer"`, which
+    also matches the header breadcrumb, and `find` takes the first match in
+    document order - so the click hit a crumb, navigated nowhere, reported
+    `Done`, and the FOLLOWING `wait --url` was what failed. It looked
+    intermittent because whether a crumb carries an agent name depends on where
+    the shared browser session had been. Fixed the same way as flow 13: click
+    the card's DESCRIPTION, which only the card has. Flows 03 and 09 also name
+    "Security Reviewer" but only `wait --text` on it, which is presence, not a
+    click, and is safe. General rule: NEVER `find text <entity name> click` when
+    that name can also appear in the breadcrumb - locate a card by a string only
+    the card has.
+  - [2026-08-31] PARTIAL, and the correction above overclaimed. Fixing flow 11's
+    locator was right and flow 11 has passed every run since - but the suite is
+    STILL intermittently red, so that ambiguity was one cause, not the cause.
+    Observed over seven consecutive `./scripts/e2e.sh` runs of the same tree:
+    run 1 flow 11 at `wait --url /context`; run 2 flow 12 at `wait --url
+    /onboarding`; runs 3, 4, 6 all 13/13; run 5 flow 11 at `wait --url
+    /agents/`; run 7 flow 09 at `find role button click --name Statistics`,
+    where the `find` ITSELF exited non-zero rather than a following `wait`.
+    Roughly 2 runs in 7 fail, each time a different flow and a different click
+    or wait step. `13-export-ci.flow.json` passed all seven. Not diagnosed and
+    deliberately not guessed at further: the failures scatter across step KINDS
+    (sidebar link, card div, role=button tab), which points at element
+    readiness in the shared browser session rather than at any one locator.
+    Anyone picking this up should start by raising `E2E_STEP_TIMEOUT` (default
+    60s) to see whether the failures move, and by checking whether the failing
+    step is always the first interaction after a route the warm-up did not
+    compile.
 
 ## Open Questions

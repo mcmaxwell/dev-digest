@@ -216,6 +216,23 @@ the root INSIGHTS.md. Format and quality gates:
   a constant - the title wraps, and merged/closed PRs grow a stale banner. A
   shared component must never encode any page's pixel dimensions; the fallback
   is for the no-chrome case only.
+- [2026-08-31] A colocated component test that renders with ONLY
+  `NextIntlClientProvider` breaks the day its component grows a data hook -
+  `useQuery` throws "No QueryClient set". Do NOT wrap the test in a
+  `QueryClientProvider`: that turns a render test into a fetch test. Add
+  `vi.mock("@/lib/hooks/<file>", ...)` returning the shape the component reads
+  (`{ data }`, `{ mutate, isPending }`), which is what `CiTab.test.tsx` and
+  `ExportCiWizard.test.tsx` do. The mock must list EVERY hook the component
+  imports from that module, or the missing one is `undefined` at call time and
+  the failure reads as an unrelated render error.
+- [2026-08-31] When two features expose the same agent field (the CI tab and the
+  Config tab both write `agents.ci_fail_on`), share the MESSAGE KEYS, not the
+  constants module: `no-restricted-imports` forbids reaching into a sibling
+  feature's `_components/`, so `CiTab` declares its own four-value list and
+  labels the options with `useTranslations("agents")`
+  (`config.ciFailOnOptions.*`). One copy of the wording, no cross-feature
+  import, and the field itself stays single-sourced because both controls go
+  through `useUpdateAgent`.
 
 ## Tool & Library Notes
 
