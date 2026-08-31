@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { RunTrace } from "@devdigest/shared";
-import messages from "../../../../../../../../messages/en/runs.json"; // apps/web/messages/en/runs.json
+import messages from "../../../messages/en/runs.json"; // apps/web/messages/en/runs.json
 
 // Mock the trace hooks so the drawer renders without a query client / SSE.
 const TRACE: RunTrace = {
@@ -22,10 +22,10 @@ const TRACE: RunTrace = {
 /** The trace the mocked hook returns; per-test overrides assign to it. */
 let current: RunTrace = TRACE;
 
-vi.mock("../../../../../../../lib/hooks/trace", () => ({
+vi.mock("@/lib/hooks/trace", () => ({
   useRunTrace: () => ({ data: current, isLoading: false }),
 }));
-vi.mock("../../../../../../../lib/hooks/reviews", () => ({
+vi.mock("@/lib/hooks/reviews", () => ({
   useRunEvents: () => ({ events: [], running: false }),
 }));
 
@@ -60,6 +60,43 @@ describe("A5 Run Trace drawer (smoke)", () => {
     fireEvent.click(screen.getByText("log"));
     // LiveLogStream renders its filter input
     expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
+  });
+});
+
+describe("focus return on close (L07 companion, AC-14)", () => {
+  it("hands focus back to the control that opened the drawer", () => {
+    // The vendored Drawer is aria-modal but does no focus management, so this
+    // is the feature's own behaviour and the only place it can be asserted.
+    const opener = document.createElement("button");
+    opener.textContent = "View trace";
+    document.body.appendChild(opener);
+    opener.focus();
+    expect(document.activeElement).toBe(opener);
+
+    const { unmount } = renderWithIntl(
+      <RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />,
+    );
+    // Move focus INTO the drawer first. Without this the assertion is vacuous:
+    // nothing inside the drawer autofocuses, so the opener would still hold
+    // focus after unmount even with no focus-return code at all.
+    screen.getByRole("button", { name: "Close" }).focus();
+    unmount();
+
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it("does not throw when the opener has left the document", () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { unmount } = renderWithIntl(
+      <RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />,
+    );
+    screen.getByRole("button", { name: "Close" }).focus();
+    opener.remove();
+    expect(() => unmount()).not.toThrow();
   });
 });
 

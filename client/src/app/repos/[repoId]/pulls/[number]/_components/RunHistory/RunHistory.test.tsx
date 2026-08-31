@@ -51,6 +51,7 @@ afterEach(cleanup);
 function run(o: Partial<RunSummary>): RunSummary {
   return {
     run_id: "run-1",
+    multi_agent_run_id: null,
     agent_id: "a1",
     agent_name: "Security Reviewer",
     provider: "openrouter",
@@ -171,5 +172,62 @@ describe("RunHistory — run cost (L01)", () => {
   it("a running run shows no cost line", () => {
     renderRuns([run({ status: "running", cost_usd: null, score: null, blockers: null })]);
     expect(screen.queryByText(/tok ·/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * L07 - a fan-out lands N rows at one timestamp. AC-27 says they must read as
+ * ONE action, and AC-28 says opening that entry goes to the comparison.
+ */
+describe("RunHistory - a multi-agent run is one entry", () => {
+  const openMulti = vi.fn();
+
+  function renderWithMulti(runs: RunSummary[]) {
+    return render(
+      <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
+        <RunHistory runs={runs} onOpenTrace={() => {}} onOpenMultiAgentRun={openMulti} />
+      </NextIntlClientProvider>,
+    );
+  }
+
+  afterEach(() => openMulti.mockClear());
+
+  it("groups the runs sharing a multi-agent run and labels it with the agent count", () => {
+    renderWithMulti([
+      run({ run_id: "r1", multi_agent_run_id: "mar-1", agent_name: "Security", findings_count: 3 }),
+      run({ run_id: "r2", multi_agent_run_id: "mar-1", agent_name: "Performance", findings_count: 2 }),
+      run({ run_id: "r3", multi_agent_run_id: "mar-1", agent_name: "Junior Mentor", findings_count: 1 }),
+      // A single-agent run beside it still renders as its own row, unchanged.
+      run({ run_id: "r4", agent_name: "Solo Reviewer" }),
+    ]);
+
+    expect(screen.getByText("3 agents in parallel")).toBeInTheDocument();
+    expect(screen.getByText("6 finding(s)")).toBeInTheDocument();
+    // The members are folded INTO the group, not listed beside it.
+    expect(screen.queryByText("Security")).not.toBeInTheDocument();
+    expect(screen.queryByText("Performance")).not.toBeInTheDocument();
+    // The single-agent row is untouched.
+    expect(screen.getByText("Solo Reviewer")).toBeInTheDocument();
+  });
+
+  it("opens that multi-agent run's results", () => {
+    renderWithMulti([
+      run({ run_id: "r1", multi_agent_run_id: "mar-9" }),
+      run({ run_id: "r2", multi_agent_run_id: "mar-9" }),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open this multi-agent review" }));
+    expect(openMulti).toHaveBeenCalledWith("mar-9");
+  });
+
+  it("keeps two different multi-agent runs apart", () => {
+    renderWithMulti([
+      run({ run_id: "r1", multi_agent_run_id: "mar-1", ran_at: "2026-06-11T18:44:34.000Z" }),
+      run({ run_id: "r2", multi_agent_run_id: "mar-1", ran_at: "2026-06-11T18:44:34.000Z" }),
+      run({ run_id: "r3", multi_agent_run_id: "mar-2", ran_at: "2026-06-12T18:44:34.000Z" }),
+      run({ run_id: "r4", multi_agent_run_id: "mar-2", ran_at: "2026-06-12T18:44:34.000Z" }),
+    ]);
+
+    expect(screen.getAllByText("2 agents in parallel")).toHaveLength(2);
   });
 });

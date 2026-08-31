@@ -16,7 +16,7 @@ import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
 import { DIFF_ORDERS, type DiffOrder } from "./_components/OrderToggle/constants";
-import RunTraceDrawer from "./_components/RunTraceDrawer";
+import RunTraceDrawer from "@/components/run-trace-drawer";
 import { usePullDetailByNumber } from "@/lib/hooks";
 import {
   usePrReviews,
@@ -223,6 +223,7 @@ export default function PRDetailPage() {
               if (window.confirm(t("detail.confirmDeleteRun"))) deleteRun.mutate(id);
             }}
             onRunDone={handleRunDone}
+            onOpenMultiAgentRun={(id) => router.push(`/repos/${repoId}/multi-agent/${id}`)}
           />
         )}
 
@@ -252,6 +253,10 @@ export default function PRDetailPage() {
           prNumber={pr.number}
           findings={runs.find((r) => r.run_id === traceRunId)?.findings ?? []}
           agentName={runs.find((r) => r.run_id === traceRunId)?.agent_name ?? null}
+          // Without this the drawer opens on the Trace tab and subscribes to no
+          // events, so a run opened from the Timeline WHILE it is running shows
+          // a pending trace instead of its live log.
+          running={liveRunIds.includes(traceRunId)}
           onClose={() => setParam("trace", null)}
         />
       )}

@@ -47,6 +47,7 @@
       "config": "Config",
       "skills": "Skills",
       "evals": "Evals",
+      "runs": "Runs",
       "stats": "Stats",
       "ci": "CI",
       "context": "Context"

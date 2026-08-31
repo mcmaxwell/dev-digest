@@ -147,6 +147,12 @@ export type RunStatus = z.infer<typeof RunStatus>;
  */
 export const RunSummary = z.object({
   run_id: z.string(),
+  /**
+   * L07 - the multi-agent run this run belongs to, or null for a single-agent
+   * run. It is what lets the PR page's run history group N rows that arrived at
+   * one timestamp into one entry, without a second request.
+   */
+  multi_agent_run_id: z.string().nullable(),
   agent_id: z.string().nullable(),
   agent_name: z.string().nullable(),
   provider: z.string().nullable(),

@@ -2,7 +2,11 @@
    screen_trace.jsx. Tabs: Trace (Configuration / Stats / Prompt assembly /
    Tool calls / Raw output) and Live log (SSE via useRunEvents → LiveLogStream,
    which has client-side Filter-input search). Default export so the PR-detail
-   page (A2) can mount it from the run-status area. */
+   page (A2) can mount it from the run-status area.
+
+   Shared, not route-owned: the PR page and the agent editor's Runs tab both
+   mount THIS component. It moved out of the pulls route's `_components/` in L07
+   because a route may not import a sibling route's `_components/`. */
 "use client";
 
 import React from "react";
@@ -43,6 +47,22 @@ export default function RunTraceDrawer({
 }: RunTraceDrawerProps) {
   const t = useTranslations("runs");
   const [tab, setTab] = React.useState<string>(running ? "log" : "trace");
+
+  // Focus return. `vendor/ui/kit/Drawer` sets role="dialog" aria-modal="true"
+  // and implements no focus management at all, and it is frozen - so the
+  // behaviour belongs here: remember whatever had focus when the drawer opened
+  // and hand it back on unmount, or a keyboard user closing the drawer lands at
+  // the top of the document instead of on the row they opened.
+  const openerRef = React.useRef<HTMLElement | null>(null);
+  React.useEffect(() => {
+    openerRef.current = document.activeElement as HTMLElement | null;
+    return () => {
+      const opener = openerRef.current;
+      // The opener can be gone (a re-rendered list, a navigation), in which case
+      // there is nothing to return to and the browser default is right.
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
   const { events, running: liveRunning } = useRunEvents(running ? [runId] : []);
   // Load the persisted trace once we're not (or no longer) running.
   const stillRunning = running && liveRunning;

@@ -30,6 +30,20 @@ module.exports = {
       to: { path: '^src/(platform|adapters|db)/|^\\.\\./reviewer-core|^(node_modules/)?drizzle-orm' },
     },
     {
+      name: 'multi-agent-clustering-is-pure',
+      comment:
+        'L07: the multi-agent comparison groups findings that already exist by ' +
+        'file and line range. "The clustering makes no model call" is the ' +
+        'central claim of the whole disagreement section, so it is enforced ' +
+        'mechanically rather than trusted: multi-agent.ts may not reach the ' +
+        'container, an adapter, the database, or the review engine. If a rule ' +
+        'genuinely needs one of those, it is not a comparison rule - it belongs ' +
+        'in the service, which already has them.',
+      severity: 'error',
+      from: { path: '^src/modules/reviews/multi-agent\\.ts$' },
+      to: { path: '^src/(platform|adapters|db)/|^\\.\\./reviewer-core|^(node_modules/)?drizzle-orm' },
+    },
+    {
       name: 'queries-live-in-repositories',
       comment:
         'Only a repository builds queries. Any other module file importing the ' +

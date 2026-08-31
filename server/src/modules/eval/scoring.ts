@@ -1,5 +1,14 @@
 import { evalF1, evalWilson } from '@devdigest/shared';
 import type { EvalCaseDelta, EvalExpectation, Finding } from '@devdigest/shared';
+import { overlaps } from '../_shared/overlap.js';
+import type { Located } from '../_shared/overlap.js';
+
+// The matching rule now has ONE implementation, in `modules/_shared/overlap.ts`,
+// because the L07 multi-agent clustering asks the same question of two findings
+// that this scorer asks of a finding and an expectation. Re-exported here so
+// every existing call site (and `test/eval-scoring.test.ts`) is unchanged.
+export { overlaps };
+export type { Located };
 
 /**
  * L06 - the eval scorer. PURE: no Container, no I/O, no model call.
@@ -15,13 +24,6 @@ import type { EvalCaseDelta, EvalExpectation, Finding } from '@devdigest/shared'
  * once. Averaging per-case ratios instead would let a case with one expectation
  * outvote a case with nine.
  */
-
-/** A location, in the only two fields the matcher reads. */
-export interface Located {
-  file: string;
-  start_line: number;
-  end_line: number;
-}
 
 /** Counts for one case. Ratios are derived; the counts are what aggregates. */
 export interface CaseScore {
@@ -49,25 +51,6 @@ export interface SuiteScore {
   f1: number;
   traces_passed: number;
   traces_total: number;
-}
-
-/**
- * Does a finding sit at an expectation's location?
- *
- * Same file, and the two line ranges intersect. Deliberately NOT an exact line
- * match: a model that reports lines 12-14 for a secret declared on line 12 has
- * found the thing, and a scorer that says otherwise measures formatting.
- *
- * Ranges are normalised first, because nothing stops a model from emitting
- * `start_line` above `end_line`.
- */
-export function overlaps(a: Located, b: Located): boolean {
-  if (a.file !== b.file) return false;
-  const aLo = Math.min(a.start_line, a.end_line);
-  const aHi = Math.max(a.start_line, a.end_line);
-  const bLo = Math.min(b.start_line, b.end_line);
-  const bHi = Math.max(b.start_line, b.end_line);
-  return aLo <= bHi && bLo <= aHi;
 }
 
 /**
