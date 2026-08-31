@@ -5,6 +5,21 @@ import { pullRequests } from './pulls';
 
 // ============================================================ Observability
 
+/**
+ * One user action that fanned one pull request out to two or more agents (L07).
+ * Declared BEFORE `agent_runs` because that table now references it.
+ */
+export const multiAgentRuns = pgTable('multi_agent_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  prId: uuid('pr_id')
+    .notNull()
+    .references(() => pullRequests.id, { onDelete: 'cascade' }),
+  ranAt: timestamp('ran_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const agentRuns = pgTable(
   'agent_runs',
   {
@@ -14,6 +29,19 @@ export const agentRuns = pgTable(
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'set null' }),
     prId: uuid('pr_id').references(() => pullRequests.id, { onDelete: 'set null' }),
+    /**
+     * L07 - the multi-agent run this run belongs to; null for a single-agent
+     * run. Single-valued in one direction, which is the whole requirement:
+     * nothing wants one agent run to appear in two multi-agent runs, so a
+     * junction table would be wider than what is asked for.
+     *
+     * `set null`, not `cascade`: `pr_id` above is already `set null` so a run
+     * outlives its pull request, and a cascade here would contradict that by
+     * destroying runs when their grouping row goes.
+     */
+    multiAgentRunId: uuid('multi_agent_run_id').references(() => multiAgentRuns.id, {
+      onDelete: 'set null',
+    }),
     ranAt: timestamp('ran_at', { withTimezone: true }).defaultNow().notNull(),
     provider: text('provider'),
     model: text('model'),
@@ -38,6 +66,9 @@ export const agentRuns = pgTable(
   },
   (t) => ({
     prIdx: index('agent_runs_pr_idx').on(t.prId, t.ranAt), // timeline + active runs
+    // Postgres does not auto-index a FK column, and this one IS the read path
+    // for "the agent runs of this multi-agent run".
+    multiIdx: index('agent_runs_multi_idx').on(t.multiAgentRunId),
   }),
 );
 
@@ -49,13 +80,3 @@ export const runTraces = pgTable('run_traces', {
   trace: jsonb('trace').notNull(),
 });
 
-export const multiAgentRuns = pgTable('multi_agent_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  workspaceId: uuid('workspace_id')
-    .notNull()
-    .references(() => workspaces.id, { onDelete: 'cascade' }),
-  prId: uuid('pr_id')
-    .notNull()
-    .references(() => pullRequests.id, { onDelete: 'cascade' }),
-  ranAt: timestamp('ran_at', { withTimezone: true }).defaultNow().notNull(),
-});

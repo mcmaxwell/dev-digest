@@ -5,16 +5,28 @@
   },
   "column": {
     "noFindings": "No findings.",
-    "findingsCount": "{count, plural, one {# finding} other {# findings}}"
+    "findingsCount": "{count, plural, one {# finding} other {# findings}}",
+    "running": "still running…",
+    "failed": "This agent's run failed.",
+    "score": "score {score}",
+    "noScore": "no score",
+    "viewTrace": "View trace",
+    "openTrace": "View the trace of {agent}'s run"
   },
   "conflicts": {
     "title": "Where agents disagree",
     "onlyConflicts": "Show only conflicts",
-    "empty": "No conflicts — the agents agree on every flagged location.",
-    "didNotFlag": "did not flag"
+    "empty": "The agents agreed on every location one of them flagged.",
+    "emptyFiltered": "No two agents differ on severity anywhere in this run.",
+    "didNotFlag": "did not flag",
+    "noOpinion": "no opinion (run failed)",
+    "agentLabel": "{agent}"
   },
   "tabs": {
-    "noSummary": "No summary."
+    "noSummary": "No summary.",
+    "select": "Show {agent}",
+    "showMore": "Show more",
+    "showLess": "Show less"
   },
   "trace": {
     "configuration": "Configuration",
@@ -115,29 +127,107 @@
     "warning": "Warning",
     "suggestion": "Suggestion"
   },
+  "runsTab": {
+    "heading": "Runs",
+    "count": "{count, plural, one {# run} other {# runs}}",
+    "loading": "Loading runs…",
+    "loadError": "Could not load this agent's runs.",
+    "retry": "Retry",
+    "loadMore": "Load more",
+    "openTrace": "Open the trace of the run from {when}",
+    "pr": "#{number} · {title}",
+    "noPr": "No pull request",
+    "findings": "{count, plural, one {# finding} other {# findings}}",
+    "score": "score {score}",
+    "scoreNone": "no score",
+    "durationNone": "no duration",
+    "status": {
+      "running": "running",
+      "done": "done",
+      "failed": "failed",
+      "cancelled": "cancelled",
+      "unknown": "unknown"
+    },
+    "source": {
+      "local": "studio",
+      "ci": "CI"
+    },
+    "empty": {
+      "title": "This agent has not run yet",
+      "body": "Runs start from a pull request - open one and run this agent on it. Its runs, and the exact prompt each one assembled, appear here."
+    }
+  },
   "page": {
     "title": "Multi-Agent Review",
-    "subtitle": "this PR through every enabled agent in parallel",
+    "subtitle": "Pick a pull request and choose which agents to fan out - they run in parallel and you compare their findings side by side.",
+    "landingSubtitle": "Every multi-agent review this repository has run, newest first. Start a new one to compare your agents on the same pull request.",
+    "crumb": "Multi-Agent Review",
+    "configureCrumb": "Configure run",
+    "configureTitle": "Run a Multi-Agent Review",
     "selectPr": "Select PR",
     "prItem": "#{number} · {title}",
     "view": {
       "columns": "columns",
       "tabs": "tabs"
     },
-    "runAll": "Run all agents",
+    "run": "Run multi-agent review ({count})",
     "running": "Running…",
-    "meta": "{count} agents · fan-out via p-queue · {duration}s total · {cost}",
+    "meta": "{count, plural, one {# agent} other {# agents}} · parallel · {duration} · {cost}",
+    "metaPartial": "at least {cost}",
+    "step": {
+      "pull": "Pull request",
+      "agents": "Agents to run"
+    },
+    "selectPrPlaceholder": "Select a pull request…",
+    "noPulls": "This repository has no imported pull requests yet.",
+    "pickPrFirst": {
+      "title": "Pick a pull request first",
+      "body": "Choose which pull request to review above, then select the agents to run on it."
+    },
+    "selectAll": "Select all",
+    "clearAll": "Clear",
+    "needTwo": "Select at least two agents to compare.",
+    "estimate": "≈ {duration} · {cost}",
+    "estimatePartial": "≈ {duration} · {cost} (partial - some agents have no history)",
     "noAgents": {
       "title": "Enable agents to run reviews",
-      "body": "Multi-agent review runs the PR through every enabled agent in parallel. You have no agents enabled yet.",
+      "body": "A multi-agent review compares two or more of your agents on one pull request. You have no agents enabled yet.",
       "cta": "Go to Agents"
     },
-    "noRun": {
-      "title": "No multi-agent run yet",
-      "bodyReady": "Run all enabled agents on this PR to see N columns + conflicts.",
-      "bodySelect": "Select a PR to begin.",
-      "cta": "Run all agents"
+    "recent": {
+      "heading": "Recent runs",
+      "new": "New multi-agent review",
+      "agents": "{count, plural, one {# agent} other {# agents}}",
+      "findings": "{count, plural, one {# finding} other {# findings}}",
+      "noDuration": "not finished",
+      "open": "Open the multi-agent run of #{number} from {when}",
+      "noPr": "No pull request",
+      "loading": "Loading runs…",
+      "loadError": "Could not load this repository's multi-agent runs.",
+      "retry": "Retry",
+      "status": {
+        "running": "running",
+        "done": "done",
+        "failed": "failed"
+      },
+      "empty": {
+        "title": "No multi-agent review yet",
+        "body": "Nothing has been fanned out for this repository. Start one and compare your agents on the same pull request."
+      }
     },
-    "crumb": "Multi-Agent Review"
+    "startError": "Could not start the run: {message}"
+  },
+  "results": {
+    "loading": "Loading this multi-agent run…",
+    "loadError": "Could not load this multi-agent run.",
+    "retry": "Retry",
+    "configure": "Configure run",
+    "view": {
+      "label": "View",
+      "columns": "Columns",
+      "tabs": "Tabs"
+    },
+    "pr": "#{number} {title}",
+    "noPr": "No pull request"
   }
 }

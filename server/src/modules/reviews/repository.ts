@@ -1,6 +1,6 @@
 import type { Db, DbOrTx } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { Finding, RunSummary, RunTrace } from '@devdigest/shared';
+import type { AgentRunsPage, Finding, RunSummary, RunTrace } from '@devdigest/shared';
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -25,6 +25,7 @@ export type ReviewRow = typeof t.reviews.$inferSelect;
 import * as reviewRepo from './repository/review.repo.js';
 import * as runRepo from './repository/run.repo.js';
 import * as pullRepo from './repository/pull.repo.js';
+import * as multiRepo from './repository/multi-agent.repo.js';
 
 export class ReviewRepository {
   constructor(private db: Db) {}
@@ -134,6 +135,15 @@ export class ReviewRepository {
     return runRepo.listRunsForPull(this.db, workspaceId, prId);
   }
 
+  /** One page of ONE agent's runs, newest first - the agent editor's Runs tab. */
+  listRunsForAgent(
+    workspaceId: string,
+    agentId: string,
+    opts: { limit: number; before?: string },
+  ): Promise<AgentRunsPage> {
+    return runRepo.listRunsForAgent(this.db, workspaceId, agentId, opts);
+  }
+
   /** Delete one agent run (+ its trace via FK cascade). Workspace-scoped. */
   deleteAgentRun(workspaceId: string, runId: string): Promise<boolean> {
     return runRepo.deleteAgentRun(this.db, workspaceId, runId);
@@ -180,14 +190,65 @@ export class ReviewRepository {
   // ---- observability: agent_runs + run_traces ----------------------------
 
   /** Create an agent_runs row in `running` state; returns its id (= the runId). */
-  createAgentRun(values: {
-    workspaceId: string;
-    agentId: string | null;
-    prId: string;
-    provider: string | null;
-    model: string | null;
-  }): Promise<string> {
-    return runRepo.createAgentRun(this.db, values);
+  createAgentRun(
+    values: {
+      workspaceId: string;
+      agentId: string | null;
+      prId: string;
+      provider: string | null;
+      model: string | null;
+      /** L07 - set when this run is one member of a multi-agent run. */
+      multiAgentRunId?: string | null;
+    },
+    tx: DbOrTx = this.db,
+  ): Promise<string> {
+    return runRepo.createAgentRun(tx, values);
+  }
+
+  // ---- L07: multi-agent runs ---------------------------------------------
+
+  /** Create the grouping row. The SERVICE owns the transaction it joins. */
+  createMultiAgentRun(
+    values: { workspaceId: string; prId: string },
+    tx: DbOrTx = this.db,
+  ): Promise<string> {
+    return multiRepo.createMultiAgentRun(tx, values);
+  }
+
+  getMultiAgentRun(
+    workspaceId: string,
+    id: string,
+  ): Promise<multiRepo.MultiAgentRunRow | undefined> {
+    return multiRepo.getMultiAgentRun(this.db, workspaceId, id);
+  }
+
+  /** Every member run of one multi-agent run, with its review and findings. */
+  runsForMultiAgentRun(multiAgentRunId: string): Promise<multiRepo.MultiAgentMemberRun[]> {
+    return multiRepo.runsForMultiAgentRun(this.db, multiAgentRunId);
+  }
+
+  /** A repository's recent multi-agent runs, newest first (headers only). */
+  listMultiAgentRunsForRepo(
+    workspaceId: string,
+    repoId: string,
+    opts: { limit: number },
+  ): Promise<multiRepo.MultiAgentRunListRow[]> {
+    return multiRepo.listMultiAgentRunsForRepo(this.db, workspaceId, repoId, opts);
+  }
+
+  /** The multi-agent run of this PR that still has a running member, if any. */
+  activeMultiAgentRunForPull(
+    workspaceId: string,
+    prId: string,
+  ): Promise<{ id: string; ranAt: Date } | undefined> {
+    return multiRepo.activeMultiAgentRunForPull(this.db, workspaceId, prId);
+  }
+
+  /** The last ten successful runs per agent - the pre-run estimate's input. */
+  recentSuccessfulRunsByAgent(
+    workspaceId: string,
+  ): Promise<{ agentId: string; durationMs: number | null; costUsd: number | null }[]> {
+    return multiRepo.recentSuccessfulRunsByAgent(this.db, workspaceId);
   }
 
   completeAgentRun(

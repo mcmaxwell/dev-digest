@@ -11,6 +11,19 @@
  */
 export const REVIEW_STRATEGY = 'single-pass' as const;
 
+/**
+ * How many of a fan-out's agent runs execute at the same time.
+ *
+ * 3, matching the repository's existing queue default (`platform/jobs.ts:42`) -
+ * one number for "how much concurrent model work this process does at once",
+ * not a second one invented here.
+ *
+ * This bounds EVERY fan-out, the pull request page's "run all" included: the
+ * executor has one loop, and forking it into a sequential and a parallel
+ * variant would mean two paths to keep in step.
+ */
+export const REVIEW_FANOUT_CONCURRENCY = 3;
+
 // --- L04: POST /reviews/diff (the pre-push CLI's endpoint) ------------------
 
 /**
