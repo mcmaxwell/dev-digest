@@ -26,6 +26,20 @@ export interface ApiClient {
     fail_on?: s.Severity;
     source: 'cli';
   }): Promise<s.DiffReview>;
+  /**
+   * POST /ci-runs - the CI counterpart of `reviewDiff`. The server reviews the
+   * diff, posts the review to the pull request with ITS OWN GitHub token and
+   * records the run; this CLI holds no secret of any kind and never will.
+   */
+  ciRun(body: {
+    repo: string;
+    pr_number: number;
+    diff: string;
+    agent?: string;
+    post_as?: 'github_review' | 'pr_comment' | 'none';
+    fail_on?: s.Severity;
+    github_url?: string;
+  }): Promise<s.CiRunResult>;
 }
 
 export interface ApiClientConfig {
@@ -91,6 +105,15 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
         timeoutMs: REVIEW_DIFF_TIMEOUT_MS,
         label,
       }),
+    // Same model call as `reviewDiff` plus a GitHub write, so it inherits the
+    // same generous ceiling rather than the 15s read default.
+    ciRun: (body) =>
+      request(apiUrl, '/ci-runs', s.CiRunResult, {
+        method: 'POST',
+        body,
+        timeoutMs: REVIEW_DIFF_TIMEOUT_MS,
+        label,
+      }),
   };
 }
 
@@ -117,6 +140,7 @@ export type {
   ConventionScan,
   ConventionStatus,
   ConventionsPage,
+  CiRunResult,
   DiffReview,
   DiffReviewFinding,
   PrBlast,

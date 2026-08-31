@@ -67,6 +67,7 @@ export function fakeApi(over: Partial<ApiClient> = {}): ApiClient {
     conventions: async () => fixtures.conventions,
     blastRadius: async () => fixtures.blast,
     reviewDiff: async () => unexpected('reviewDiff'),
+    ciRun: async () => unexpected('ciRun'),
   };
   return { ...base, ...over };
 }

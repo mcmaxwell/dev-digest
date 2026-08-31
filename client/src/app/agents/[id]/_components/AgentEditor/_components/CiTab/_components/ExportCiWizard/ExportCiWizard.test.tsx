@@ -30,8 +30,19 @@ const mutate = vi.fn((input: unknown, opts?: { onSuccess?: () => void }) => {
   opts?.onSuccess?.();
 });
 
+// The preview step now also offers Install, so the export mutation is stubbed
+// alongside the bundle one; these cases exercise the preview, not the install.
+const installMutate = vi.fn();
+
 vi.mock("@/lib/hooks/ci", () => ({
   useCiBundle: () => ({ mutate, data, isPending: false, isError: false }),
+  useExportCi: () => ({
+    mutate: installMutate,
+    data: undefined,
+    isPending: false,
+    isError: false,
+    isSuccess: false,
+  }),
 }));
 
 import { ExportCiWizard } from "./ExportCiWizard";
@@ -167,9 +178,11 @@ describe("ExportCiWizard - preview step", () => {
     expect(await screen.findByText("Copied")).toBeInTheDocument();
   });
 
-  it("says the workflow does not run a review yet", () => {
+  // Supersedes the placeholder case: the workflow runs a real review now, and
+  // the thing a first-time user must be told instead is where it runs.
+  it("states the self-hosted runner requirement", () => {
     toPreview();
-    expect(screen.getByText(/does not run a review yet/)).toBeInTheDocument();
+    expect(screen.getByText(/runs on a self-hosted runner/)).toBeInTheDocument();
   });
 
   it("explains the shorter bundle when the agent has no skills", () => {

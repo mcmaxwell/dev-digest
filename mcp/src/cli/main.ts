@@ -7,13 +7,20 @@ import {
   createResolvers,
   type ApiClient,
 } from '../api/index.js';
+import { writeFile } from 'node:fs/promises';
 import { loadConfig } from '../config.js';
 import { parseArgs, type ReviewCommand } from './args.js';
 import { EXIT, type ExitCode } from './exit.js';
 import { collectDiff, GitError, hasCommits, repoRoot } from './git.js';
 import { helpText } from './help.js';
 import { MODES } from './modes.js';
-import { renderJson, renderJsonFailure, renderReview, renderUntrackedWarning } from './render.js';
+import {
+  renderCiResult,
+  renderJson,
+  renderJsonFailure,
+  renderReview,
+  renderUntrackedWarning,
+} from './render.js';
 
 /**
  * `devdigest review` - the pre-push CLI.
@@ -53,7 +60,18 @@ async function main(argv: string[]): Promise<ExitCode> {
 
 async function review(cmd: ReviewCommand): Promise<ExitCode> {
   const mode = MODES[cmd.mode]!;
-  if (!mode.diffArgs) {
+  let diffArgs: string[];
+  if (mode.diffArgsFor) {
+    // A base-relative mode with no base cannot fall back to anything: guessing
+    // "main" would review a different set of commits than the pull request.
+    if (!cmd.base) {
+      process.stderr.write(`devdigest: --mode ${cmd.mode} needs --base <ref>, e.g. --base main.\n`);
+      return EXIT.USAGE;
+    }
+    diffArgs = mode.diffArgsFor(cmd.base);
+  } else if (mode.diffArgs) {
+    diffArgs = mode.diffArgs;
+  } else {
     process.stderr.write(`devdigest: ${mode.notImplemented ?? `Mode "${cmd.mode}" is not implemented.`}\n`);
     return EXIT.USAGE;
   }
@@ -74,7 +92,7 @@ async function review(cmd: ReviewCommand): Promise<ExitCode> {
 
   let tree;
   try {
-    tree = await collectDiff(root, mode.diffArgs);
+    tree = await collectDiff(root, diffArgs);
   } catch (err) {
     const detail = err instanceof GitError ? err.message : (err as Error).message;
     process.stderr.write(`devdigest: git failed - ${detail}\n`);
@@ -127,15 +145,34 @@ async function review(cmd: ReviewCommand): Promise<ExitCode> {
     agentId = resolution.id;
   }
 
+  const runUrl = workflowRunUrl();
+
   try {
-    const result = await api.reviewDiff({
-      diff: tree.diff,
-      ...(agentId ? { agent: agentId } : {}),
-      ...(cmd.severityMin ? { severity_min: cmd.severityMin } : {}),
-      ...(cmd.failOn ? { fail_on: cmd.failOn } : {}),
-      source: 'cli',
-    });
+    // `--repo` + `--pr` mean this is a CI run: the SERVER reviews, posts the
+    // review with its own GitHub token and records the row. Without them the
+    // call is the ordinary PR-less review, which persists nothing.
+    const result =
+      cmd.repo && cmd.prNumber
+        ? (
+            await api.ciRun({
+              repo: cmd.repo,
+              pr_number: cmd.prNumber,
+              diff: tree.diff,
+              ...(agentId ? { agent: agentId } : {}),
+              ...(cmd.postAs ? { post_as: cmd.postAs } : {}),
+              ...(cmd.failOn ? { fail_on: cmd.failOn } : {}),
+              ...(runUrl ? { github_url: runUrl } : {}),
+            })
+          ).review
+        : await api.reviewDiff({
+            diff: tree.diff,
+            ...(agentId ? { agent: agentId } : {}),
+            ...(cmd.severityMin ? { severity_min: cmd.severityMin } : {}),
+            ...(cmd.failOn ? { fail_on: cmd.failOn } : {}),
+            source: 'cli',
+          });
     const code = result.blockers > 0 ? EXIT.BLOCKED : EXIT.OK;
+    if (cmd.ciResult) await writeCiResult(cmd.ciResult, result, cmd.prNumber ?? null);
     process.stdout.write(
       cmd.format === 'json'
         ? `${renderJson(result, ctx, code)}\n`
@@ -152,6 +189,38 @@ async function review(cmd: ReviewCommand): Promise<ExitCode> {
     // ALWAYS 2, never 0. A hook must fail closed when the reviewer did not run.
     return EXIT.FAILED;
   }
+}
+
+/**
+ * The artifact file, written before the review is printed.
+ *
+ * A failure here is reported and then IGNORED: the review has already been paid
+ * for and its exit code is the thing CI acts on, so an unwritable path must not
+ * turn a finished review into a failed step.
+ */
+async function writeCiResult(
+  path: string,
+  result: Parameters<typeof renderCiResult>[0],
+  prNumber: number | null,
+): Promise<void> {
+  try {
+    await writeFile(path, `${renderCiResult(result, prNumber)}\n`, 'utf8');
+  } catch (err) {
+    process.stderr.write(`devdigest: could not write ${path} - ${(err as Error).message}\n`);
+  }
+}
+
+/**
+ * The URL of the workflow run, when there is one.
+ *
+ * These three variables are set by GitHub Actions itself, so the generated
+ * workflow does not have to pass a flag for something the runner already knows.
+ * Outside Actions they are absent and the run is simply recorded without a link.
+ */
+function workflowRunUrl(): string | null {
+  const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+  if (!GITHUB_SERVER_URL || !GITHUB_REPOSITORY || !GITHUB_RUN_ID) return null;
+  return `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`;
 }
 
 /**

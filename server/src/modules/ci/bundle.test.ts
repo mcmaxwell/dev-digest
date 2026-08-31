@@ -17,6 +17,7 @@ import {
  */
 
 const agent: BundleAgent = {
+  id: 'a1000000-0000-4000-8000-000000000001',
   name: 'Security Reviewer',
   provider: 'openai',
   model: 'gpt-4.1',
@@ -142,15 +143,25 @@ describe('buildBundle', () => {
     );
   });
 
-  it('marks the review step as a placeholder that does not run a review (AC-17)', () => {
+  // Supersedes the AC-17 placeholder case: the workflow now runs the review on a
+  // self-hosted runner through the CLI, and the server posts it - so the file
+  // must carry no placeholder, no write permission and the agent's own id.
+  it('runs a real review on the self-hosted runner and uploads its result', () => {
     const wf = at(buildBundle(agent, [], options), '.github/workflows/devdigest-review.yml')!;
-    expect(wf.contents).toContain('PLACEHOLDER');
-    expect(wf.contents).toContain('no runner is configured');
+    expect(wf.contents).not.toContain('PLACEHOLDER');
+    expect(wf.contents).toContain('runs-on: [self-hosted, devdigest]');
+    expect(wf.contents).toContain('permissions:\n  contents: read');
+    expect(wf.contents).toContain('--mode branch');
+    expect(wf.contents).toContain(`--agent ${agent.id}`);
+    expect(wf.contents).toContain('--ci-result devdigest-result.json');
+    expect(wf.contents).toContain('uses: actions/upload-artifact@v4');
   });
 
-  it('leaves the GitHub token as an Actions expression, not an interpolated value', () => {
+  it('leaves every GitHub value as an Actions expression, not an interpolated value', () => {
     const wf = at(buildBundle(agent, [], options), '.github/workflows/devdigest-review.yml')!;
-    expect(wf.contents).toContain('GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
+    expect(wf.contents).toContain('DEVDIGEST_PR: ${{ github.event.pull_request.number }}');
+    expect(wf.contents).toContain('DEVDIGEST_REPO: ${{ github.repository }}');
+    expect(wf.contents).toContain('ref: ${{ github.event.pull_request.head.sha }}');
   });
 
   it('exports an agent with no skills as two files with an empty skills list (AC-18)', () => {

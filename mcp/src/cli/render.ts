@@ -127,3 +127,31 @@ export function renderJsonFailure(
     2,
   );
 }
+
+/**
+ * The `CiResultArtifact` JSON a CI run uploads (`--ci-result <path>`).
+ *
+ * Deliberately NOT `renderJson`: that object is the CLI's own output contract
+ * and carries findings, whereas this one mirrors the `CiResultArtifact` shape
+ * in `@devdigest/shared` - counts, cost, duration, agent - and nothing else. The
+ * findings are already on the pull request, so putting model-authored prose in a
+ * downloadable artifact would only duplicate them.
+ */
+export function renderCiResult(review: DiffReview, prNumber: number | null): string {
+  const by = (severity: string) => review.findings.filter((f) => f.severity === severity).length;
+  return JSON.stringify(
+    {
+      findings_count: review.findings.length,
+      critical: by('CRITICAL'),
+      warning: by('WARNING'),
+      suggestion: by('SUGGESTION'),
+      cost_usd: review.usage.cost_usd ?? null,
+      duration_ms: review.usage.duration_ms,
+      agent: review.agent.name,
+      version: null,
+      pr_number: prNumber,
+    },
+    null,
+    2,
+  );
+}

@@ -11,7 +11,10 @@
       "last7Days": "Last 7 days",
       "allAgents": "All agents",
       "allRepos": "All repos",
-      "allStatuses": "All statuses"
+      "allStatuses": "All statuses",
+      "last24Hours": "Last 24 hours",
+      "last30Days": "Last 30 days",
+      "allTime": "All time"
     },
     "table": {
       "timestamp": "Timestamp",
@@ -27,7 +30,8 @@
       "noFindings": "No findings",
       "failed": "Failed",
       "running": "Running"
-    }
+    },
+    "pullRequestCell": "{repo} #{number}"
   },
   "exportWizard": {
     "title": "Export to CI",
@@ -88,9 +92,12 @@
     "download": "Download",
     "fileCount": "{count, plural, one {# file} other {# files}}",
     "noSkillsNote": "This agent has no skills attached, so the bundle is the workflow and the manifest.",
-    "placeholderTitle": "The workflow does not run a review yet",
-    "placeholderBody": "Its review step is a marked placeholder. The file that carries the agent is the manifest under .devdigest/agents/ - commit it and the agent becomes readable, diffable and shareable.",
-    "done": "Done"
+    "done": "Done",
+    "runnerNoteTitle": "The workflow runs on a self-hosted runner",
+    "runnerNoteBody": "It needs a runner labelled devdigest that can reach this DevDigest API, with the devdigest CLI on its PATH ($DEVDIGEST_CLI overrides the command). The review, the posting and the recording all happen server-side, so no key and no token live in the repository - and GitHub's own guidance is that self-hosted runners belong on private repositories.",
+    "installFailed": "Could not open the pull request.",
+    "installedTitle": "Installed",
+    "repoRequired": "Name the repository to install into, as owner/name."
   },
   "ciTab": {
     "heading": "Continuous Integration",
@@ -102,8 +109,12 @@
     "empty": "Not deployed to CI yet. Use “Publish to CI” to open a PR that adds the workflow + agent config.",
     "installed": "installed {date}",
     "explainer": "Export turns this agent into plain files you can commit: a manifest that is the agent - model, prompt, skills and gate policy - one Markdown file per attached skill, and a GitHub Actions workflow.",
-    "pointNoWrite": "Nothing is written to any repository. The files are yours to copy or download.",
-    "pointNoState": "Nothing is recorded here, so exporting again is the same as exporting the first time."
+    "pointNoWrite": "Install opens a pull request with these files in the repository you name. Nothing else is written, and nothing changes until you merge it.",
+    "pointNoState": "Every repository you install into is listed here with its date, and each CI review lands on the CI Runs page.",
+    "activeIn": "Active in {count, plural, one {# repo} other {# repos}}",
+    "failOnLabel": "Fail CI on",
+    "failOnHint": "Which findings block the pull request. The same setting as Fail CI on under Config.",
+    "failOnSaving": "Saving…"
   },
   "publishDialog": {
     "title": "Publish to CI",

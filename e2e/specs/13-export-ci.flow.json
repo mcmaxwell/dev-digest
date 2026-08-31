@@ -65,9 +65,9 @@
       "cmd": [
         "wait",
         "--text",
-        "Nothing is written to any repository"
+        "Install opens a pull request"
       ],
-      "label": "the tab says what export does and does not do"
+      "label": "the tab says what installing does before anything is written"
     },
     {
       "cmd": [
@@ -178,9 +178,9 @@
       "cmd": [
         "wait",
         "--text",
-        "The workflow does not run a review yet"
+        "The workflow runs on a self-hosted runner"
       ],
-      "label": "the placeholder is stated, not hidden (AC-17)"
+      "label": "the runner requirement is stated up front, not discovered on the first failed run (supersedes AC-17)"
     },
     {
       "cmd": [

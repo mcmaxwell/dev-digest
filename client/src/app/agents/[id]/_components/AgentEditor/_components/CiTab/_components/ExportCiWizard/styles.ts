@@ -177,4 +177,33 @@ export const s = {
   } satisfies CSSProperties,
   footer: { display: "flex", alignItems: "center", gap: 8 } satisfies CSSProperties,
   spacer: { marginLeft: "auto" } satisfies CSSProperties,
+  installCard: {
+    marginTop: 14,
+    padding: "14px 15px",
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+  } satisfies CSSProperties,
+  installTitle: { fontSize: 13, fontWeight: 600, marginBottom: 4 } satisfies CSSProperties,
+  installBody: {
+    fontSize: 12.5,
+    color: "var(--text-secondary)",
+    lineHeight: 1.55,
+    marginBottom: 12,
+  } satisfies CSSProperties,
+  installActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 12,
+  } satisfies CSSProperties,
+  prLink: { fontSize: 12.5, color: "var(--accent, #3b82f6)" } satisfies CSSProperties,
+  installDone: {
+    display: "flex",
+    gap: 7,
+    alignItems: "center",
+    marginTop: 10,
+    fontSize: 12.5,
+    color: "var(--text-secondary)",
+  } satisfies CSSProperties,
 };

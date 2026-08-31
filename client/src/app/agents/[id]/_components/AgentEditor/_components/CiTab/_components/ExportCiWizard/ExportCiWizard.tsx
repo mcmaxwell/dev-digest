@@ -9,9 +9,9 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Button, ExportWizardSteps, Icon, Modal } from "@devdigest/ui";
+import { Button, ExportWizardSteps, FormField, Icon, Modal, TextInput } from "@devdigest/ui";
 import type { Agent, CiFile, CiTarget, CiTrigger } from "@devdigest/shared";
-import { useCiBundle } from "@/lib/hooks/ci";
+import { useCiBundle, useExportCi } from "@/lib/hooks/ci";
 import { POST_AS, POST_AS_KEY, TARGETS, TRIGGERS } from "./constants";
 import { s } from "./styles";
 
@@ -33,6 +33,7 @@ function downloadFile(file: CiFile) {
 export function ExportCiWizard({ agent, onClose }: { agent: Agent; onClose: () => void }) {
   const t = useTranslations("ci");
   const bundle = useCiBundle(agent.id);
+  const install = useExportCi(agent.id);
 
   const [step, setStep] = React.useState(0);
   const [target, setTarget] = React.useState<CiTarget>("gha");
@@ -40,6 +41,7 @@ export function ExportCiWizard({ agent, onClose }: { agent: Agent; onClose: () =
   const [postAs, setPostAs] = React.useState<PostAs>("github_review");
   const [selected, setSelected] = React.useState(0);
   const [copied, setCopied] = React.useState<string | null>(null);
+  const [repo, setRepo] = React.useState("");
 
   const files = bundle.data?.files ?? [];
   // The workflow is generated first and is what the user came to look at, so it
@@ -55,6 +57,21 @@ export function ExportCiWizard({ agent, onClose }: { agent: Agent; onClose: () =
     setSelected(0);
     bundle.mutate({ target, triggers, post_as: postAs }, { onSuccess: () => setStep(2) });
   };
+
+  // The same options the preview was generated from, so what is installed is
+  // what the user just read. `base` is the repository's main branch: the PR is
+  // opened against it, and the branch itself is the server's `devdigest/ci`.
+  const installToRepo = () =>
+    install.mutate({
+      repo: repo.trim(),
+      target,
+      action: "open_pr",
+      post_as: postAs,
+      triggers,
+      base: "main",
+    });
+
+  const prUrl = install.data?.pr_url ?? null;
 
   const copy = async (file: CiFile) => {
     await navigator.clipboard.writeText(file.contents);
@@ -194,8 +211,8 @@ export function ExportCiWizard({ agent, onClose }: { agent: Agent; onClose: () =
             <div style={s.noteTop}>
               <Icon.AlertTriangle size={14} />
               <span>
-                <span style={s.noteTitle}>{t("exportWizard.placeholderTitle")}</span>{" "}
-                {t("exportWizard.placeholderBody")}
+                <span style={s.noteTitle}>{t("exportWizard.runnerNoteTitle")}</span>{" "}
+                {t("exportWizard.runnerNoteBody")}
               </span>
             </div>
             <div style={s.preview}>
@@ -239,6 +256,51 @@ export function ExportCiWizard({ agent, onClose }: { agent: Agent; onClose: () =
               </div>
             )}
 
+            {/* The install card. Copy and download stay above it: a user who
+                only wants the files never has to name a repository. */}
+            <div style={s.installCard}>
+              <div style={s.installTitle}>{t("exportWizard.installCardTitle")}</div>
+              <div style={s.installBody}>
+                {t("exportWizard.installCardBody", {
+                  repo: repo.trim() || t("exportWizard.ownerRepo"),
+                  count: files.length,
+                })}
+              </div>
+              <FormField label={t("exportWizard.repoLabel")} hint={t("exportWizard.repoHint")}>
+                <TextInput
+                  value={repo}
+                  onChange={setRepo}
+                  placeholder={t("exportWizard.repoPlaceholder")}
+                />
+              </FormField>
+              <div style={s.installActions}>
+                <Button
+                  kind="primary"
+                  icon="GitPullRequest"
+                  disabled={repo.trim().length === 0}
+                  loading={install.isPending}
+                  onClick={installToRepo}
+                >
+                  {install.isPending ? t("exportWizard.installing") : t("exportWizard.install")}
+                </Button>
+                {prUrl && (
+                  <a href={prUrl} target="_blank" rel="noreferrer" style={s.prLink}>
+                    {t("publishDialog.openPr")}
+                  </a>
+                )}
+              </div>
+              {install.isSuccess && (
+                <div style={s.installDone}>
+                  <Icon.Check size={13} />
+                  <span>{t("exportWizard.installedTitle")}</span>
+                </div>
+              )}
+              {install.isError && (
+                <div style={s.error} role="alert">
+                  {t("exportWizard.installFailed")}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { Verdict, Finding } from './findings.js';
+import { Verdict, Finding, Severity } from './findings.js';
+import { MAX_REVIEW_DIFF_CHARS, ReviewDiffResponse } from './review-diff.js';
 import { EvalRun, EvalOwnerKind, Conformance, Provider, CiFailOn } from './knowledge.js';
 
 /**
@@ -246,7 +247,8 @@ export const CiRun = z.object({
   github_url: z.string().nullable(),
   source: z.string().nullable(),
   agent: z.string().nullish(),
-  duration_s: z.number().nullish(),
+  /** The installation's repository ("owner/name"), joined for the runs list. */
+  repo: z.string().nullish(),
 });
 export type CiRun = z.infer<typeof CiRun>;
 
@@ -266,6 +268,42 @@ export const CiResultArtifact = z.object({
   pr_number: z.number().int().nullish(),
 });
 export type CiResultArtifact = z.infer<typeof CiResultArtifact>;
+
+/**
+ * Request body for `POST /ci-runs` - what the CI runner pushes back.
+ *
+ * The runner holds no model key and no GitHub token: it sends the diff it
+ * computed, and the server reviews it, posts the review and records the run.
+ * The diff bound is `MAX_REVIEW_DIFF_CHARS`, shared with `POST /reviews/diff`,
+ * because this endpoint does the same billable work plus a GitHub write.
+ */
+export const CiRunInput = z.object({
+  /** "owner/name". Must already have a `ci_installations` row, or the call 404s. */
+  repo: z.string().min(1),
+  pr_number: z.number().int().positive(),
+  /** A unified diff (base..head), exactly as `POST /reviews/diff` takes it. */
+  diff: z.string().min(1).max(MAX_REVIEW_DIFF_CHARS),
+  /** Agent slug or id. Omitted -> the workspace's default enabled agent. */
+  agent: z.string().min(1).optional(),
+  /** How the review reaches the pull request; "none" reviews without posting. */
+  post_as: z.enum(['github_review', 'pr_comment', 'none']).default('github_review'),
+  /** Severity at or above which a finding blocks. Omitted -> the agent's gate. */
+  fail_on: Severity.optional(),
+  /** Link back to the workflow run, shown on the CI Runs page. */
+  github_url: z.string().nullish(),
+});
+export type CiRunInput = z.infer<typeof CiRunInput>;
+/** Caller-facing input type - `.default()` fields stay optional. */
+export type CiRunInputBody = z.input<typeof CiRunInput>;
+
+/** Response of `POST /ci-runs`: the recorded row, the review, and whether it was posted. */
+export const CiRunResult = z.object({
+  run: CiRun,
+  review: ReviewDiffResponse,
+  /** False when posting was skipped (`post_as: "none"`) or GitHub refused it. */
+  posted: z.boolean(),
+});
+export type CiRunResult = z.infer<typeof CiRunResult>;
 
 // ===========================================================================
 // Conformance (PRD ↔ PR) — API record (the analysis shape is `Conformance`)
