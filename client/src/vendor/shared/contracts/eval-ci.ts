@@ -173,6 +173,35 @@ export const CiExport = z.object({
 });
 export type CiExport = z.infer<typeof CiExport>;
 
+/**
+ * CI bundle - the L06 first cut of Export to CI.
+ *
+ * A bundle is a PURE DERIVATION of an agent: given the agent, its skills and a
+ * few options, `POST /agents/:id/ci-bundle` returns the files that agent would
+ * be as configuration. Nothing is persisted and nothing is written to any
+ * repository, which is why this is a separate pair of shapes from
+ * `CiExportInput` / `CiExport` above - those describe the export that records a
+ * `ci_installations` row and opens a pull request, and they are deliberately
+ * left untouched for that iteration rather than widened to fit a narrower one.
+ */
+export const CiTrigger = z.enum(['opened', 'synchronize', 'reopened']);
+export type CiTrigger = z.infer<typeof CiTrigger>;
+
+/** Request body for `POST /agents/:id/ci-bundle`. */
+export const CiBundleInput = z.object({
+  target: CiTarget.default('gha'),
+  /** At least one, or the workflow would never fire. Order is normalized. */
+  triggers: z.array(CiTrigger).min(1).default(['opened', 'synchronize']),
+  post_as: z.enum(['github_review', 'pr_comment', 'none']).default('github_review'),
+});
+export type CiBundleInput = z.infer<typeof CiBundleInput>;
+/** Caller-facing input type - `.default()` fields stay optional. */
+export type CiBundleInputBody = z.input<typeof CiBundleInput>;
+
+/** Response of `POST /agents/:id/ci-bundle`. */
+export const CiBundle = z.object({ files: z.array(CiFile) });
+export type CiBundle = z.infer<typeof CiBundle>;
+
 export const CiRunStatus = z.enum(['succeeded', 'failed', 'no_findings', 'running']);
 export type CiRunStatus = z.infer<typeof CiRunStatus>;
 

@@ -70,6 +70,17 @@ the root INSIGHTS.md. Format and quality gates:
   component test all pass, because the component test renders `<XEditor>` with
   `tab` as a prop and never goes through the page. Only `./scripts/e2e.sh`
   caught it (L05's Context tab).
+  - [2026-08-31] It happened a SECOND time, to L06's CI tab, with this entry
+    already written. Documenting a duplication does not stop it; deleting the
+    duplication does. `VALID_TABS` is now DERIVED - `TABS.map((t) => t.key)` -
+    and lives in `AgentEditor/constants.ts` next to TABS, not in the page,
+    because a Next App Router `page.tsx` may export nothing but the route
+    contract (exporting a const from it fails typecheck with "Property
+    'VALID_TABS' is incompatible with index signature ... not assignable to
+    type 'never'" in `.next/types/app/.../page.ts`). `AgentEditor.test.tsx`
+    pins `VALID_TABS` against `TABS`. NOT yet done for the skills editor:
+    `app/skills/[id]/page.tsx` still hand-writes its allowlist and is the one
+    remaining instance of this trap.
 
 - [2026-08-14] A fixture whose ARRAY ORDER was written to match what the
   component happens to render is a test that cannot fail. `PrBriefCard.test.tsx`

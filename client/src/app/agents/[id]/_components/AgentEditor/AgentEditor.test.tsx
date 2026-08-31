@@ -12,6 +12,7 @@ vi.mock("../../../../../lib/hooks/agents", () => ({
 }));
 
 import { AgentEditor } from "./AgentEditor";
+import { TABS, VALID_TABS } from "./constants";
 
 afterEach(cleanup);
 
@@ -44,5 +45,14 @@ describe("A2 Agent Editor (smoke)", () => {
     expect(screen.getByText("Config")).toBeInTheDocument();
     expect(screen.getByText("Configuration")).toBeInTheDocument();
     expect(screen.getByText("Save agent")).toBeInTheDocument();
+  });
+
+  // The route normalises an unrecognised `?tab=` back to "config". When that
+  // list was maintained by hand it silently drifted from TABS, and a tab added
+  // to the strip rendered Config instead of its own panel while the URL claimed
+  // otherwise - the CI tab shipped that way and only the browser suite caught
+  // it. VALID_TABS is now derived, and this pins the two together.
+  it("accepts every tab in the strip as a valid ?tab= value", () => {
+    expect([...VALID_TABS].sort()).toEqual(TABS.map((t) => t.key).sort());
   });
 });

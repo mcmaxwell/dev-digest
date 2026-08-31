@@ -41,7 +41,8 @@
       "target": "Target",
       "preview": "Preview",
       "configure": "Configure",
-      "install": "Install"
+      "install": "Install",
+      "previewInstall": "Preview & install"
     },
     "targets": {
       "gha": "GitHub Actions",
@@ -72,7 +73,24 @@
     "installCardTitle": "Open a PR with these files",
     "installCardBody": "DevDigest opens a PR in {repo} titled “Add DevDigest CI review” with the {count} generated files.",
     "ownerRepo": "owner/repo",
-    "secretNote": "Add {key} to the repo's Actions secrets before the workflow runs."
+    "secretNote": "Add {key} to the repo's Actions secrets before the workflow runs.",
+    "unavailable": "not yet available",
+    "triggers": {
+      "opened": "Pull request opened",
+      "synchronize": "New commits pushed",
+      "reopened": "Pull request reopened"
+    },
+    "triggerHint": "Pick at least one event, or the workflow never fires.",
+    "generateFailed": "Could not generate the bundle.",
+    "retry": "Try again",
+    "copy": "Copy",
+    "copied": "Copied",
+    "download": "Download",
+    "fileCount": "{count, plural, one {# file} other {# files}}",
+    "noSkillsNote": "This agent has no skills attached, so the bundle is the workflow and the manifest.",
+    "placeholderTitle": "The workflow does not run a review yet",
+    "placeholderBody": "Its review step is a marked placeholder. The file that carries the agent is the manifest under .devdigest/agents/ - commit it and the agent becomes readable, diffable and shareable.",
+    "done": "Done"
   },
   "ciTab": {
     "heading": "Continuous Integration",
@@ -82,7 +100,10 @@
     "update": "Update CI",
     "noRepo": "Connect a repository first",
     "empty": "Not deployed to CI yet. Use “Publish to CI” to open a PR that adds the workflow + agent config.",
-    "installed": "installed {date}"
+    "installed": "installed {date}",
+    "explainer": "Export turns this agent into plain files you can commit: a manifest that is the agent - model, prompt, skills and gate policy - one Markdown file per attached skill, and a GitHub Actions workflow.",
+    "pointNoWrite": "Nothing is written to any repository. The files are yours to copy or download.",
+    "pointNoState": "Nothing is recorded here, so exporting again is the same as exporting the first time."
   },
   "publishDialog": {
     "title": "Publish to CI",

@@ -80,6 +80,16 @@ the root INSIGHTS.md. Format and quality gates:
   points `pnpm typecheck` at a directory that only exists after e2e has run
   (`restore_snapshot` in `scripts/e2e.sh`).
 
+- [2026-08-31] `find text "<entity name>" click` on a detail page is AMBIGUOUS:
+  the app's header breadcrumb carries the same name, `find` takes the first
+  match, and clicking a breadcrumb crumb navigates nowhere - the step reports
+  `Done` and the following `wait --url` is what fails, pointing at the wrong
+  place. Locate a card by a string only that card has: `13-export-ci.flow.json`
+  clicks the agent's DESCRIPTION ("Flags secrets, injection, SSRF and the
+  lethal trifecta before merge.") instead of "Security Reviewer". Agent cards
+  are plain `div`s with an `onClick`, so `find role button` is not available
+  for them.
+
 ## Recurring Errors & Fixes
 
 - [2026-08-13] `specs/11-project-context.flow.json` failed one run at step 4
@@ -122,5 +132,15 @@ the root INSIGHTS.md. Format and quality gates:
   files the suite writes to.
 
 ## Session Notes
+
+- [2026-08-31] Intermittent, unreproduced: across four consecutive
+  `./scripts/e2e.sh` runs of the SAME tree, run 1 failed only flow 11 at
+  `wait --url /context` and run 2 failed only flow 12 at `wait --url
+  /onboarding`; runs 3 and 4 passed 13/13. Both failing steps are a sidebar
+  click followed immediately by `wait --url`, which suggests a race between the
+  click and a client-side navigation rather than a broken flow. Not fixed:
+  there was no reproduction to fix against, and the suite is green. If it
+  recurs, suspect the click landing before the router is listening, and try
+  `wait --load networkidle` between the click and the `wait --url`.
 
 ## Open Questions

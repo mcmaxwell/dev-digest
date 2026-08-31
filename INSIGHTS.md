@@ -27,6 +27,17 @@ the matching one, never rewrite old entries. Package-specific lessons go to
     with `run-executor.ts:404` hardcoding `specs_read: []` as the only missing
     link. Checking the CLIENT renderer before planning UI work is what tells you
     whether a lesson is a wiring job or a build.
+  - [2026-08-30] Scaffolding can be COMPLETE on the data side and entirely
+    ABSENT on the execution side, so check the executor, not just the tables and
+    the contracts. Export to CI ships `ci_installations` + `ci_runs`
+    (`server/src/db/schema/ci.ts`), the full contract set (`CiExportInput`,
+    `CiExport`, `AgentManifest`, `CiResultArtifact` in
+    `contracts/eval-ci.ts`), and `agents.ciFailOn` - yet nothing can run a
+    review inside CI: `mcp/bin/devdigest` implements only `--mode working`
+    (`mcp/src/cli/modes.ts` registers `branch` and `staged` as explicitly NOT
+    implemented) and reaches the API over HTTP, which a GitHub-hosted runner
+    cannot do against a local-first server. Before spec'ing any feature that
+    EMITS config, verify the binary that config invokes actually exists.
 
 ## What Doesn't Work
 
@@ -161,6 +172,14 @@ the matching one, never rewrite old entries. Package-specific lessons go to
   and lists the agents loaded at start. Editing an existing agent file takes
   effect, adding one needs a session restart — budget for that before planning
   a live smoke test of a brand-new agent.
+
+- [2026-08-30] NEVER write `grep -rn PATTERN dir --include=*.ts` in this repo's
+  zsh: zsh expands the glob before grep sees it and the whole command dies with
+  `(eval):1: no matches found: --include=*.ts`, returning NOTHING - which reads
+  exactly like "this code does not exist". Always quote it: `--include='*.ts'`.
+  This produced a false "there is no CI code in the repo" while spec'ing
+  `L06-export-ci`, when `server/src/db/schema/ci.ts` and the complete
+  `contracts/eval-ci.ts` were already present.
 
 ## Recurring Errors & Fixes
 

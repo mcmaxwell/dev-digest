@@ -537,6 +537,19 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   must treat blank content as absent or it fills its budget with empty slices.
   Guard with `raw && raw.trim().length > 0`, not `raw !== null`.
 
+- [2026-08-31] NEVER hand-roll YAML for a string a user or a model authored -
+  use the `yaml` package (added to server for `modules/ci/bundle.ts`). Probing
+  the four cases that break naive block-scalar emission showed each needs a
+  DIFFERENT construct, none of which a hand-written serializer usually emits:
+  a first line that is indented needs an explicit indentation indicator
+  (`|2-`), trailing blank lines need keep-chomping (`|+`), and a tab or a CRLF
+  cannot be a literal block at all and must fall back to a double-quoted
+  scalar. A prompt containing `---` / `...` is safely indented inside the block
+  and cannot start a new document. The library got all of them right; the point
+  of failure would have been silent - a corrupt file the user commits. Belt and
+  braces in `agentYaml()`: validate the object BEFORE serializing and re-parse
+  the emitted text AFTER, comparing the round-tripped prompt.
+
 ## Recurring Errors & Fixes
 
 - [2026-08-13] A single `*.it.test.ts` file failing the whole SUITE (not a test)
