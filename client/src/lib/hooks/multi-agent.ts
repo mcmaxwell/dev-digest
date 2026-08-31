@@ -21,6 +21,8 @@ import type {
 // copies will silently drift. ----
 export const multiAgentKeys = {
   estimates: () => ["agent-run-estimates"] as const,
+  /** Every repo's list at once - the start mutation knows a pull request, not a repo. */
+  allRepoRuns: () => ["repo-multi-agent-runs"] as const,
   repoRuns: (repoId: string | null | undefined) => ["repo-multi-agent-runs", repoId] as const,
   run: (runId: string | null | undefined) => ["multi-agent-run", runId] as const,
 };
@@ -76,7 +78,7 @@ export function useStartMultiAgentRun() {
       // Seed the results cache so the screen the user lands on paints from the
       // response instead of flashing a spinner for one poll interval.
       qc.setQueryData(multiAgentKeys.run(run.id), run);
-      qc.invalidateQueries({ queryKey: ["repo-multi-agent-runs"] });
+      qc.invalidateQueries({ queryKey: multiAgentKeys.allRepoRuns() });
     },
   });
 }
