@@ -128,6 +128,16 @@ export function parseArgs(argv: readonly string[]): Command {
       case '--base': {
         const value = readValue();
         if (value === undefined) return missingValue('--base');
+        // Belt to `--end-of-options`' braces (git.ts). `readValue` already
+        // refuses a following token starting with `--`, but `--base=-x` is one
+        // token and slips past it, and git reads a leading-dash rev as an
+        // option.
+        if (value.startsWith('-')) {
+          return {
+            kind: 'usage-error',
+            message: `--base takes a git ref, not an option ("${value}").`,
+          };
+        }
         cmd.base = value;
         break;
       }

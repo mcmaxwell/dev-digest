@@ -168,7 +168,12 @@ export type CiInstallation = z.infer<typeof CiInstallation>;
 
 /** Response of `POST /agents/:id/export-ci`. */
 export const CiExport = z.object({
-  installation: CiInstallation,
+  /**
+   * Null for `action: "files"`. Nothing is installed by downloading files, and
+   * a row recorded there would both inflate "Active in N repos" and mint the
+   * proof of installation that `POST /ci-runs` gates on.
+   */
+  installation: CiInstallation.nullable(),
   files: z.array(CiFile),
   pr_url: z.string().nullable(),
 });
@@ -261,7 +266,11 @@ export const CiRunInput = z.object({
   /** Severity at or above which a finding blocks. Omitted -> the agent's gate. */
   fail_on: Severity.optional(),
   /** Link back to the workflow run, shown on the CI Runs page. */
-  github_url: z.string().nullish(),
+  github_url: z
+    .string()
+    .max(2048)
+    .regex(/^https:\/\//, 'must be an https URL')
+    .nullish(),
 });
 export type CiRunInput = z.infer<typeof CiRunInput>;
 /** Caller-facing input type - `.default()` fields stay optional. */

@@ -62,12 +62,21 @@ export class CiService {
    * Install the agent into a repository.
    *
    * `action: "open_pr"` commits the generated files onto `devdigest/ci` as one
-   * atomic commit and opens (or reuses) the pull request that merges them;
-   * `action: "files"` records the installation and returns the same files
-   * without touching GitHub at all. Either way the `ci_installations` row for
-   * `(agent, repo)` is created at most once - a second export of the same pair
-   * returns the first row and, because `findOpenPr` is consulted before
-   * `openPullRequest`, does not open a second pull request.
+   * atomic commit, opens (or reuses) the pull request that merges them, and
+   * records the `ci_installations` row. `action: "files"` returns the same
+   * files, touches GitHub not at all, and records NOTHING - nothing was
+   * installed, so claiming an installation would make "Active in N repos"
+   * count downloads.
+   *
+   * TWO THINGS GUARD THE GITHUB WRITE, and both are load-bearing because this
+   * server has no authentication on any route and binds 0.0.0.0:
+   *  - `parseRepoRef` proves the string is repository-SHAPED;
+   *  - `reposRepo.findByFullName` proves it is a repository this workspace
+   *    actually imported. Without the second, a caller could name any
+   *    repository the user's PAT can write to and have DevDigest commit to it.
+   *    Recording the installation only after a successful publish is the other
+   *    half: it stops `action: "files"` from minting the row that
+   *    `POST /ci-runs` treats as proof of installation.
    */
   async export(workspaceId: string, agentId: string, input: CiExportInput): Promise<CiExport> {
     const ref = parseRepoRef(input.repo);
@@ -79,6 +88,16 @@ export class CiService {
       );
     }
 
+    const owned = await this.container.reposRepo.findByFullName(
+      workspaceId,
+      `${ref.owner}/${ref.name}`,
+    );
+    if (!owned) {
+      throw new NotFoundError(
+        `"${input.repo}" is not a repository in this workspace. Import it first.`,
+      );
+    }
+
     const { agent, skills, row: agentRow } = await this.loadAgent(workspaceId, agentId);
     const files = buildBundle(agent, skills, {
       target: input.target,
@@ -86,11 +105,16 @@ export class CiService {
       post_as: input.post_as,
     });
 
-    const pr_url = input.action === 'open_pr' ? await this.publish(ref, input.base, files) : null;
+    if (input.action !== 'open_pr') {
+      return { installation: null, files, pr_url: null };
+    }
 
-    // One transaction around the read-then-insert: `ci_installations` has no
-    // unique index on `(agent_id, repo)`, so the pair of statements is the only
-    // thing keeping a double click from recording the repository twice.
+    const pr_url = await this.publish(ref, input.base, files);
+
+    // Only now, with the files actually on a branch behind a pull request. One
+    // transaction around the read-then-insert: `ci_installations` has no unique
+    // index on `(agent_id, repo)`, so the pair of statements is the only thing
+    // keeping a double click from recording the repository twice.
     const row = await this.repo.transaction((tx) =>
       this.repo.upsertInstallation(
         { agentId: agentRow.id, repo: input.repo, targetType: input.target },
