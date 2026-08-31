@@ -2,23 +2,156 @@
   "name": "Project Context page renders the clone-less states, and the agent's Context tab links back to it",
   "description": "L05. The seeded stack has NO clone — seed.ts inserts acme/payments-api with clonePath: null and scripts/e2e.sh uses an ephemeral Postgres — so this flow asserts exactly the states a clone-less stack produces: the sidebar entry navigates to /repos/:repoId/context, the page renders the not-yet-cloned state naming the clone as the missing prerequisite (AC-11), and the agent editor's Context tab renders '0 of 0 attached' with its link back to the page. Read-only: nothing here writes, so the flow is re-runnable against a stack it does not own. Opening a document, refreshing a scan and attaching a document are NOT reachable without a real clone, and faking one would mean writing into server/clones/** — those are covered by the server integration lane instead.",
   "steps": [
-    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
-    { "cmd": ["wait", "--load", "networkidle"], "label": "initial data fetch settles" },
-    { "cmd": ["wait", "--url", "/pulls"], "label": "root redirects to a repo's PRs" },
-    { "cmd": ["find", "text", "Project Context", "click"], "label": "sidebar entry navigates to Project Context" },
-    { "cmd": ["wait", "--url", "/context"], "label": "repo-scoped context route reached" },
-    { "cmd": ["wait", "--load", "networkidle"], "label": "document list fetch settles" },
-    { "cmd": ["wait", "--text", "This repository has no clone yet"], "label": "not-yet-cloned state renders (AC-11)" },
-    { "cmd": ["wait", "--text", "Project documents are read from the repository's clone on disk"], "label": "the state names the clone as the missing prerequisite" },
-    { "cmd": ["find", "text", "Agents", "click"], "label": "sidebar navigates to the agents list" },
-    { "cmd": ["wait", "--url", "/agents"], "label": "agents route reached" },
-    { "cmd": ["wait", "--load", "networkidle"], "label": "agents fetch settles" },
-    { "cmd": ["find", "text", "Security Reviewer", "click"], "label": "open a seeded agent" },
-    { "cmd": ["wait", "--url", "/agents/"], "label": "agent editor route reached" },
-    { "cmd": ["wait", "--text", "Configuration"], "label": "editor tabs render" },
-    { "cmd": ["find", "role", "button", "click", "--name", "Context", "--exact"], "label": "switch to the Context tab" },
-    { "cmd": ["wait", "--text", "0 of 0 attached"], "label": "zero-document state on the Context tab" },
-    { "cmd": ["find", "text", "Open Project Context", "click"], "label": "the empty state links back to the page" },
-    { "cmd": ["wait", "--url", "/context"], "label": "link lands on the Project Context page" }
+    {
+      "cmd": [
+        "open",
+        "{BASE}/"
+      ],
+      "label": "load the app root"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "initial data fetch settles"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls"
+      ],
+      "label": "root redirects to a repo's PRs"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Project Context",
+        "click"
+      ],
+      "label": "sidebar entry navigates to Project Context"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/context"
+      ],
+      "label": "repo-scoped context route reached"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "document list fetch settles"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "This repository has no clone yet"
+      ],
+      "label": "not-yet-cloned state renders (AC-11)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Project documents are read from the repository's clone on disk"
+      ],
+      "label": "the state names the clone as the missing prerequisite"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Agents",
+        "click"
+      ],
+      "label": "sidebar navigates to the agents list"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/agents"
+      ],
+      "label": "agents route reached"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "agents fetch settles"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Flags secrets, injection, SSRF and the lethal trifecta before merge.",
+        "click"
+      ],
+      "label": "open a seeded agent by its card description (the NAME alone is ambiguous - it also lands in the header breadcrumb, and find takes the first match)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/agents/"
+      ],
+      "label": "agent editor route reached"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Configuration"
+      ],
+      "label": "editor tabs render"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Context",
+        "--exact"
+      ],
+      "label": "switch to the Context tab"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "0 of 0 attached"
+      ],
+      "label": "zero-document state on the Context tab"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Open Project Context",
+        "click"
+      ],
+      "label": "the empty state links back to the page"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/context"
+      ],
+      "label": "link lands on the Project Context page"
+    }
   ]
 }
