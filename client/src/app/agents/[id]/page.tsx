@@ -10,12 +10,9 @@ import { Button, Dropdown, ErrorState, Skeleton, Icon, Badge } from "@devdigest/
 import { useSetCrumb } from "@/lib/shell-crumb";
 import { AgentCard } from "../_components/AgentCard";
 import { AgentEditor } from "./_components/AgentEditor";
+import { VALID_TABS } from "./_components/AgentEditor/constants";
 import { useAgents, useAgent, useUpdateAgent } from "@/lib/hooks/agents";
 import { ApiError } from "@/lib/api";
-
-/** Must stay in step with `AgentEditor/constants.ts` TABS — a key missing here
-    is silently normalised back to "config", so the tab can never be opened. */
-const VALID_TABS = ["config", "skills", "context", "evals", "runs"];
 
 export default function AgentEditorPage() {
   const t = useTranslations("agents");

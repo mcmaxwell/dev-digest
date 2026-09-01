@@ -10,6 +10,7 @@ import { DEFAULT_MODE, isMode, MODES } from './modes.js';
 
 export type Severity = 'CRITICAL' | 'WARNING' | 'SUGGESTION';
 export type Format = 'text' | 'json';
+export type PostAs = 'github_review' | 'pr_comment' | 'none';
 
 export interface ReviewCommand {
   kind: 'review';
@@ -19,6 +20,18 @@ export interface ReviewCommand {
   severityMin?: Severity;
   format: Format;
   apiUrl?: string;
+  /** The ref a base-relative mode diffs against (`--mode branch` needs one). */
+  base?: string;
+  /**
+   * `--repo` and `--pr` together switch the CLI from `POST /reviews/diff` to
+   * `POST /ci-runs`: the server then records the run and posts the review.
+   * Neither is useful without the other, so one without the other is refused.
+   */
+  repo?: string;
+  prNumber?: number;
+  postAs?: PostAs;
+  /** Where to write the `CiResultArtifact` JSON, for `upload-artifact`. */
+  ciResult?: string;
 }
 
 export type Command =
@@ -32,6 +45,8 @@ const SEVERITIES: Record<string, Severity> = {
   warning: 'WARNING',
   suggestion: 'SUGGESTION',
 };
+
+const POST_AS: readonly PostAs[] = ['github_review', 'pr_comment', 'none'];
 
 export function parseArgs(argv: readonly string[]): Command {
   const [first, ...rest] = argv;
@@ -110,6 +125,67 @@ export function parseArgs(argv: readonly string[]): Command {
         cmd.format = value;
         break;
       }
+      case '--base': {
+        const value = readValue();
+        if (value === undefined) return missingValue('--base');
+        // Belt to `--end-of-options`' braces (git.ts). `readValue` already
+        // refuses a following token starting with `--`, but `--base=-x` is one
+        // token and slips past it, and git reads a leading-dash rev as an
+        // option.
+        if (value.startsWith('-')) {
+          return {
+            kind: 'usage-error',
+            message: `--base takes a git ref, not an option ("${value}").`,
+          };
+        }
+        cmd.base = value;
+        break;
+      }
+      case '--repo': {
+        const value = readValue();
+        if (value === undefined) return missingValue('--repo');
+        const parts = value.split('/');
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+          return {
+            kind: 'usage-error',
+            message: `--repo takes owner/name, not "${value}".`,
+          };
+        }
+        cmd.repo = value;
+        break;
+      }
+      case '--pr': {
+        const value = readValue();
+        if (value === undefined) return missingValue('--pr');
+        // `Number()` alone accepts "1e3", " 12 " and "0x1f"; a pull request
+        // number is decimal digits and nothing else.
+        if (!/^[0-9]+$/.test(value) || Number(value) < 1) {
+          return {
+            kind: 'usage-error',
+            message: `--pr takes a pull request number, not "${value}".`,
+          };
+        }
+        cmd.prNumber = Number(value);
+        break;
+      }
+      case '--post-as': {
+        const value = readValue();
+        if (value === undefined) return missingValue('--post-as');
+        if (!POST_AS.includes(value as PostAs)) {
+          return {
+            kind: 'usage-error',
+            message: `--post-as takes ${POST_AS.join(', ')}, not "${value}".`,
+          };
+        }
+        cmd.postAs = value as PostAs;
+        break;
+      }
+      case '--ci-result': {
+        const value = readValue();
+        if (value === undefined) return missingValue('--ci-result');
+        cmd.ciResult = value;
+        break;
+      }
       case '--api': {
         const value = readValue();
         if (value === undefined) return missingValue('--api');
@@ -122,6 +198,21 @@ export function parseArgs(argv: readonly string[]): Command {
           message: `Unknown option "${name}". Run devdigest review --help to see the flags.`,
         };
     }
+  }
+
+  // A CI run needs both halves: `--repo` alone has nothing to post to, and
+  // `--pr` alone has no repository to post it in.
+  if ((cmd.repo === undefined) !== (cmd.prNumber === undefined)) {
+    return {
+      kind: 'usage-error',
+      message: '--repo and --pr go together: both name the pull request the review is posted to.',
+    };
+  }
+  if (cmd.postAs !== undefined && cmd.repo === undefined) {
+    return {
+      kind: 'usage-error',
+      message: '--post-as only means something with --repo and --pr, which name where to post.',
+    };
   }
 
   return cmd;

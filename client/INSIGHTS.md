@@ -88,6 +88,17 @@ the root INSIGHTS.md. Format and quality gates:
   component test all pass, because the component test renders `<XEditor>` with
   `tab` as a prop and never goes through the page. Only `./scripts/e2e.sh`
   caught it (L05's Context tab).
+  - [2026-08-31] It happened a SECOND time, to L06's CI tab, with this entry
+    already written. Documenting a duplication does not stop it; deleting the
+    duplication does. `VALID_TABS` is now DERIVED - `TABS.map((t) => t.key)` -
+    and lives in `AgentEditor/constants.ts` next to TABS, not in the page,
+    because a Next App Router `page.tsx` may export nothing but the route
+    contract (exporting a const from it fails typecheck with "Property
+    'VALID_TABS' is incompatible with index signature ... not assignable to
+    type 'never'" in `.next/types/app/.../page.ts`). `AgentEditor.test.tsx`
+    pins `VALID_TABS` against `TABS`. NOT yet done for the skills editor:
+    `app/skills/[id]/page.tsx` still hand-writes its allowlist and is the one
+    remaining instance of this trap.
 
 - [2026-08-14] A fixture whose ARRAY ORDER was written to match what the
   component happens to render is a test that cannot fail. `PrBriefCard.test.tsx`
@@ -235,6 +246,23 @@ the root INSIGHTS.md. Format and quality gates:
   a constant - the title wraps, and merged/closed PRs grow a stale banner. A
   shared component must never encode any page's pixel dimensions; the fallback
   is for the no-chrome case only.
+- [2026-08-31] A colocated component test that renders with ONLY
+  `NextIntlClientProvider` breaks the day its component grows a data hook -
+  `useQuery` throws "No QueryClient set". Do NOT wrap the test in a
+  `QueryClientProvider`: that turns a render test into a fetch test. Add
+  `vi.mock("@/lib/hooks/<file>", ...)` returning the shape the component reads
+  (`{ data }`, `{ mutate, isPending }`), which is what `CiTab.test.tsx` and
+  `ExportCiWizard.test.tsx` do. The mock must list EVERY hook the component
+  imports from that module, or the missing one is `undefined` at call time and
+  the failure reads as an unrelated render error.
+- [2026-08-31] When two features expose the same agent field (the CI tab and the
+  Config tab both write `agents.ci_fail_on`), share the MESSAGE KEYS, not the
+  constants module: `no-restricted-imports` forbids reaching into a sibling
+  feature's `_components/`, so `CiTab` declares its own four-value list and
+  labels the options with `useTranslations("agents")`
+  (`config.ciFailOnOptions.*`). One copy of the wording, no cross-feature
+  import, and the field itself stays single-sourced because both controls go
+  through `useUpdateAgent`.
 
 - [2026-08-31] Reading `localStorage` for a remembered UI preference must happen
   in an EFFECT, never in the `useState` initialiser: every route here is a

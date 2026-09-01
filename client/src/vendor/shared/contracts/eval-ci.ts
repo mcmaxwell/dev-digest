@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { Verdict, Finding } from './findings.js';
-import { EvalRun, EvalOwnerKind, Conformance } from './knowledge.js';
+import { Verdict, Finding, Severity } from './findings.js';
+import { MAX_REVIEW_DIFF_CHARS, ReviewDiffResponse } from './review-diff.js';
+import { EvalRun, EvalOwnerKind, Conformance, Provider, CiFailOn } from './knowledge.js';
 
 /**
  * A4 — Eval / CI / Compose / Conformance API contracts (L06).
@@ -141,6 +142,35 @@ export const CiFile = z.object({
 });
 export type CiFile = z.infer<typeof CiFile>;
 
+/**
+ * AgentManifest — the agent contract shared by the studio and the CI runner.
+ *
+ * The studio (`CiService.agentYaml`) WRITES this shape to
+ * `.devdigest/agents/<slug>.yaml`; the agent-runner READS it. Keeping one Zod
+ * schema for both ends guarantees the formats never drift. `skills` are slugs
+ * resolved to `.devdigest/skills/<slug>.md`.
+ */
+export const AgentManifest = z.object({
+  name: z.string().min(1),
+  provider: Provider.default('openrouter'),
+  model: z.string().min(1),
+  system_prompt: z.string(),
+  // Tolerate both a missing key and an explicit `null` (YAML `skills:` with no
+  // value parses to null, which `.default([])` does NOT catch) — normalize both
+  // to an empty array so manifests without skills validate cleanly.
+  skills: z
+    .array(z.string())
+    .nullish()
+    .transform((v) => v ?? []),
+  strategy: z.enum(['auto', 'single-pass', 'map-reduce']).default('auto'),
+  // CI gate policy (see CiFailOn) — when the posted review should BLOCK
+  // (REQUEST_CHANGES + fail the check) vs just comment. Default: block on critical.
+  ci_fail_on: CiFailOn.default('critical'),
+});
+export type AgentManifest = z.infer<typeof AgentManifest>;
+/** Caller-facing input type — `.default()` fields stay optional. */
+export type AgentManifestInput = z.input<typeof AgentManifest>;
+
 /** Request body for `POST /agents/:id/export-ci`. */
 export const CiExportInput = z.object({
   repo: z.string().min(1), // "owner/name"
@@ -167,11 +197,45 @@ export type CiInstallation = z.infer<typeof CiInstallation>;
 
 /** Response of `POST /agents/:id/export-ci`. */
 export const CiExport = z.object({
-  installation: CiInstallation,
+  /**
+   * Null for `action: "files"`. Nothing is installed by downloading files, and
+   * a row recorded there would both inflate "Active in N repos" and mint the
+   * proof of installation that `POST /ci-runs` gates on.
+   */
+  installation: CiInstallation.nullable(),
   files: z.array(CiFile),
   pr_url: z.string().nullable(),
 });
 export type CiExport = z.infer<typeof CiExport>;
+
+/**
+ * CI bundle - the L06 first cut of Export to CI.
+ *
+ * A bundle is a PURE DERIVATION of an agent: given the agent, its skills and a
+ * few options, `POST /agents/:id/ci-bundle` returns the files that agent would
+ * be as configuration. Nothing is persisted and nothing is written to any
+ * repository, which is why this is a separate pair of shapes from
+ * `CiExportInput` / `CiExport` above - those describe the export that records a
+ * `ci_installations` row and opens a pull request, and they are deliberately
+ * left untouched for that iteration rather than widened to fit a narrower one.
+ */
+export const CiTrigger = z.enum(['opened', 'synchronize', 'reopened']);
+export type CiTrigger = z.infer<typeof CiTrigger>;
+
+/** Request body for `POST /agents/:id/ci-bundle`. */
+export const CiBundleInput = z.object({
+  target: CiTarget.default('gha'),
+  /** At least one, or the workflow would never fire. Order is normalized. */
+  triggers: z.array(CiTrigger).min(1).default(['opened', 'synchronize']),
+  post_as: z.enum(['github_review', 'pr_comment', 'none']).default('github_review'),
+});
+export type CiBundleInput = z.infer<typeof CiBundleInput>;
+/** Caller-facing input type - `.default()` fields stay optional. */
+export type CiBundleInputBody = z.input<typeof CiBundleInput>;
+
+/** Response of `POST /agents/:id/ci-bundle`. */
+export const CiBundle = z.object({ files: z.array(CiFile) });
+export type CiBundle = z.infer<typeof CiBundle>;
 
 export const CiRunStatus = z.enum(['succeeded', 'failed', 'no_findings', 'running']);
 export type CiRunStatus = z.infer<typeof CiRunStatus>;
@@ -188,7 +252,8 @@ export const CiRun = z.object({
   github_url: z.string().nullable(),
   source: z.string().nullable(),
   agent: z.string().nullish(),
-  duration_s: z.number().nullish(),
+  /** The installation's repository ("owner/name"), joined for the runs list. */
+  repo: z.string().nullish(),
 });
 export type CiRun = z.infer<typeof CiRun>;
 
@@ -209,6 +274,46 @@ export const CiResultArtifact = z.object({
 });
 export type CiResultArtifact = z.infer<typeof CiResultArtifact>;
 
+/**
+ * Request body for `POST /ci-runs` - what the CI runner pushes back.
+ *
+ * The runner holds no model key and no GitHub token: it sends the diff it
+ * computed, and the server reviews it, posts the review and records the run.
+ * The diff bound is `MAX_REVIEW_DIFF_CHARS`, shared with `POST /reviews/diff`,
+ * because this endpoint does the same billable work plus a GitHub write.
+ */
+export const CiRunInput = z.object({
+  /** "owner/name". Must already have a `ci_installations` row, or the call 404s. */
+  repo: z.string().min(1),
+  pr_number: z.number().int().positive(),
+  /** A unified diff (base..head), exactly as `POST /reviews/diff` takes it. */
+  diff: z.string().min(1).max(MAX_REVIEW_DIFF_CHARS),
+  /** Agent slug or id. Omitted -> the workspace's default enabled agent. */
+  agent: z.string().min(1).optional(),
+  /** How the review reaches the pull request; "none" reviews without posting. */
+  post_as: z.enum(['github_review', 'pr_comment', 'none']).default('github_review'),
+  /** Severity at or above which a finding blocks. Omitted -> the agent's gate. */
+  fail_on: Severity.optional(),
+  /** Link back to the workflow run, shown on the CI Runs page. */
+  github_url: z
+    .string()
+    .max(2048)
+    .regex(/^https:\/\//, 'must be an https URL')
+    .nullish(),
+});
+export type CiRunInput = z.infer<typeof CiRunInput>;
+/** Caller-facing input type - `.default()` fields stay optional. */
+export type CiRunInputBody = z.input<typeof CiRunInput>;
+
+/** Response of `POST /ci-runs`: the recorded row, the review, and whether it was posted. */
+export const CiRunResult = z.object({
+  run: CiRun,
+  review: ReviewDiffResponse,
+  /** False when posting was skipped (`post_as: "none"`) or GitHub refused it. */
+  posted: z.boolean(),
+});
+export type CiRunResult = z.infer<typeof CiRunResult>;
+
 // ===========================================================================
 // Conformance (PRD ↔ PR) — API record (the analysis shape is `Conformance`)
 // ===========================================================================
@@ -217,7 +322,7 @@ export type CiResultArtifact = z.infer<typeof CiResultArtifact>;
 export const ConformanceInput = z.object({
   /** Spec path/id to compare against; if omitted, the first available spec. */
   spec: z.string().nullish(),
-  provider: z.enum(['openai', 'anthropic']).nullish(),
+  provider: z.enum(['openai', 'anthropic', 'openrouter']).nullish(),
   model: z.string().nullish(),
 });
 export type ConformanceInput = z.infer<typeof ConformanceInput>;

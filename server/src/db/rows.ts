@@ -25,3 +25,5 @@ export type EvalRunRow = typeof t.evalRuns.$inferSelect;
 export type EvalSuiteRunRow = typeof t.evalSuiteRuns.$inferSelect;
 export type ConventionRow = typeof t.conventions.$inferSelect;
 export type ConventionScanRow = typeof t.conventionScans.$inferSelect;
+export type CiInstallationRow = typeof t.ciInstallations.$inferSelect;
+export type CiRunRow = typeof t.ciRuns.$inferSelect;

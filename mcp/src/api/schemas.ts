@@ -297,6 +297,25 @@ export const DiffReview = z.object({
 });
 export type DiffReview = z.infer<typeof DiffReview>;
 
+// --- CI run ingest (POST /ci-runs, the workflow this CLI runs inside) -------
+
+/**
+ * What the server recorded, mirrored as narrowly as `DiffReview` is: the CLI
+ * prints none of it and only needs to know the run exists. `posted` is the one
+ * field worth surfacing, because "the review ran but GitHub refused it" is
+ * invisible from the pull request.
+ */
+export const CiRunResult = z.object({
+  run: z.object({
+    id: z.string(),
+    pr_number: z.number().int().nullish(),
+    status: z.string().nullish(),
+  }),
+  review: DiffReview,
+  posted: z.boolean().catch(false),
+});
+export type CiRunResult = z.infer<typeof CiRunResult>;
+
 export const RepoList = z.array(Repo);
 export const AgentList = z.array(Agent);
 export const RunSummaryList = z.array(RunSummary);

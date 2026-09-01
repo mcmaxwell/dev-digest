@@ -489,6 +489,38 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   separate extraction schema because what the model returns is not what is
   persisted; intent persists exactly what it receives, so a second definition
   could only drift.
+- [2026-08-31] A cross-module dependency on a FUNCTION that lives outside
+  `service.ts`/`types.ts`/`constants.ts` is solved by one re-export line in the
+  owning module's `service.ts`, never by importing the file directly and never
+  by moving the function. `modules/ci/service.ts` needs `reviewDiff`, which
+  lives in `modules/reviews/diff-review.ts`; `reviews/service.ts` now re-exports
+  it beside the `helpers.js` re-exports it already had. The consumer's import
+  stays `../reviews/service.js`, `no-cross-module-imports` holds with no
+  allowlist entry, and the seam is visible in the file a reader opens first.
+  - [2026-08-31] CORRECTION to the entry above, after architecture review
+    rejected it: a bare `export { fn } from './file.js'` in `service.ts`
+    satisfies the RULE'S REGEX but not its stated exception, which is
+    "a module may CONSTRUCT another module's service". Make it a real method
+    (`ReviewService.diff` delegates to `reviewDiff`) and have the consumer do
+    `new ReviewService(this.container).diff(...)`. Do NOT instead move the
+    function to `modules/_shared/` - `diff-review.ts` imports `./constants.js`
+    and `./helpers.js`, so moving it makes the shared layer depend on
+    `modules/reviews/`, which is strictly worse.
+  - [2026-08-31] When a delegating method must accept a NARROWER logger than
+    the one its own file already imports (`reviews/service.ts` imports the
+    4-method `Logger` from `run-executor.ts`, while `reviewDiff` wants only
+    `{ info }`), type the parameter as `Parameters<typeof reviewDiff>[3]`
+    rather than restating the structural type under a second name. A restated
+    copy would widen the accepted shape and break the `{ info }`-only logger
+    that `ci/service.ts` passes.
+- [2026-08-31] `ci_installations` and `ci_runs` are the SECOND and third tables
+  with no `workspace_id` (after `pr_intent`), and the pattern for reads that do
+  not start from an already-resolved id is now explicit: the repository method
+  takes `workspaceId` and INNER JOINs through `agents`
+  (`CiRepository.installationForRepo`, `.listRuns`). An inner join is the point
+  - a run whose installation is gone belongs to no workspace and must not fall
+  into another one's list. Everything that starts from an agent id is scoped one
+  layer up by `container.agentsRepo.getById(workspaceId, agentId)` instead.
 
 - [2026-08-31] A contract shape that has never had a consumer is NOT evidence it
   describes the feature. L07's `AgentColumn` had sat in `contracts/observability.ts`
@@ -562,6 +594,19 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   rejecting (`src/adapters/mocks.ts`), so any "read these optional files" sampler
   must treat blank content as absent or it fills its budget with empty slices.
   Guard with `raw && raw.trim().length > 0`, not `raw !== null`.
+
+- [2026-08-31] NEVER hand-roll YAML for a string a user or a model authored -
+  use the `yaml` package (added to server for `modules/ci/bundle.ts`). Probing
+  the four cases that break naive block-scalar emission showed each needs a
+  DIFFERENT construct, none of which a hand-written serializer usually emits:
+  a first line that is indented needs an explicit indentation indicator
+  (`|2-`), trailing blank lines need keep-chomping (`|+`), and a tab or a CRLF
+  cannot be a literal block at all and must fall back to a double-quoted
+  scalar. A prompt containing `---` / `...` is safely indented inside the block
+  and cannot start a new document. The library got all of them right; the point
+  of failure would have been silent - a corrupt file the user commits. Belt and
+  braces in `agentYaml()`: validate the object BEFORE serializing and re-parse
+  the emitted text AFTER, comparing the round-tripped prompt.
 
 ## Recurring Errors & Fixes
 

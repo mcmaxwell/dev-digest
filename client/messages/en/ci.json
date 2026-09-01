@@ -11,7 +11,10 @@
       "last7Days": "Last 7 days",
       "allAgents": "All agents",
       "allRepos": "All repos",
-      "allStatuses": "All statuses"
+      "allStatuses": "All statuses",
+      "last24Hours": "Last 24 hours",
+      "last30Days": "Last 30 days",
+      "allTime": "All time"
     },
     "table": {
       "timestamp": "Timestamp",
@@ -27,7 +30,8 @@
       "noFindings": "No findings",
       "failed": "Failed",
       "running": "Running"
-    }
+    },
+    "pullRequestCell": "{repo} #{number}"
   },
   "exportWizard": {
     "title": "Export to CI",
@@ -41,7 +45,8 @@
       "target": "Target",
       "preview": "Preview",
       "configure": "Configure",
-      "install": "Install"
+      "install": "Install",
+      "previewInstall": "Preview & install"
     },
     "targets": {
       "gha": "GitHub Actions",
@@ -72,7 +77,27 @@
     "installCardTitle": "Open a PR with these files",
     "installCardBody": "DevDigest opens a PR in {repo} titled “Add DevDigest CI review” with the {count} generated files.",
     "ownerRepo": "owner/repo",
-    "secretNote": "Add {key} to the repo's Actions secrets before the workflow runs."
+    "secretNote": "Add {key} to the repo's Actions secrets before the workflow runs.",
+    "unavailable": "not yet available",
+    "triggers": {
+      "opened": "Pull request opened",
+      "synchronize": "New commits pushed",
+      "reopened": "Pull request reopened"
+    },
+    "triggerHint": "Pick at least one event, or the workflow never fires.",
+    "generateFailed": "Could not generate the bundle.",
+    "retry": "Try again",
+    "copy": "Copy",
+    "copied": "Copied",
+    "download": "Download",
+    "fileCount": "{count, plural, one {# file} other {# files}}",
+    "noSkillsNote": "This agent has no skills attached, so the bundle is the workflow and the manifest.",
+    "done": "Done",
+    "runnerNoteTitle": "The workflow runs on a self-hosted runner",
+    "runnerNoteBody": "It needs a runner labelled devdigest that can reach this DevDigest API, with the devdigest CLI on its PATH ($DEVDIGEST_CLI overrides the command). The review, the posting and the recording all happen server-side, so no key and no token live in the repository - and GitHub's own guidance is that self-hosted runners belong on private repositories.",
+    "installFailed": "Could not open the pull request.",
+    "installedTitle": "Installed",
+    "repoRequired": "Name the repository to install into, as owner/name."
   },
   "ciTab": {
     "heading": "Continuous Integration",
@@ -82,7 +107,14 @@
     "update": "Update CI",
     "noRepo": "Connect a repository first",
     "empty": "Not deployed to CI yet. Use “Publish to CI” to open a PR that adds the workflow + agent config.",
-    "installed": "installed {date}"
+    "installed": "installed {date}",
+    "explainer": "Export turns this agent into plain files you can commit: a manifest that is the agent - model, prompt, skills and gate policy - one Markdown file per attached skill, and a GitHub Actions workflow.",
+    "pointNoWrite": "Install opens a pull request with these files in the repository you name. Nothing else is written, and nothing changes until you merge it.",
+    "pointNoState": "Every repository you install into is listed here with its date, and each CI review lands on the CI Runs page.",
+    "activeIn": "Active in {count, plural, one {# repo} other {# repos}}",
+    "failOnLabel": "Fail CI on",
+    "failOnHint": "Which findings block the pull request. The same setting as Fail CI on under Config.",
+    "failOnSaving": "Saving…"
   },
   "publishDialog": {
     "title": "Publish to CI",

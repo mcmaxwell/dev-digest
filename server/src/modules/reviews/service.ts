@@ -6,6 +6,8 @@ import type {
   FindingActionKind,
   MultiAgentRun,
   MultiAgentRunSummary,
+  ReviewDiffRequest,
+  ReviewDiffResponse,
   RunEventKind,
   RunTrace,
 } from '@devdigest/shared';
@@ -15,6 +17,7 @@ import { ReviewRepository } from './repository.js';
 import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
+import { reviewDiff } from './diff-review.js';
 import { findingRowToDto, reviewToDto } from './helpers.js';
 import {
   byAgentOrder,
@@ -171,6 +174,23 @@ export class ReviewService {
     });
 
     return { runs, reviews: [] };
+  }
+
+  /**
+   * Review a raw unified diff that belongs to no pull request (L04) - what the
+   * pre-push CLI and the CI ingest call. The implementation stays a free
+   * function in ./diff-review.ts because it shares none of this class's
+   * run/SSE/persistence machinery; this method is the seam another module
+   * composes it through.
+   */
+  diff(
+    workspaceId: string,
+    body: ReviewDiffRequest,
+    // Narrower than this file's `Logger` (it only ever logs `info`), and
+    // derived rather than restated so the two cannot drift apart.
+    logger?: Parameters<typeof reviewDiff>[3],
+  ): Promise<ReviewDiffResponse> {
+    return reviewDiff(this.container, workspaceId, body, logger);
   }
 
   // ===========================================================================

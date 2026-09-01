@@ -88,10 +88,17 @@ export async function hasCommits(root: string): Promise<boolean> {
 export async function collectDiff(root: string, diffArgs: string[]): Promise<WorkingTree> {
   const diff = await git(root, [
     'diff',
-    ...diffArgs,
     '--no-color',
     '--no-ext-diff',
     '-U3',
+    // `--end-of-options` BEFORE the refs, and the refs after it. `execFile`
+    // stops a shell from seeing this, but not git: a rev beginning with a dash
+    // is parsed as an OPTION, and `--base=--output=/path` writes the diff to
+    // that path while `--base=--src-prefix=z/` yields an empty diff and exit 0
+    // - a silent "no changes to review" in CI. Both were reproduced against
+    // real git before this line existed.
+    '--end-of-options',
+    ...diffArgs,
     '--',
   ]);
   const untracked = (await git(root, ['ls-files', '--others', '--exclude-standard']))

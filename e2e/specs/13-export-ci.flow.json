@@ -1,0 +1,214 @@
+{
+  "name": "Export to CI: the agent's CI tab and the three-step wizard",
+  "description": "L06 export-ci. Opens a seeded agent's CI tab and walks the wizard end to end: the target step preselects GitHub Actions and shows the other three as unavailable (AC-4, AC-5), the configure step carries the default triggers and post-as (AC-7, AC-9), and Continue generates a real bundle whose files are listed by path with the workflow already open (AC-10, AC-20, AC-21) and copy/download offered for it (AC-22). Read-only: a bundle is a pure derivation and persists nothing, so the flow is re-runnable against a stack it does not own and leaves no rows behind. Not asserted here, because agent-browser has no negative locator: that Continue is DISABLED with every trigger deselected (AC-8) and that the CI tab claims no installation (AC-3) - both live in the client suite.",
+  "steps": [
+    {
+      "cmd": [
+        "open",
+        "{BASE}/agents"
+      ],
+      "label": "load the agents page"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "agents fetch settles"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Flags secrets, injection, SSRF and the lethal trifecta before merge.",
+        "click"
+      ],
+      "label": "open the seeded agent by its card description (its NAME also sits in the breadcrumb, so the name alone is ambiguous)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/agents/"
+      ],
+      "label": "agent editor route reached"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "agent fetch settles"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "CI"
+      ],
+      "label": "switch to the CI tab (AC-1)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "tab=ci"
+      ],
+      "label": "CI tab is active in the URL"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Install opens a pull request"
+      ],
+      "label": "the tab says what installing does before anything is written"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Export to CI"
+      ],
+      "label": "open the wizard (AC-2)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Run Security Reviewer automatically on pull requests"
+      ],
+      "label": "wizard opened on the target step"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "recommended"
+      ],
+      "label": "GitHub Actions is the recommended target (AC-4)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "not yet available"
+      ],
+      "label": "the other targets are marked unavailable (AC-5)"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Continue"
+      ],
+      "label": "advance to the configure step"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Pull request opened"
+      ],
+      "label": "trigger choices render (AC-7)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "GitHub review"
+      ],
+      "label": "post-as choices render (AC-9)"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Continue"
+      ],
+      "label": "generate the bundle"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "the ci-bundle request settles"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        ".github/workflows/devdigest-review.yml"
+      ],
+      "label": "the workflow is listed (AC-10, AC-20)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        ".devdigest/agents/security-reviewer.yaml"
+      ],
+      "label": "the manifest is listed (AC-10)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "name: DevDigest Review"
+      ],
+      "label": "the workflow is the file already open (AC-21)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "The workflow runs on a self-hosted runner"
+      ],
+      "label": "the runner requirement is stated up front, not discovered on the first failed run (supersedes AC-17)"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Copy"
+      ],
+      "label": "the copy control is offered for the shown file (AC-22)"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        ".devdigest/agents/security-reviewer.yaml",
+        "click"
+      ],
+      "label": "switch the preview to the manifest"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "system_prompt:"
+      ],
+      "label": "the manifest contents render in the pane"
+    }
+  ]
+}
