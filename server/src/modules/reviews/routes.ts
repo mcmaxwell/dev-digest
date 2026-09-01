@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { ReviewDiffRequest, ReviewDiffResponse, RunRequest } from '@devdigest/shared';
+import { MultiAgentRunRequest, ReviewDiffRequest, ReviewDiffResponse, RunRequest } from '@devdigest/shared';
 import type { RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
@@ -17,12 +17,32 @@ import { DIFF_REVIEW_BODY_LIMIT_BYTES } from './constants.js';
  *   GET    /runs/:id/events                            → SSE stream of RunEvent (replay-first)
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
+ *   GET    /agents/:id/runs    ?limit&before                → one agent's own run log (L07)
+ *   POST   /pulls/:id/multi-agent-run  {agent_ids}         → fan one PR out to N agents (L07)
+ *   GET    /multi-agent-runs/:id                           → header + columns + clusters
+ *   GET    /repos/:id/multi-agent-runs ?limit              → a repo's recent runs (headers only)
+ *   GET    /agents/run-estimates                           → every enabled agent's pre-run estimate
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
 
 /** RunRequest, but tolerant of a missing/null body (both fields are optional). */
 const RunBody = z.preprocess((v) => v ?? {}, RunRequest);
+
+/**
+ * `GET /agents/:id/runs` paging. `limit` is coerced because a querystring is
+ * always strings; `before` is the `ran_at` of the oldest row already shown and
+ * is exclusive, so a load-more never repeats a row.
+ */
+const AgentRunsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(50),
+  before: z.string().datetime().optional(),
+});
+
+/** `GET /repos/:id/multi-agent-runs` paging. The 20-row cap IS the whole list. */
+const RepoMultiAgentRunsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
 
 export default async function reviewsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
@@ -149,6 +169,21 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     return service.listRuns(workspaceId, req.params.id);
   });
 
+  // ---- One agent's own run log (the agent editor's Runs tab) --------------
+  // One request, at most 50 rows, no per-run follow-up: the trace is fetched
+  // only when a row opens the drawer.
+  app.get(
+    '/agents/:id/runs',
+    { schema: { params: IdParams, querystring: AgentRunsQuery } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return service.listRunsForAgent(workspaceId, req.params.id, {
+        limit: req.query.limit,
+        ...(req.query.before !== undefined ? { before: req.query.before } : {}),
+      });
+    },
+  );
+
   // ---- Delete one run from the history (+ its trace) ----------------------
   app.delete('/runs/:id', { schema: { params: IdParams } }, async (req) => {
     const { workspaceId } = await getContext(container, req);
@@ -169,6 +204,61 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     const trace = await service.getRunTrace(req.params.id);
     if (!trace) throw new NotFoundError('Run trace not found');
     return trace;
+  });
+
+  // ---- L07: multi-agent runs ---------------------------------------------
+  //
+  // 4/min, the TIGHTEST limit on this API, shared with `POST /reviews/diff` and
+  // `POST /agents/:id/eval-runs` and chosen there for exactly this reason: one
+  // request fans out into N billable model calls.
+  //
+  // Deliberately NOT behind the job runner. `JobRunner.enqueue` wraps every
+  // handler in `withRetry` at a default of 2, so a throw after a successful
+  // model call would re-issue and re-bill every call the first attempt made.
+  //
+  // "At least two agents" is enforced by the SCHEMA (`agent_ids.min(2)`), so a
+  // one-agent request is a 422 before the handler runs.
+  app.post(
+    '/pulls/:id/multi-agent-run',
+    {
+      schema: { params: IdParams, body: MultiAgentRunRequest },
+      config: { rateLimit: { max: 4, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const { workspaceId } = await getContext(container, req);
+      const run = await service.startMultiAgentRun(
+        workspaceId,
+        req.params.id,
+        req.body.agent_ids,
+        req.log,
+      );
+      reply.status(201);
+      return run;
+    },
+  );
+
+  // The WHOLE results screen in one request: header, columns and clusters.
+  app.get('/multi-agent-runs/:id', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    return service.getMultiAgentRun(workspaceId, req.params.id);
+  });
+
+  // A repository's recent multi-agent runs (amendment 01 - the landing page).
+  // HEADERS ONLY: no column, no cluster, no finding.
+  app.get(
+    '/repos/:id/multi-agent-runs',
+    { schema: { params: IdParams, querystring: RepoMultiAgentRunsQuery } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return service.listMultiAgentRunsForRepo(workspaceId, req.params.id, req.query.limit);
+    },
+  );
+
+  // Every enabled agent's pre-run estimate, from recorded history only - so the
+  // configure screen issues NO request when a checkbox is toggled.
+  app.get('/agents/run-estimates', async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    return service.agentRunEstimates(workspaceId);
   });
 
   // ---- Reads --------------------------------------------------------------

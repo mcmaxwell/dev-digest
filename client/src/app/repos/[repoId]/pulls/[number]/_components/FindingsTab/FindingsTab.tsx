@@ -26,6 +26,8 @@ interface FindingsTabProps {
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
+  /** L07 - open the results of one multi-agent run from the timeline group. */
+  onOpenMultiAgentRun?: (multiAgentRunId: string) => void;
 }
 
 export function FindingsTab({
@@ -43,6 +45,7 @@ export function FindingsTab({
   onOpenTrace,
   onDelete,
   onRunDone,
+  onOpenMultiAgentRun,
 }: FindingsTabProps) {
   const handleCancelAll = useCallback(() => {
     liveRunIds.forEach((id) => cancelMutation.mutate(id));
@@ -124,6 +127,7 @@ export function FindingsTab({
             onOpenTrace={onOpenTrace}
             onGoToReview={handleGoToReview}
             onDelete={onDelete}
+            {...(onOpenMultiAgentRun ? { onOpenMultiAgentRun } : {})}
           />
         </div>
       )}

@@ -1,7 +1,7 @@
-import { and, count, desc, eq, inArray, isNotNull, max, sum } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, lt, max, sum } from 'drizzle-orm';
 import type { Db, DbOrTx } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
-import type { RunSummary, RunTrace, SeverityCounts } from '@devdigest/shared';
+import type { AgentRunsPage, RunSummary, RunTrace, SeverityCounts } from '@devdigest/shared';
 import { rollupSeverities } from '../../_shared/severity.js';
 
 // ---- in-flight / history --------------------------------------------------
@@ -83,6 +83,10 @@ export async function listRunsForPull(
 
   return rows.map(({ run, agentName }) => ({
     run_id: run.id,
+    // L07 - non-null for a run that belongs to a multi-agent run, which is what
+    // lets the timeline group N rows sharing one timestamp into one entry
+    // without a second request.
+    multi_agent_run_id: run.multiAgentRunId,
     agent_id: run.agentId,
     agent_name: agentName ?? null,
     provider: run.provider,
@@ -100,6 +104,61 @@ export async function listRunsForPull(
     score: run.score,
     blockers: run.blockers,
   }));
+}
+
+/**
+ * One page of ONE agent's runs, newest first - the agent editor's Runs tab.
+ *
+ * The `id` tiebreak is not decoration: every fan-out creates its rows in one
+ * pass, so two runs routinely share a `ran_at` to the microsecond, and without
+ * a second sort key Postgres is free to return them in a different order on
+ * every read.
+ *
+ * `has_more` comes from selecting one row past the limit rather than a second
+ * COUNT query. `before` is exclusive, so a load-more never repeats a row.
+ */
+export async function listRunsForAgent(
+  db: Db,
+  workspaceId: string,
+  agentId: string,
+  opts: { limit: number; before?: string },
+): Promise<AgentRunsPage> {
+  const where = [eq(t.agentRuns.workspaceId, workspaceId), eq(t.agentRuns.agentId, agentId)];
+  if (opts.before) where.push(lt(t.agentRuns.ranAt, new Date(opts.before)));
+
+  const rows = await db
+    .select({
+      run: t.agentRuns,
+      prNumber: t.pullRequests.number,
+      prTitle: t.pullRequests.title,
+    })
+    .from(t.agentRuns)
+    // LEFT join: `agent_runs.pr_id` is ON DELETE set null, so a run outlives its
+    // pull request and must still appear in the list.
+    .leftJoin(t.pullRequests, eq(t.pullRequests.id, t.agentRuns.prId))
+    .where(and(...where))
+    .orderBy(desc(t.agentRuns.ranAt), desc(t.agentRuns.id))
+    .limit(opts.limit + 1);
+
+  const hasMore = rows.length > opts.limit;
+  return {
+    runs: rows.slice(0, opts.limit).map(({ run, prNumber, prTitle }) => ({
+      run_id: run.id,
+      ran_at: run.ranAt.toISOString(),
+      pr_id: run.prId,
+      pr_number: prNumber ?? null,
+      pr_title: prTitle ?? null,
+      status: run.status,
+      error: run.error,
+      findings_count: run.findingsCount,
+      blockers: run.blockers,
+      score: run.score,
+      duration_ms: run.durationMs,
+      cost_usd: run.costUsd,
+      source: run.source,
+    })),
+    has_more: hasMore,
+  };
 }
 
 /**
@@ -220,15 +279,22 @@ export async function reapStaleRunningRuns(db: Db): Promise<number> {
 
 // ---- observability: agent_runs + run_traces -------------------------------
 
-/** Create an agent_runs row in `running` state; returns its id (= the runId). */
+/**
+ * Create an agent_runs row in `running` state; returns its id (= the runId).
+ *
+ * Takes a `DbOrTx` because L07 creates the grouping row and its N member runs
+ * in ONE transaction; every existing caller passes nothing and gets today's
+ * behaviour. `multiAgentRunId` is likewise absent for a single-agent run.
+ */
 export async function createAgentRun(
-  db: Db,
+  db: DbOrTx,
   values: {
     workspaceId: string;
     agentId: string | null;
     prId: string;
     provider: string | null;
     model: string | null;
+    multiAgentRunId?: string | null;
   },
 ): Promise<string> {
   const [row] = await db
@@ -239,6 +305,7 @@ export async function createAgentRun(
       prId: values.prId,
       provider: values.provider,
       model: values.model,
+      multiAgentRunId: values.multiAgentRunId ?? null,
       status: 'running',
       source: 'local',
     })

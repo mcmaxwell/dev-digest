@@ -77,7 +77,42 @@ const commitRowStyle: React.CSSProperties = {
 
 type TimelineItem =
   | { kind: "run"; ts: number; run: RunSummary }
+  /**
+   * L07 - the N runs of ONE multi-agent run, as ONE entry.
+   *
+   * A fan-out lands N rows at a single timestamp, which reads as N unrelated
+   * reviews that happened to arrive together rather than as the one action it
+   * was. Grouping them is what makes the timeline honest.
+   */
+  | { kind: "multi"; ts: number; multiAgentRunId: string; runs: RunSummary[] }
   | { kind: "commit"; ts: number; commit: PrCommit };
+
+/**
+ * Split the runs into the ones that belong to a multi-agent run and the rest.
+ *
+ * A group's timestamp is its EARLIEST member's: that is when the user pressed
+ * the button, which is what the entry is labelled with.
+ */
+function groupRuns(runs: RunSummary[]): TimelineItem[] {
+  const groups = new Map<string, RunSummary[]>();
+  const items: TimelineItem[] = [];
+  for (const run of runs) {
+    if (run.multi_agent_run_id) {
+      groups.set(run.multi_agent_run_id, [...(groups.get(run.multi_agent_run_id) ?? []), run]);
+    } else {
+      items.push({ kind: "run", ts: tsOf(run.ran_at), run });
+    }
+  }
+  for (const [multiAgentRunId, members] of groups) {
+    items.push({
+      kind: "multi",
+      ts: Math.min(...members.map((r) => tsOf(r.ran_at))),
+      multiAgentRunId,
+      runs: members,
+    });
+  }
+  return items;
+}
 
 /** Epoch ms for sorting; unparseable / missing timestamps sort last. */
 function tsOf(s: string | null | undefined): number {
@@ -93,6 +128,7 @@ export function RunHistory({
   onOpenTrace,
   onGoToReview,
   onDelete,
+  onOpenMultiAgentRun,
 }: {
   runs: RunSummary[];
   commits?: PrCommit[];
@@ -103,13 +139,19 @@ export function RunHistory({
   /** Jump to this run's inline review accordion below (clicking the agent name). */
   onGoToReview?: (runId: string) => void;
   onDelete?: (runId: string) => void;
+  /**
+   * L07 - open one multi-agent run's results. Absent means the group still
+   * renders as one entry, just without a destination; navigation belongs to the
+   * page, which knows the repository.
+   */
+  onOpenMultiAgentRun?: (multiAgentRunId: string) => void;
 }) {
   const t = useTranslations("prReview");
   const [hoverRunId, setHoverRunId] = React.useState<string | null>(null);
   if (runs.length === 0 && commits.length === 0) return null;
 
   const items: TimelineItem[] = [
-    ...runs.map((run) => ({ kind: "run" as const, ts: tsOf(run.ran_at), run })),
+    ...groupRuns(runs),
     ...commits.map((commit) => ({
       kind: "commit" as const,
       ts: tsOf(commit.committed_at),
@@ -149,6 +191,19 @@ export function RunHistory({
                 </span>
               )}
             </div>
+          );
+        }
+
+        if (item.kind === "multi") {
+          return (
+            <MultiAgentRunRow
+              key={`multi:${item.multiAgentRunId}`}
+              runs={item.runs}
+              ts={item.ts}
+              {...(onOpenMultiAgentRun
+                ? { onOpen: () => onOpenMultiAgentRun(item.multiAgentRunId) }
+                : {})}
+            />
           );
         }
 
@@ -268,6 +323,63 @@ export function RunHistory({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The N runs of one multi-agent run, as ONE timeline entry (L07, AC-27/AC-28).
+ *
+ * Labelled with how many agents took part and when the fan-out started, and it
+ * opens that run's results rather than any one agent's trace: the comparison is
+ * the thing the action produced, and the per-agent traces are reachable from
+ * there.
+ */
+function MultiAgentRunRow({
+  runs,
+  ts,
+  onOpen,
+}: {
+  runs: RunSummary[];
+  ts: number;
+  onOpen?: () => void;
+}) {
+  const t = useTranslations("prReview");
+  const running = runs.some((r) => r.status === "running");
+  const allFailed = runs.length > 0 && runs.every((r) => r.status === "failed");
+  const findings = runs.reduce((n, r) => n + (r.findings_count ?? 0), 0);
+  const color = running ? "var(--accent)" : allFailed ? "var(--crit)" : "var(--ok)";
+  const bg = running ? "var(--accent-bg)" : allFailed ? "var(--crit-bg)" : "var(--ok-bg)";
+
+  return (
+    <div style={rowStyle}>
+      <Badge color={color} bg={bg} icon="Users">
+        {t("timeline.multiAgent.badge")}
+      </Badge>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+          {t("timeline.multiAgent.label", { count: runs.length })}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          {t("runStatus.findings", { count: findings })}
+        </div>
+      </div>
+      {ts > 0 && (
+        <span style={{ fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
+          {new Date(ts).toLocaleTimeString()}
+        </span>
+      )}
+      {onOpen && (
+        <button
+          type="button"
+          onClick={onOpen}
+          title={t("timeline.multiAgent.open")}
+          aria-label={t("timeline.multiAgent.open")}
+          style={iconBtnStyle}
+        >
+          <Icon.ArrowRight size={13} />
+        </button>
+      )}
     </div>
   );
 }

@@ -174,6 +174,19 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   non-deterministic in the size of the model's prose
   (`modules/onboarding/verify.ts::collectDraftPaths`).
 
+- [2026-08-31] To make "at most N agents run at once" a real assertion rather
+  than a hopeful one, count CONCURRENT provider calls in the integration test
+  with a shared `{ inFlight, peak }` object across every provider key in
+  `overrides.llm`, and make the stand-in `await` a real timer (~40 ms) inside
+  the counted region. Without the timer every task resolves before the next one
+  starts, so the peak reads 1 and the assertion passes against a SEQUENTIAL
+  implementation too. Watch it red by raising `REVIEW_FANOUT_CONCURRENCY` to 5
+  and confirming `expected 5 to be less than or equal to 3`
+  (`modules/reviews/multi-agent.it.test.ts`). All N `agent_runs` rows are
+  created up front with the same `ran_at`, so their recorded start times cannot
+  answer this question and no column was added to make them able to.
+
+
 ## What Doesn't Work
 
 - [2026-08-13] `scrubSecrets` (`platform/prompt-log.ts:42-51`) only knows
@@ -508,6 +521,19 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
   - a run whose installation is gone belongs to no workspace and must not fall
   into another one's list. Everything that starts from an agent id is scoped one
   layer up by `container.agentsRepo.getById(workspaceId, agentId)` instead.
+
+- [2026-08-31] A contract shape that has never had a consumer is NOT evidence it
+  describes the feature. L07's `AgentColumn` had sat in `contracts/observability.ts`
+  since A5 with `status: ['done','failed','running']` and NO `error` field, and
+  the implementation plan enumerated four contract edits without spotting the
+  second one. `agent_runs` has FOUR statuses (a user can cancel one agent
+  mid-run) and it records `error`, so a failed column had nothing to render in
+  place of its score - which is the whole of AC-39. The tell was an integration
+  assertion reading `expected undefined to be truthy`, not a type error: the
+  server built the column from a row that HAS the field and dropped it silently
+  on the way out. Before implementing against a pre-seeded contract, diff its
+  fields against the TABLE it summarises, field by field.
+
 
 ## Tool & Library Notes
 

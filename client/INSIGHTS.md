@@ -32,6 +32,24 @@ the root INSIGHTS.md. Format and quality gates:
     screen is `/repos/new`, and it is still a direct sibling under `src/app/`
     for the same reason.
 
+- [2026-08-31] A "fall back to a narrower layout" rule must be keyed on the
+  MEASURED container and the item COUNT, never on a viewport media query: five
+  agent columns overflowed a 1600px window (`scrollWidth 1548` against
+  `clientWidth 1278`) because the sidebar and the page padding eat the viewport
+  and the count decides the need. `MultiAgentResultsView.useColumnsFit` computes
+  `count x COLUMN_MIN_WIDTH + gaps <= measured width` and treats an unmeasured
+  width (0) as fitting, so the server render and the first client paint agree.
+  Measure with a CALLBACK ref (`useState<HTMLElement|null>` + an effect keyed on
+  the node), not `useRef`: the element mounts only after the data loads, so a
+  `[]` effect would measure `null` and never re-run. Pair it with
+  `flex: "1 1 0"` + `minWidth`, so the columns share the width instead of being
+  pinned to their minimum.
+- [2026-08-31] When a decorative visual repeats a number that is already on
+  screen as text (`CircularScore` beside `score 38`), wrap it in
+  `aria-hidden="true"` at the CALL SITE - `vendor/ui/**` is frozen, and a screen
+  reader otherwise reads the same score twice. The text stays the accessible
+  carrier, which is also what the AC is read from.
+
 ## What Doesn't Work
 
 - [2026-07-31] Don't reuse `AppShell`/`AppFrame` itself as a root `<Suspense>`
@@ -91,6 +109,18 @@ the root INSIGHTS.md. Format and quality gates:
   order from the PRODUCER (here `adapters/github/octokit.ts`, which returns
   `pulls.listCommits` untouched), never from the consumer, then confirm the
   assertion goes red before fixing the component.
+
+- [2026-08-31] A focus-return test that only focuses the OPENER before mounting
+  a drawer cannot fail: nothing inside `vendor/ui/kit/Drawer` autofocuses, so
+  the opener still holds focus after unmount whether or not the component
+  restores it. Proved by deleting the `opener.focus()` line in the effect and
+  watching the test stay green. Move focus INTO the drawer first
+  (`screen.getByRole("button", { name: "Close" }).focus()`), then unmount -
+  which is also the only sequence a real keyboard user produces. Same shape as
+  the `PrBriefCard` ordering trap above: any assertion about a restore, an
+  order, or a default must be watched red before it is trusted
+  (`components/run-trace-drawer/RunTraceDrawer.test.tsx`).
+
 
 ## Codebase Patterns
 
@@ -234,6 +264,34 @@ the root INSIGHTS.md. Format and quality gates:
   import, and the field itself stays single-sourced because both controls go
   through `useUpdateAgent`.
 
+- [2026-08-31] Reading `localStorage` for a remembered UI preference must happen
+  in an EFFECT, never in the `useState` initialiser: every route here is a
+  client component that Next still renders on the server, where `localStorage`
+  does not exist, and an initialiser that reads it makes the first client paint
+  disagree with the server HTML. `MultiAgentResultsView` starts at the default
+  and adopts the stored value in a mount effect
+  (`multi-agent/[runId]/.../helpers.ts::readViewMode`), and validates the stored
+  string against the allowed set rather than casting it - a stale value would
+  otherwise render neither view. Same shape the `dd-repo` / `dd-theme`
+  precedents use.
+- [2026-08-31] A pure transform that a route's `_components` owns becomes
+  unreachable the moment a SECOND route needs it, because `pnpm lint` rejects
+  the sibling `_components` import - and that is the moment to promote it, not
+  before. `evalCaseFromFinding` moved from
+  `pulls/[number]/_components/FindingsPanel/helpers.ts` to `lib/eval-case.ts`
+  when L07's results screen became the second surface offering "Turn into eval
+  case"; the old module re-exports it, so the existing call site and its test
+  were untouched. Re-exporting from the vacated file is what keeps such a
+  promotion a one-line diff at the old site instead of a rename sweep.
+  - [2026-08-31] The same rule, one level down: a shared piece that is NOT a
+    hook and NOT a pure lib util - L07's per-agent colour palette, painted by
+    both the configure screen and the results screen - goes to the nearest
+    common ancestor `_components/` as a plain module
+    (`multi-agent/_components/agent-colors.ts`), not to `lib/`. Re-export it
+    from the consuming feature's own `constants.ts` so the feature code still
+    has one import site.
+
+
 ## Tool & Library Notes
 
 - [2026-08-10] When testing that untrusted text cannot inject into a generated
@@ -309,6 +367,35 @@ the root INSIGHTS.md. Format and quality gates:
   `components/app-shell/helpers.test.ts`. Adding `aria-current="page"` to
   `NavItem` would make it observable, but `vendor/ui/**` is frozen except
   `nav.ts` data edits.
+
+- [2026-08-31] `@testing-library/user-event` is NOT a dependency of `client/`;
+  every suite here drives interaction with `fireEvent` from
+  `@testing-library/react`. A test written to the RTL house style
+  (`userEvent.setup()`) fails at COLLECTION with "Failed to resolve import", not
+  at an assertion, so it reads like a path bug. Use `fireEvent` rather than
+  adding the package for one test file.
+- [2026-08-31] `formatUsd` (`lib/format.ts`) renders sub-dollar amounts through
+  `Number(usd.toPrecision(2))`, so `0.2` prints as `$0.2`, NOT `$0.20`. Any test
+  asserting a cost string must copy the formatter's output, not the intuitive
+  currency spelling.
+- [2026-08-31] Two traps when a test asserts an inline style. jsdom normalises
+  colours, so `el.style.background` for `#ef4444` reads back as
+  `rgb(239, 68, 68)` and `toEqual("#ef4444")` fails against correct code - use
+  `expect(el).toHaveStyle({ background: hex })`, which normalises both sides, and
+  keep `el.style.background` only for "are these N values distinct". And the
+  DOM's `CSSStyleDeclaration` spells the clamp `webkitLineClamp` (lowercase w)
+  while React's `CSSProperties` spells it `WebkitLineClamp` - `pnpm test` passes
+  either way because the value is `undefined`; only `pnpm typecheck` catches it.
+- [2026-08-31] jsdom computes no layout, so any component that BRANCHES on a
+  measured box (`clientWidth` for a layout fallback, `scrollHeight >
+  clientHeight` for a "does this text overflow" clamp) reads 0 and takes the
+  default branch forever. Stub the getter on `HTMLElement.prototype` per test and
+  restore it in a `finally` (see `stubBox` in `MultiAgentResultsView.test.tsx`);
+  a global stub in `beforeEach` silently changes every other test in the file.
+  `ResizeObserver` is already a no-op stub in `src/test/setup.ts`, so the FIRST
+  measure is the only one a test ever sees - keep it outside the observer
+  callback.
+
 
 ## Recurring Errors & Fixes
 

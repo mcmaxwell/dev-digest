@@ -47,7 +47,7 @@ so must an mcp test that needs a live API.
 `server/src/modules/`: _shared, agents, blast, brief, conventions, eval, intent, onboarding, polling, project-context, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
 
 Registered statically in `server/src/modules/index.ts` (one import + one entry).
-Shared helpers live in `modules/_shared/`: context.ts, diff-loader.ts, hunk-map.ts, logger.ts, schemas.ts, severity.ts, skills.ts
+Shared helpers live in `modules/_shared/`: context.ts, diff-loader.ts, hunk-map.ts, logger.ts, overlap.ts, schemas.ts, severity.ts, skills.ts
 
 ## Mechanical boundary rules
 
@@ -56,7 +56,7 @@ or add an allowlist entry to fix a violation - fix the placement.
 
 | Config | Rules |
 |---|---|
-| `server/.dependency-cruiser.cjs` | routes-are-transport-only, queries-live-in-repositories, no-cross-module-imports, modules-use-ports-not-clients, platform-independent-of-modules, db-independent-of-modules |
+| `server/.dependency-cruiser.cjs` | routes-are-transport-only, eval-scoring-is-pure, multi-agent-clustering-is-pure, queries-live-in-repositories, no-cross-module-imports, modules-use-ports-not-clients, platform-independent-of-modules, db-independent-of-modules |
 | `reviewer-core/.dependency-cruiser.cjs` | core-has-no-io, core-has-no-db-or-server, vendor-sdks-confined-to-llm-adapters |
 | `mcp/.dependency-cruiser.cjs` | mcp-is-standalone, mcp-has-no-db-or-framework, tools-go-through-the-api-port, cli-goes-through-the-api-port, cli-does-not-import-the-mcp-server, no-circular |
 

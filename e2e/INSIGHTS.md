@@ -131,6 +131,16 @@ the root INSIGHTS.md. Format and quality gates:
   `git checkout --` them before doing anything else. They are the only tracked
   files the suite writes to.
 
+- [2026-08-31] A single flow failing with `Command failed: agent-browser find
+  ... click` on a DIFFERENT step each run is the 60 s `E2E_STEP_TIMEOUT`, not a
+  regression. `scripts/e2e.sh` warms the routes against `next dev`, and on a
+  cold machine `/repos/[repoId]/pulls/[number]` alone compiles for 16-18 s
+  (6800 modules); the first interaction inside it can then exceed the default.
+  Two runs failed flows 04 and 05 at three different steps; `E2E_STEP_TIMEOUT=120000
+  ./scripts/e2e.sh` went 12/12. Diagnose by re-running: a REAL breakage fails
+  the same step every time. Do not "fix" the flow spec.
+
+
 ## Session Notes
 
 - [2026-08-31] Intermittent, unreproduced: across four consecutive

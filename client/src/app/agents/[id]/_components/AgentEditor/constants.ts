@@ -7,12 +7,18 @@ export interface EditorTab {
   icon: IconName;
 }
 
-/** Editor tabs. L02 adds Skills; L06 adds Evals and CI; a later lesson adds Stats. */
+/** Editor tabs. L02 adds Skills; L06 adds Evals and CI; L07 adds Runs; a later
+    lesson adds Stats. Every entry here needs ONE more edit to actually open:
+    the branch in `AgentEditor.tsx`. The `?tab=` allowlist used to be a third
+    edit, hand-written in the route page, and missing it there rendered the tab,
+    set `?tab=`, and silently showed Config anyway. `VALID_TABS` below is now
+    derived from this list, so that failure mode is gone. */
 export const TABS: readonly EditorTab[] = [
   { key: "config", labelKey: "editor.tabs.config", icon: "Settings" },
   { key: "skills", labelKey: "editor.tabs.skills", icon: "Sparkles" },
   { key: "context", labelKey: "editor.tabs.context", icon: "FileText" },
   { key: "evals", labelKey: "editor.tabs.evals", icon: "FlaskConical" },
+  { key: "runs", labelKey: "editor.tabs.runs", icon: "History" },
   { key: "ci", labelKey: "editor.tabs.ci", icon: "Workflow" },
 ];
 

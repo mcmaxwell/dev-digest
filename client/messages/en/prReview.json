@@ -135,6 +135,11 @@
     "goToReview": "Jump to this run’s findings below",
     "openTrace": "Open run trace & logs",
     "deleteRun": "Delete run",
-    "runMeta": "{tokens} tok · {cost}"
+    "runMeta": "{tokens} tok · {cost}",
+    "multiAgent": {
+      "badge": "multi-agent",
+      "label": "{count, plural, one {# agent} other {# agents}} in parallel",
+      "open": "Open this multi-agent review"
+    }
   }
 }
