@@ -266,7 +266,7 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     ]);
   }
 
-  // ---- built-in agents (the three starter presets) ----
+  // ---- built-in agents (the starter presets) ----
   // Prompt bodies live in ./seed-prompts.ts (mirrored in docs/agent-prompts/*.md).
   const seedAgents: Array<typeof t.agents.$inferInsert> = [
     {
@@ -452,6 +452,309 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
         },
       })
       .onConflictDoNothing();
+  }
+
+  // ---- demo multi-agent run on its OWN pull request, #483 (L07) ----
+  // Gives /repos/:id/multi-agent something to show before the first real run,
+  // which needs a provider key and bills four model calls. Same reasoning as
+  // the seeded review above: the screen is demoable and the browser flow is
+  // deterministic without an LLM.
+  //
+  // It gets its own pull request rather than sharing #482 ON PURPOSE. The PR
+  // timeline is newest-first and its accordion opens the newest run, so four
+  // agent runs on #482 pushed the single seeded review out of the open slot
+  // and flow 04 stopped finding the finding it asserts on. #482 is fixed
+  // fixture data for flows 02/04/05/10; anything that adds runs to it changes
+  // what those flows see. A second pull request is free and touches nothing.
+  //
+  // Its title must not CONTAIN #482's, because flows 02 and 04 select that row
+  // with `find text`, which takes the first match.
+  //
+  // The four runs are chosen so the screen shows every state it can:
+  //   config.ts:12       only Security flags it  -> a divergence, but NOT a
+  //                      severity conflict, so the "show only conflicts"
+  //                      filter correctly hides it
+  //   webhooks.ts:62     CRITICAL vs WARNING     -> a real severity conflict
+  //   users.ts:45-52     CRITICAL vs WARNING     -> a second one
+  //   Test Quality       failed                  -> a failed column beside
+  //                      succeeded ones, contributing `no_opinion`
+  // The line numbers match this PR's patches below, so every finding anchors
+  // in the diff viewer.
+  let [maPr] = await db
+    .select()
+    .from(t.pullRequests)
+    .where(and(eq(t.pullRequests.repoId, repoId), eq(t.pullRequests.number, 483)));
+  if (!maPr) {
+    [maPr] = await db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId,
+        number: 483,
+        title: 'Harden the public webhook callback path',
+        author: 'dan.okonkwo',
+        branch: 'fix/webhook-callback-allowlist',
+        base: 'main',
+        headSha: 'b7c8d9e0f1a2',
+        additions: 42,
+        deletions: 8,
+        filesCount: 3,
+        status: 'needs_review',
+        body: 'Validate the webhook callback target and stop forwarding the account token to it.',
+      })
+      .returning();
+
+    await db.insert(t.prFiles).values([
+      {
+        prId: maPr!.id,
+        path: 'src/api/public/webhooks.ts',
+        additions: 24,
+        deletions: 6,
+        // The token-forwarding fetch lands on line 62 - the conflict below.
+        patch: [
+          '@@ -58,4 +58,9 @@',
+          ' export async function webhookHandler(req: Req, res: Res) {',
+          '-  const account = await db.accounts.find(req.accountId);',
+          '-  return res.status(202).end();',
+          '+  const target = req.body.callback_url;',
+          '+  const account = await db.accounts.find(req.accountId);',
+          '+  const token = account.apiToken;',
+          '+',
+          '+  await fetch(target, { headers: { Authorization: token } });',
+          '+  return res.status(202).end();',
+          ' }',
+        ].join('\n'),
+      },
+      {
+        prId: maPr!.id,
+        path: 'src/config.ts',
+        additions: 4,
+        deletions: 0,
+        // The `sk_live_` literal lands on line 12 - the divergence below.
+        patch: [
+          '@@ -8,5 +8,9 @@',
+          " import { env } from './env';",
+          ' ',
+          ' export const config = {',
+          '   port: Number(process.env.PORT ?? 3000),',
+          '+  stripeKey: "sk_live_51H8xq2Ka9Vn3PqLm7Rd0bZ4Xc",',
+          '+  webhookAllowlist: process.env.WEBHOOK_ALLOWLIST,',
+          '+  webhookTimeoutMs: 5_000,',
+          '+  redisUrl: process.env.REDIS_URL,',
+          ' };',
+        ].join('\n'),
+      },
+      {
+        prId: maPr!.id,
+        path: 'src/api/users.ts',
+        additions: 7,
+        deletions: 2,
+        // The per-user query lands on line 45 - the second conflict below.
+        patch: [
+          '@@ -42,6 +42,11 @@',
+          ' export async function listUsers(req: Req, res: Res) {',
+          ' ',
+          '   const users = await db.users.findMany();',
+          '-  const result = users.map(toDto);',
+          '-  return res.json(result);',
+          '+  const result = [];',
+          '+  for (const u of users) {',
+          '+    const orders = await db.orders.findByUser(u.id);',
+          '+    result.push({ ...toDto(u), orderCount: orders.length });',
+          '+  }',
+          '+',
+          '+  return res.json(result);',
+          ' }',
+        ].join('\n'),
+      },
+    ]);
+
+    await db.insert(t.prCommits).values({
+      prId: maPr!.id,
+      sha: 'b7c8d9e0f1a2',
+      message: 'Allowlist webhook callback hosts',
+      author: 'dan.okonkwo',
+    });
+  }
+
+  const [existingMultiRun] = await db
+    .select()
+    .from(t.multiAgentRuns)
+    .where(and(eq(t.multiAgentRuns.workspaceId, workspaceId), eq(t.multiAgentRuns.prId, maPr!.id)));
+  if (!existingMultiRun) {
+    const agentRows = await db
+      .select()
+      .from(t.agents)
+      .where(eq(t.agents.workspaceId, workspaceId));
+    const byName = new Map(agentRows.map((a) => [a.name, a]));
+
+    /** One seeded column: the run, its review, and the findings under it. */
+    interface SeedColumn {
+      agentName: string;
+      status: 'done' | 'failed';
+      error?: string;
+      score?: number;
+      durationMs?: number;
+      costUsd?: number;
+      verdict?: string;
+      summary?: string;
+      findings?: Array<Omit<typeof t.findings.$inferInsert, 'reviewId'>>;
+    }
+
+    const columns: SeedColumn[] = [
+      {
+        agentName: 'Security Reviewer',
+        status: 'done',
+        score: 54,
+        durationMs: 41_200,
+        costUsd: 0.0212,
+        verdict: 'request_changes',
+        summary:
+          'The callback is still not allowlisted, and the account API token is handed to whatever host the caller names. A live Stripe key also sits in config.',
+        findings: [
+          {
+            file: 'src/api/public/webhooks.ts',
+            startLine: 62,
+            endLine: 62,
+            severity: 'CRITICAL',
+            category: 'security',
+            title: 'Account API token sent to a caller-controlled URL',
+            rationale:
+              'callback_url comes from the request body and is fetched with the account token in the Authorization header, so a caller can name any host and receive the credential.',
+            suggestion: 'Allowlist the callback host and never forward the account token to it.',
+            confidence: 0.94,
+          },
+          {
+            file: 'src/config.ts',
+            startLine: 12,
+            endLine: 12,
+            severity: 'CRITICAL',
+            category: 'security',
+            title: 'Hardcoded Stripe secret key in config',
+            rationale: 'Line 12 contains a literal `sk_live_` Stripe secret key.',
+            suggestion: 'Move to env var and rotate the key immediately.',
+            confidence: 0.98,
+          },
+        ],
+      },
+      {
+        agentName: 'General Reviewer',
+        status: 'done',
+        score: 71,
+        durationMs: 28_400,
+        costUsd: 0.0148,
+        verdict: 'comment',
+        summary:
+          'The allowlist config is in place but nothing reads it yet, and the user list still does per-row queries.',
+        findings: [
+          {
+            file: 'src/api/public/webhooks.ts',
+            startLine: 62,
+            endLine: 62,
+            severity: 'WARNING',
+            category: 'correctness',
+            title: 'Callback URL is still unvalidated',
+            rationale: 'webhookAllowlist is added to config but never consulted before the fetch.',
+            suggestion: 'Check the target host against the allowlist before calling it.',
+            confidence: 0.72,
+          },
+          {
+            file: 'src/api/users.ts',
+            startLine: 45,
+            endLine: 52,
+            severity: 'WARNING',
+            category: 'perf',
+            title: 'Per-user query inside the list loop',
+            rationale: 'The loop issues one orders query per user.',
+            suggestion: 'Batch the orders lookup.',
+            confidence: 0.81,
+          },
+        ],
+      },
+      {
+        agentName: 'Performance Reviewer',
+        status: 'done',
+        score: 63,
+        durationMs: 33_100,
+        costUsd: 0.0163,
+        verdict: 'request_changes',
+        summary:
+          'The N+1 in the user list is the blocker: this endpoint is on the hot path and the per-row query multiplies with every user.',
+        findings: [
+          {
+            file: 'src/api/users.ts',
+            startLine: 45,
+            endLine: 52,
+            severity: 'CRITICAL',
+            category: 'perf',
+            title: 'N+1 query in user list endpoint',
+            rationale:
+              'One orders query per user on a hot endpoint. At a few hundred users this is already thousands of queries per minute.',
+            suggestion: 'Use a single IN query and group in memory.',
+            confidence: 0.91,
+          },
+        ],
+      },
+      {
+        agentName: 'Test Quality Reviewer',
+        status: 'failed',
+        error: 'provider returned 429 (rate limited) after 3 retries',
+      },
+    ];
+
+    const [multiRun] = await db
+      .insert(t.multiAgentRuns)
+      .values({ workspaceId, prId: maPr!.id })
+      .returning();
+
+    for (const col of columns) {
+      const agent = byName.get(col.agentName);
+      if (!agent) continue;
+
+      const [run] = await db
+        .insert(t.agentRuns)
+        .values({
+          workspaceId,
+          agentId: agent.id,
+          prId: maPr!.id,
+          multiAgentRunId: multiRun!.id,
+          provider: agent.provider,
+          model: agent.model,
+          status: col.status,
+          error: col.error ?? null,
+          score: col.score ?? null,
+          durationMs: col.durationMs ?? null,
+          costUsd: col.costUsd ?? null,
+          findingsCount: col.findings?.length ?? null,
+          source: 'local',
+        })
+        .returning();
+
+      // A failed run has no review and no findings - that is what makes its
+      // column read `no_opinion` rather than `did_not_flag`.
+      if (col.status !== 'done') continue;
+
+      const [review] = await db
+        .insert(t.reviews)
+        .values({
+          workspaceId,
+          prId: maPr!.id,
+          agentId: agent.id,
+          runId: run!.id,
+          kind: 'review',
+          verdict: col.verdict ?? null,
+          summary: col.summary ?? null,
+          score: col.score ?? null,
+          model: agent.model,
+        })
+        .returning();
+
+      if (col.findings?.length) {
+        await db
+          .insert(t.findings)
+          .values(col.findings.map((f) => ({ ...f, reviewId: review!.id })));
+      }
+    }
   }
 
   // ---- demo conventions + their scan (L02 conventions extractor) ----

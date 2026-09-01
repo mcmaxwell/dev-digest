@@ -189,6 +189,19 @@ gates: `.claude/skills/engineering-insights/SKILL.md`.
 
 ## What Doesn't Work
 
+- [2026-09-01] Seeded PR #482 is FIXED FIXTURE DATA for browser flows 02, 04, 05
+  and 10 - never add agent runs to it. Attaching a demo multi-agent run's four
+  `agent_runs` there turned flows 04 and 10 red: the PR timeline is newest-first
+  and its accordion opens the NEWEST run, so the page began opening a failed run
+  with no findings instead of the single seeded review, and
+  `wait --text "Hardcoded Stripe secret key in commit"` stopped matching. The
+  break surfaced one step LATE and read as unrelated, because that flow's earlier
+  assertions (`request changes`, `2 findings`) still matched text in OTHER,
+  collapsed rows - so the first red step is not the cause. A demo run gets its
+  OWN pull request (#483 in `seed.ts`), and its title must not CONTAIN #482's,
+  because flows 02/04 select that row with `find text`, which takes the first
+  match in document order.
+
 - [2026-08-13] `scrubSecrets` (`platform/prompt-log.ts:42-51`) only knows
   OpenAI/Anthropic `sk-…`, GitHub `ghp_`/`github_pat_`, `Bearer`, AWS `AKIA`,
   PEM headers and JWTs. It does NOT match Stripe `sk_live_…`/`sk_test_…`, Slack
