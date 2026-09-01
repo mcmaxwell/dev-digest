@@ -1,0 +1,112 @@
+{
+  "name": "Multi-Agent Review: the grouped results screen and the conflicts filter",
+  "description": "L07 multi-agent review. Opens the seeded multi-agent run of PR #483 from the repository's Multi-Agent Review landing page and asserts what the screen exists to show: every agent that ran is present, the failed agent is represented as `no opinion (run failed)` rather than dropped, and 'Show only conflicts' keeps a real severity disagreement. Read-only: the pull request, its multi-agent run, the four agent runs and their findings are all seeded, so no model call happens and nothing is written. Two things are deliberately NOT asserted. First, the section heading 'Where agents disagree': `wait --text` substring-matches Chrome's innerText, which APPLIES text-transform, and that heading is styled `textTransform: uppercase` (styles.ts sectionTitle), so it is only ever on the page as WHERE AGENTS DISAGREE - matching the source casing is impossible and matching the uppercased form would pin a test to a CSS choice. The three assertions below all sit in the same section and prove it rendered. Second, that the filter HIDES the src/config.ts cluster, which only one agent flagged - a divergence, not a disagreement: agent-browser has no negative locator, so that case is pinned in the client suite. Assertions also avoid any agent column body: at the runner's viewport four agents do not fit, so `effectiveView` falls back from columns to tabs and only the selected agent's body renders.",
+  "steps": [
+    {
+      "cmd": [
+        "open",
+        "{BASE}/"
+      ],
+      "label": "load the app root"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls"
+      ],
+      "label": "shell settles on the active repo, which is what fills :repoId in the nav"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Multi-Agent Review",
+        "click"
+      ],
+      "label": "open Multi-Agent Review from the sidebar (only the nav carries this text on the PR list)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/multi-agent"
+      ],
+      "label": "landing route reached"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "recent-runs fetch settles"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Recent runs"
+      ],
+      "label": "the landing list renders rather than the empty state"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Harden the public webhook callback path",
+        "click"
+      ],
+      "label": "open the seeded run by its pull request title (#483 - deliberately not #482, whose fixture data other flows assert on)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/multi-agent/"
+      ],
+      "label": "results route reached (the landing URL has no trailing segment, so this discriminates)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "the whole results document settles in one request"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Security Reviewer"
+      ],
+      "label": "every agent that ran is present on the screen"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "no opinion (run failed)"
+      ],
+      "label": "the agent whose run failed keeps a stance of its own, distinct from an agent that ran and stayed silent"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Show only conflicts",
+        "click"
+      ],
+      "label": "filter down to genuine severity disagreements"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "src/api/public/webhooks.ts"
+      ],
+      "label": "the CRITICAL-vs-WARNING disagreement survives the filter"
+    }
+  ]
+}

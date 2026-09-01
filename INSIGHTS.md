@@ -41,6 +41,17 @@ the matching one, never rewrite old entries. Package-specific lessons go to
 
 ## What Doesn't Work
 
+- [2026-09-01] A git worktree keeps the base it was created from, so "X does not
+  exist in this codebase" read out of one is only ever true OF THAT BASE. A
+  worktree cut at the PR-16 merge still had `multi_agent_runs` as a table nothing
+  wrote to, so grepping for its writers came back empty and the whole feature
+  looked unbuilt - while `origin/main` already had
+  `server/src/modules/reviews/repository/multi-agent.repo.ts:51` inserting into
+  it, merged as PR #17 with 99 files. ALWAYS `git fetch origin main` and grep the
+  REVISION (`git grep -n <symbol> origin/main -- <path>`) before telling anyone a
+  feature is missing, before planning to build it, and before spending a planner
+  on it. The cost of not doing so is a plan for work that already shipped.
+
 ## Codebase Patterns
 
 - [2026-08-14] A criterion of the form "the persisted prompt contains no line
@@ -78,6 +89,19 @@ the matching one, never rewrite old entries. Package-specific lessons go to
     generated and lists the CURRENT drift set (three files: `adapters.ts`,
     `contracts/eval-ci.ts`, `contracts/productionize.ts`) — read that rather
     than this bullet before choosing between `diff -q` and a symbol grep.
+  - [2026-09-01] The drift set is now ONE file, not three. `contracts/eval-ci.ts`
+    and `contracts/productionize.ts` are byte-identical again: both client copies
+    were missing `openrouter` from a `provider` enum - the repo's own seeded
+    `DEFAULT_PROVIDER` - so the client could not express the default provider in
+    `ConformanceInput` or `ProductionizeInput`. All 17 files under `contracts/`
+    now match, which makes a whole-DIRECTORY
+    `diff -r server/src/vendor/shared/contracts client/src/vendor/shared/contracts`
+    a valid cheap sweep (the whole-TREE comparison is still red). `adapters.ts`
+    stays drifted ON PURPOSE: its extra surface is server-only ports
+    (`CommitFilesPayload`, `commitFiles`, the OpenRouter `sessionId`), no client
+    code imports it, and copying it would push GitHub-write ports into the client
+    bundle. Regenerate `.claude/repo-facts.md` after changing the set - it names
+    the drifted files and told the previous reader not to fix these two.
 - [2026-08-10] The `@devdigest/shared` barrel does `export *` over every
   contract file, so a NEW contract file must not re-export a name it imports
   from a sibling - `contracts/blast.ts` builds on `BlastCaller` /

@@ -202,10 +202,15 @@ for path in \
   "/repos/new" \
   "/settings/api-keys" \
   "/settings/models" \
+  "/agents/${WARM_ID}" \
+  "/ci-runs" \
   "/repos/${WARM_ID}/pulls" \
   "/repos/${WARM_ID}/pulls/1" \
   "/repos/${WARM_ID}/context" \
   "/repos/${WARM_ID}/onboarding" \
+  "/repos/${WARM_ID}/multi-agent" \
+  "/repos/${WARM_ID}/multi-agent/new" \
+  "/repos/${WARM_ID}/multi-agent/${WARM_ID}" \
 ; do
   # -m 180: a cold compile of a heavy route can genuinely take minutes on a
   # loaded machine. Failure is not fatal — a route that will not compile fails

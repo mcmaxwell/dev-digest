@@ -49,6 +49,16 @@ the root INSIGHTS.md. Format and quality gates:
   `messages/en/*.json` string are title-case. Same trap for any `filesCount`-style
   ICU plural rendered inside one (`"FILES CHANGED · 9 FILES"`). Failure looks
   like a missing element, not a case mismatch, so check the CSS before the copy.
+  - [2026-09-01] Hit again in a new flow, so treat this as the FIRST thing to
+    check when `wait --text` cannot find text you can see: `conflicts.title`
+    ("Where agents disagree") is uppercased by
+    `MultiAgentResultsView/styles.ts:194`, so that string is only ever on the
+    page as WHERE AGENTS DISAGREE. Prefer a different remedy to the uppercase
+    spelling suggested above: assert a SIBLING string in the same section that
+    carries no transform (flow 14 uses `no opinion (run failed)` and
+    `src/api/public/webhooks.ts`). Spelling the assertion in caps pins the flow
+    to a CSS choice, and a later restyle turns it red for no real reason.
+    Grep the view's `styles.ts` for `textTransform` before picking the string.
 - [2026-08-09] A control that has scrolled ABOVE the fold is not reliably
   clickable by `find text|role … click`: agent-browser scrolls it to the top of
   the viewport, where the app's sticky header sits over it, and the click lands
@@ -120,6 +130,17 @@ the root INSIGHTS.md. Format and quality gates:
   nothing about the others under a lazily-compiling dev server, and the symptom
   it produces looks exactly like a selector or timing bug in whichever flow drew
   the short straw.
+  - [2026-09-01] The warm list is HAND-MAINTAINED and drifts: it was missing
+    `/agents/[id]`, `/ci-runs` and all three `/repos/[repoId]/multi-agent*`
+    patterns, every one of which flows 13 and 14 open. Add a new flow's route
+    patterns to the loop in `scripts/e2e.sh` in the SAME change as the flow.
+    But do NOT attribute every slow first request to a cold compile: with those
+    patterns warmed (the placeholder-uuid request served in 6112ms) a later real
+    request to the same pattern still took 64789ms once and blew the 60s
+    `E2E_STEP_TIMEOUT` (`e2e/run.ts:41`), then served in 1177ms and 65ms on the
+    next two runs of the same tree. Warming removes the compile cost, not the
+    machine-load stall, and in the log the two are indistinguishable - the only
+    way to tell them apart is to re-run and compare the served time.
 - [2026-08-14] **Killing an e2e run poisons the next one's baseline.**
   `scripts/e2e.sh` snapshots `client/next-env.d.ts` and `client/tsconfig.json`
   before `next dev` rewrites them for `.next-e2e`, and `cleanup()` restores them

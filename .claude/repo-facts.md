@@ -44,7 +44,7 @@ so must an mcp test that needs a live API.
 
 ## Server modules
 
-`server/src/modules/`: _shared, agents, blast, brief, conventions, eval, intent, onboarding, polling, project-context, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
+`server/src/modules/`: _shared, agents, blast, brief, ci, conventions, eval, intent, onboarding, polling, project-context, pulls, repo-intel, repos, reviews, settings, skills, smart-diff, workspace
 
 Registered statically in `server/src/modules/index.ts` (one import + one entry).
 Shared helpers live in `modules/_shared/`: context.ts, diff-loader.ts, hunk-map.ts, logger.ts, overlap.ts, schemas.ts, severity.ts, skills.ts
@@ -73,7 +73,7 @@ sides drift silently. There is no sync script.
 Files under `contracts/`: blast.ts, brief.ts, eval-ci.ts, eval-math.ts, eval-suite.ts, findings.ts, intent.ts, knowledge.ts, observability.ts, platform.ts, pr-brief.ts, productionize.ts, project-context.ts, review-api.ts, review-diff.ts, trace.ts, why.ts
 
 
-Already drifted, pre-existing, do not "fix" as a side quest: `adapters.ts` `contracts/eval-ci.ts` `contracts/productionize.ts` 
+Already drifted, pre-existing, do not "fix" as a side quest: `adapters.ts` 
 
 Verify a change with `diff -q` on the files you touched, never a
 whole-tree comparison - that is always red because of the drift above.
